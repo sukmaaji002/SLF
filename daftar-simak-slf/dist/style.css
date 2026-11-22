@@ -117,6 +117,9 @@ summary { cursor: pointer; font-weight: 700; }
 .photo-preview[hidden] { display: none; }
 .remove-sample { margin-top: 10px; }
 .reset-wrap { gap: 8px; flex-wrap: wrap; }
+.embedded-checklist .top, .embedded-checklist .footer, .embedded-checklist .hero { display: none; }
+.embedded-checklist .shell { width: calc(100% - 26px); }
+.embedded-checklist main { padding-top: 12px; }
 .item[hidden], .reset-wrap [hidden], .item-body button[hidden] { display: none; }
 @media (max-width: 650px) {
   .shell { width: calc(100% - 28px); }

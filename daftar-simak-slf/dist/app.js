@@ -1,7 +1,13 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
-const storageKey = "daftar-simak-slf:v2";
+const projectId = new URLSearchParams(location.search).get("proyek");
+const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
+const storageKey = "daftar-simak-slf:v2" + (projectMode ? ":" + projectId : "");
+const photoKey = (key) => projectMode ? projectId + ":" + key : key;
+if (projectMode && new URLSearchParams(location.search).has("embed")) {
+  document.body.classList.add("embedded-checklist");
+}
 const legacyKey = "daftar-simak-slf:v1";
 const yesNo = ["Ya", "Tidak"];
 const existence = ["Ada", "Tidak ada"];
@@ -62,7 +68,7 @@ function load(key) {
   }
 }
 
-const previous = load(legacyKey);
+const previous = projectMode ? null : load(legacyKey);
 let state = load(storageKey) ?? { identity: { ...previous?.building }, checks: {} };
 
 function save() {
@@ -212,7 +218,7 @@ async function photoStore(operation, key, value) {
     const tx = db.transaction("photos", operation === "get" ? "readonly" : "readwrite");
     const store = tx.objectStore("photos");
     const request = operation === "clear" ? store.clear() :
-      operation === "put" ? store.put(value, key) : store[operation](key);
+      operation === "put" ? store.put(value, photoKey(key)) : store[operation](photoKey(key));
     tx.oncomplete = () => resolve(request.result);
     tx.onabort = () => reject(tx.error);
   });
@@ -531,7 +537,13 @@ byId("reset").addEventListener("click", async () => {
   if (photoWrites || !window.confirm("Hapus identitas, hasil pemeriksaan, dan foto untuk formulir ini dari browser?")) return;
   try {
     if (Object.values(state.checks).some((check) => check.rows.some((row) => row.photo || row.ndtPhoto))) {
-      await photoStore("clear");
+      for (const [id, check] of Object.entries(state.checks)) {
+        for (const row of check.rows) {
+          for (const property of ["photo", "ndtPhoto"]) {
+            if (row[property]) await photoStore("delete", id + ":" + row.key + ":" + property);
+          }
+        }
+      }
     }
     state = { identity: {}, checks: {} };
     for (const item of items) {
