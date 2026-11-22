@@ -1,0 +1,469 @@
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const database = openStore("ruang-kajian-slf", "workspace");
+const preset = "disiplin";
+const editor = $("editor");
+const status = $("save-status");
+const dialog = $("preview-dialog");
+const reportUrls = [];
+let workspace;
+let active = "cover";
+let saving = 0;
+
+function heading(text) {
+  return { type: "heading", text, body: "" };
+}
+
+function draft(name, template) {
+  return {
+    id: crypto.randomUUID(), name, template,
+    cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
+    front: {},
+    chapters: reportTemplates[template].chapters.map(([title, ...sections]) => ({
+      title, checklist: sections.includes("@checklist"),
+      blocks: sections.filter((section) => section !== "@checklist").map(heading),
+    })),
+  };
+}
+
+const current = () => workspace.projects.find(({ id }) => id === workspace.current);
+
+async function save() {
+  const revision = ++saving;
+  status.textContent = "Menyimpan…";
+  try {
+    await storeValue(database, "workspace", "drafts", workspace);
+    if (revision === saving) status.textContent = "Tersimpan di browser ini";
+  } catch {
+    if (revision === saving) status.textContent = "Gagal menyimpan. Unduh cadangan sebelum menutup.";
+  }
+}
+
+function button(text, action, className = "") {
+  const control = dom("button", { type: "button", className }, text);
+  control.addEventListener("click", action);
+  return control;
+}
+
+function field(label, value, onInput, type = "text") {
+  const props = { value: value ?? "" };
+  const input = type === "area" ? dom("textarea", { ...props, rows: 4 }) : dom("input", { ...props, type });
+  input.addEventListener("input", () => onInput(input.value));
+  return dom("label", { className: type === "area" ? "wide" : "" }, dom("span", {}, label), input);
+}
+
+function boundField(data, key, label, type, changed = save) {
+  return field(label, data[key], (value) => { data[key] = value; changed(); }, type);
+}
+
+function setCurrent(id) {
+  workspace.current = id;
+  active = "cover";
+  const url = new URL(location.href);
+  url.searchParams.set("proyek", id);
+  history.replaceState(null, "", url);
+  save();
+  render();
+}
+
+function outlineEntry(label, id, marker) {
+  const control = button("", () => { active = id; render(); }, "outline-entry");
+  control.append(dom("span", { className: "nav-marker", ariaHidden: "true" }, marker), dom("span", {}, label));
+  if (active === id) control.setAttribute("aria-current", "page");
+  return control;
+}
+
+function renderOutline() {
+  const project = current();
+  const nav = $("outline");
+  nav.replaceChildren(outlineEntry("Sampul", "cover", "01"), outlineEntry("Bagian awal & daftar isi", "front", "02"));
+  for (const [index, chapter] of project.chapters.entries()) {
+    nav.append(outlineEntry(chapter.title.trim() || "Bab tanpa judul", index, roman(index + 1)));
+  }
+  if (!project.chapters.some((chapter) => chapter.checklist)) {
+    nav.append(outlineEntry("Daftar simak", "checklist", "✓"));
+  }
+}
+
+function render() {
+  const project = current();
+  $("projects").replaceChildren(...workspace.projects.map(({ id, name }) => new Option(name, id)));
+  $("projects").value = project.id;
+  $("template-label").textContent = reportTemplates[project.template].label;
+  renderOutline();
+  editor.replaceChildren();
+  if (active === "cover") return renderCover(project);
+  if (active === "front") return renderFront(project);
+  if (active === "checklist") return renderChecklistEditor(project);
+  renderChapter(project);
+}
+
+function title(type, label) {
+  $("section-type").textContent = type;
+  $("section-title").textContent = label;
+}
+
+function renderCover(project) {
+  title("Bagian awal", "Sampul laporan");
+  editor.append(dom("p", { className: "lead" }, "Isian ini dipakai pada sampul laporan."),
+    dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
+      boundField(project.cover, key, label, type))));
+  editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
+    project.name = value;
+    $("projects").selectedOptions[0].textContent = value;
+    save();
+  }));
+}
+
+function renderFront(project) {
+  title("Bagian awal", "Bagian awal & daftar isi");
+  editor.append(dom("p", { className: "lead" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
+    dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
+      boundField(project.front, key, label, index < 2 ? "area" : "text"))),
+    dom("h3", {}, "Susunan bab"),
+    dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) =>
+      dom("li", {}, button(chapterLabel(project, index), () => { active = index; render(); }, "quiet")))));
+}
+
+function renderChecklistEditor(project) {
+  if (active === "checklist") title("Lampiran", "Daftar simak kajian");
+  const url = "./daftar-simak.html?proyek=" + encodeURIComponent(project.id);
+  editor.append(dom("div", { className: "checklist-head" },
+    dom("p", { className: "lead" }, "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."),
+    dom("a", { href: url, target: "_blank", rel: "noopener" }, "Buka layar penuh")),
+    dom("iframe", { src: url + "&embed=1", title: "Daftar simak proyek", className: "checklist-frame" }));
+}
+
+function renderChapter(project) {
+  const index = active;
+  const chapter = project.chapters[index];
+  title("Bab " + roman(index + 1), chapter.title || "Bab tanpa judul");
+  const chapterActions = dom("div", { className: "button-row chapter-actions" });
+  for (const [delta, label] of [[-1, "Naikkan bab"], [1, "Turunkan bab"]]) {
+    const control = button(label, () => {
+      const next = index + delta;
+      [project.chapters[next], project.chapters[index]] = [chapter, project.chapters[next]];
+      active = next;
+      save();
+      render();
+    });
+    control.disabled = !project.chapters[index + delta];
+    chapterActions.append(control);
+  }
+  if (!chapter.checklist) chapterActions.append(button("Hapus bab", () => {
+    if (!confirm("Hapus bab ini beserta seluruh isinya?")) return;
+    project.chapters.splice(index, 1);
+    active = "front";
+    save();
+    render();
+  }, "danger"));
+  editor.append(boundField(chapter, "title", "Judul bab", "text", () => {
+    title("Bab " + roman(index + 1), chapter.title || "Bab tanpa judul");
+    renderOutline();
+    save();
+  }), chapterActions);
+  if (chapter.checklist) return renderChecklistEditor(project);
+  for (const [bi, block] of chapter.blocks.entries()) editor.append(blockEditor(chapter, block, bi));
+  const actions = dom("div", { className: "button-row add-block" });
+  for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
+    actions.append(button("＋ " + label, () => {
+      const data = type === "heading" ? heading("") :
+        type === "table" ? { type, text: "", headers: ["Uraian", "Keterangan"], rows: [["", ""]] } : { type, text: "" };
+      chapter.blocks.push(data);
+      save();
+      render();
+      editor.querySelector(".block:last-of-type input, .block:last-of-type textarea")?.focus();
+    }));
+  }
+  editor.append(actions);
+}
+
+function tableEditor(block) {
+  const matrix = dom("div", { className: "matrix" });
+  const table = dom("table");
+  const header = dom("tr");
+  for (const [index, value] of block.headers.entries()) {
+    header.append(dom("th", { scope: "col" }, field("Kolom " + (index + 1), value, (text) => {
+      block.headers[index] = text;
+      save();
+    })));
+  }
+  header.append(dom("th", {}, "Baris"));
+  const rows = dom("tbody");
+  for (const [index, row] of block.rows.entries()) {
+    rows.append(dom("tr", {}, ...row.map((value, column) =>
+      dom("td", {}, field("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
+        row[column] = text;
+        save();
+      }))), dom("td", {}, button("Hapus", () => {
+      if (row.some((cell) => cell.trim()) && !confirm("Hapus baris tabel ini?")) return;
+      block.rows.splice(index, 1);
+      save();
+      render();
+    }, "danger"))));
+  }
+  table.append(dom("thead", {}, header), rows);
+  matrix.append(table);
+  const change = (edit) => { edit(); save(); render(); };
+  const actions = dom("div", { className: "button-row" },
+    button("＋ Baris", () => change(() => block.rows.push(block.headers.map(() => "")))),
+    button("＋ Kolom", () => change(() => { block.headers.push("Kolom baru"); block.rows.forEach((row) => row.push("")); })));
+  if (block.headers.length > 1) actions.append(button("Hapus kolom terakhir", () => {
+    if (block.rows.some((row) => row.at(-1).trim()) && !confirm("Hapus kolom terakhir beserta isinya?")) return;
+    change(() => { block.headers.pop(); block.rows.forEach((row) => row.pop()); });
+  }));
+  return dom("div", {}, matrix, actions);
+}
+
+async function imageData(file) {
+  const image = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, 1440 / Math.max(image.width, image.height));
+    const canvas = dom("canvas", { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) });
+    const context = canvas.getContext("2d", { alpha: false });
+    context.fillStyle = "white";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } finally {
+    image.close();
+  }
+}
+
+function photoEditor(chapter, block) {
+  const upload = dom("input", { type: "file", accept: "image/*" });
+  const feedback = dom("p", { className: "hint", role: "status" });
+  const image = dom("img", { className: "photo-thumb", alt: "Pratinjau dokumentasi", hidden: true });
+  if (block.image) { image.src = block.image; image.hidden = false; }
+  upload.addEventListener("change", async () => {
+    if (!upload.files[0]) return;
+    upload.disabled = true;
+    try {
+      const data = await imageData(upload.files[0]);
+      if (!chapter.blocks.includes(block)) return;
+      block.image = data;
+      image.src = data;
+      image.hidden = false;
+      feedback.textContent = "Foto ditambahkan";
+      save();
+    } catch {
+      feedback.textContent = "Foto tidak dapat dibuka. Pilih file gambar lain.";
+    } finally {
+      upload.value = "";
+      upload.disabled = false;
+    }
+  });
+  return dom("div", {}, dom("label", {}, "Pilih foto", upload), feedback, image,
+    button("Hapus foto", () => { delete block.image; image.hidden = true; image.removeAttribute("src"); save(); }, "quiet"));
+}
+
+function blockEditor(chapter, block, index) {
+  const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
+  const bar = dom("div", { className: "block-head" }, dom("strong", {}, labels[block.type]));
+  const controls = dom("div", { className: "button-row" });
+  for (const [delta, name] of [[-1, "Naikkan blok"], [1, "Turunkan blok"]]) {
+    const control = button(name, () => {
+      const next = index + delta;
+      [chapter.blocks[index], chapter.blocks[next]] = [chapter.blocks[next], block];
+      save();
+      render();
+    }, "quiet");
+    control.disabled = !chapter.blocks[index + delta];
+    controls.append(control);
+  }
+  controls.append(button("Hapus", () => {
+    if (!confirm("Hapus bagian ini?")) return;
+    chapter.blocks.splice(index, 1);
+    save();
+    render();
+  }, "danger"));
+  bar.append(controls);
+  const wrapper = dom("section", { className: "block" }, bar);
+  if (block.type === "heading") wrapper.append(boundField(block, "text", "Judul subbab"), boundField(block, "body", "Isi subbab", "area"));
+  if (block.type === "text") wrapper.append(boundField(block, "text", "Isi paragraf", "area"));
+  if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
+  if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), photoEditor(chapter, block));
+  return wrapper;
+}
+
+function download(name, body) {
+  const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
+  const link = dom("a", { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function blobData(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function backup() {
+  const project = structuredClone(current());
+  const checklist = readChecklist(project.id);
+  const photos = {};
+  const control = $("backup");
+  control.disabled = true;
+  try {
+    for (const key of checklistPhotos(checklist)) {
+      const blob = await checklistPhoto(project.id, key);
+      if (blob) photos[key] = await blobData(blob);
+    }
+    download("kajian-slf-" + project.id.slice(0, 8) + ".json", JSON.stringify({ version: 1, project, checklist, photos }));
+    status.textContent = "Cadangan diunduh";
+  } catch {
+    status.textContent = "Cadangan gagal dibuat";
+  } finally {
+    control.disabled = false;
+  }
+}
+
+function pickText(record, keys) {
+  return Object.fromEntries(keys.filter((key) => typeof record?.[key] === "string").map((key) => [key, record[key]]));
+}
+
+function validateBackup(data) {
+  const source = data?.project;
+  const valid = (condition) => { if (!condition) throw new Error("Struktur cadangan tidak valid"); };
+  valid(data?.version === 1 && typeof source?.name === "string" && Object.hasOwn(reportTemplates, source.template) &&
+    Array.isArray(source.chapters));
+  const chapters = source.chapters.map((chapter) => {
+    valid(typeof chapter?.title === "string" && Array.isArray(chapter.blocks));
+    const blocks = chapter.blocks.map((block) => {
+      valid(block && ["heading", "text", "table", "photo"].includes(block.type) && typeof block.text === "string");
+      const clean = { type: block.type, text: block.text };
+      if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; }
+      if (block.type === "table") {
+        valid(Array.isArray(block.headers) && block.headers.length && block.headers.every((value) => typeof value === "string") &&
+          Array.isArray(block.rows) && block.rows.every((row) => Array.isArray(row) &&
+            row.length === block.headers.length && row.every((value) => typeof value === "string")));
+        clean.headers = block.headers;
+        clean.rows = block.rows;
+      }
+      if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
+      return clean;
+    });
+    return { title: chapter.title, blocks, checklist: chapter.checklist === true };
+  });
+  const project = {
+    id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
+    cover: pickText(source.cover, coverFields.map(([key]) => key)),
+    front: pickText(source.front, frontFields.map(([key]) => key)), chapters,
+  };
+  const checks = {};
+  for (const { id } of checklistItems) {
+    const check = data.checklist?.checks?.[id];
+    if (!check) continue;
+    valid(Array.isArray(check.rows) && Number.isSafeInteger(check.nextRow) && check.nextRow > 0);
+    const rows = check.rows.map((row) => {
+      valid(typeof row?.key === "string" && /^\d+$/.test(row.key) && Number(row.key) < check.nextRow);
+      return pickText(row, ["key", "label", ...Object.keys(checklistLabels)]);
+    });
+    valid(new Set(rows.map((row) => row.key)).size === rows.length);
+    checks[id] = { rows, nextRow: check.nextRow, na: check.na === true };
+  }
+  return { project, checklist: { identity: pickText(data.checklist?.identity, Object.keys(checklistIdentityLabels)), checks } };
+}
+
+async function importBackup(file) {
+  try {
+    const raw = JSON.parse(await file.text());
+    const { project, checklist } = validateBackup(raw);
+    for (const key of checklistPhotos(checklist)) {
+      const photo = raw.photos?.[key];
+      if (typeof photo !== "string" || !/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(photo)) continue;
+      const blob = await (await fetch(photo)).blob();
+      await checklistPhoto(project.id, key, blob);
+    }
+    localStorage.setItem("daftar-simak-slf:v2:" + project.id, JSON.stringify(checklist));
+    workspace.projects.push(project);
+    setCurrent(project.id);
+  } catch {
+    status.textContent = "Impor gagal. Periksa file cadangan atau ruang penyimpanan browser.";
+  } finally {
+    $("backup-file").value = "";
+  }
+}
+
+async function presentReport(print) {
+  const buttons = [$("preview"), $("print")];
+  if (buttons.some((control) => control.disabled)) return;
+  buttons.forEach((control) => { control.disabled = true; });
+  status.textContent = "Menyiapkan laporan…";
+  try {
+    await buildReport($("report"), structuredClone(current()), reportUrls);
+    dialog.showModal();
+    status.textContent = "Laporan siap";
+    if (print) window.print();
+  } catch {
+    status.textContent = "Laporan gagal disiapkan";
+    reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+  } finally {
+    buttons.forEach((control) => { control.disabled = false; });
+  }
+}
+
+async function start() {
+  try {
+    workspace = await storeValue(database, "workspace", "drafts");
+  } catch {
+    status.textContent = "Penyimpanan browser tidak tersedia";
+  }
+  if (!workspace?.projects?.length) {
+    const project = draft("Kajian baru", preset);
+    workspace = { projects: [project], current: project.id };
+  }
+  const requested = new URLSearchParams(location.search).get("proyek");
+  if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
+  $("projects").addEventListener("change", () => setCurrent($("projects").value));
+  $("add-chapter").addEventListener("click", () => {
+    const project = current();
+    project.chapters.push({ title: "Bab baru", blocks: [heading("")], checklist: false });
+    active = project.chapters.length - 1;
+    save();
+    render();
+  });
+  $("new-project").addEventListener("click", () => $("project-dialog").showModal());
+  $("project-cancel").addEventListener("click", () => $("project-dialog").close());
+  const form = $("project-form");
+  const templates = form.elements.template;
+  templates.append(...Object.entries(reportTemplates).map(([key, value]) => new Option(value.label, key)));
+  const explain = () => { $("template-description").textContent = reportTemplates[templates.value].description; };
+  templates.addEventListener("change", explain);
+  explain();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = form.elements.name.value.trim();
+    if (!name) { form.elements.name.focus(); return; }
+    const project = draft(name, templates.value);
+    workspace.projects.push(project);
+    $("project-dialog").close();
+    form.reset();
+    explain();
+    setCurrent(project.id);
+  });
+  $("preview").addEventListener("click", () => presentReport(false));
+  $("print").addEventListener("click", () => presentReport(true));
+  $("print-preview").addEventListener("click", () => window.print());
+  $("close-preview").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    $("report").replaceChildren();
+    reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+  });
+  $("backup").addEventListener("click", backup);
+  $("restore").addEventListener("click", () => $("backup-file").click());
+  $("backup-file").addEventListener("change", () => {
+    if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
+  });
+  render();
+  await save();
+}
+
+start();
