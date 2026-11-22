@@ -1,0 +1,19 @@
+# Local dependencies and editor files
+node_modules/
+.vs/
+.idea/
+*.tmp
+*.log
+Thumbs.db
+
+# Local credentials and configuration
+.aws/
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
