@@ -5,8 +5,9 @@ const projectId = new URLSearchParams(location.search).get("proyek");
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
 const storageKey = "daftar-simak-slf:v2" + (projectMode ? ":" + projectId : "");
 const photoKey = (key) => projectMode ? projectId + ":" + key : key;
-if (projectMode && new URLSearchParams(location.search).has("embed")) {
-  document.body.classList.add("embedded-checklist");
+if (projectMode) {
+  document.getElementById("project-editor").href = "./index.html?proyek=" + encodeURIComponent(projectId);
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embedded-checklist");
 }
 const legacyKey = "daftar-simak-slf:v1";
 const yesNo = ["Ya", "Tidak"];
@@ -217,8 +218,7 @@ async function photoStore(operation, key, value) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction("photos", operation === "get" ? "readonly" : "readwrite");
     const store = tx.objectStore("photos");
-    const request = operation === "clear" ? store.clear() :
-      operation === "put" ? store.put(value, photoKey(key)) : store[operation](photoKey(key));
+    const request = operation === "put" ? store.put(value, photoKey(key)) : store[operation](photoKey(key));
     tx.oncomplete = () => resolve(request.result);
     tx.onabort = () => reject(tx.error);
   });

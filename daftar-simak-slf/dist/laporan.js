@@ -86,7 +86,7 @@ function reportSection(title, id) {
   return dom("section", { className: "report-section", id }, dom("h2", {}, title));
 }
 
-function readMarkdown(text) {
+function reportParagraphs(text) {
   return text.split(/\n\s*\n/).filter((paragraph) => paragraph.trim())
     .map((paragraph) => dom("p", { className: "report-text" }, paragraph));
 }
@@ -167,7 +167,7 @@ async function buildReport(target, project, urls) {
   for (const [key, label] of frontFields.slice(0, 2)) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
     const section = reportSection(label, "report-" + key);
-    section.append(...readMarkdown(project.front[key] || ""));
+    section.append(...reportParagraphs(project.front[key] || ""));
     if (key === "approval") for (const [id] of frontFields.slice(2)) {
       if (project.front[id]) section.append(dom("p", {}, project.front[id]));
     }
@@ -181,9 +181,9 @@ async function buildReport(target, project, urls) {
       const id = section.id + "-block-" + bi;
       if (block.type === "heading") {
         if (block.text.trim()) section.append(dom("h3", { id }, (index + 1) + "." + (++sub) + " " + block.text));
-        section.append(...readMarkdown(block.body));
+        section.append(...reportParagraphs(block.body));
       }
-      if (block.type === "text") section.append(...readMarkdown(block.text));
+      if (block.type === "text") section.append(...reportParagraphs(block.text));
       if (block.type === "table") {
         const label = "Tabel " + (tableEntries.length + 1) + " · " + (block.text || "Tabel kajian");
         tableEntries.push([id, label]);

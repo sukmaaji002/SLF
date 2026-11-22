@@ -17,3 +17,8 @@ Thumbs.db
 *.key
 *.p12
 *.pfx
+
+# Kajian lokal dan hasil ekspor pelanggan
+kajian-slf-*.json
+daftar-simak-slf*.csv
+Ruang Kajian SLF.pdf
