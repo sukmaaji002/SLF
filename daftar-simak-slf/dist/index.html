@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Form kajian pemeriksaan bangunan gedung untuk Sertifikat Laik Fungsi.">
+  <meta name="theme-color" content="#103c37">
+  <title>Daftar Simak SLF</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="catalog.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="shell top-inner">
+      <a class="brand" href="#judul"><span class="mark" aria-hidden="true">✓</span> Daftar Simak SLF</a>
+      <nav aria-label="Navigasi utama"><a href="#identitas">Identitas &amp; kondisi</a><a href="#pemeriksaan">Pemeriksaan</a></nav>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="hero" aria-labelledby="judul">
+      <div class="hero-copy">
+        <p class="eyebrow">Sertifikat Laik Fungsi</p>
+        <h1 id="judul">Daftar Simak SLF</h1>
+        <p class="intro">Form kajian pemeriksaan bangunan gedung. Catat kondisi faktual, hasil pengukuran, dan kesesuaian setiap komponen.</p>
+        <a class="button primary" href="#pemeriksaan">Buka daftar simak</a>
+      </div>
+      <aside class="progress-card" aria-labelledby="progress-title">
+        <h2 id="progress-title">Progres pemeriksaan</h2>
+        <div class="progress-numbers"><strong id="percent">0%</strong><span id="count"></span></div>
+        <progress id="progress" value="0" max="100" aria-labelledby="progress-title"></progress>
+        <p id="findings" aria-live="polite"></p>
+      </aside>
+    </section>
+
+    <section class="panel identity" id="identitas" aria-labelledby="identity-title">
+      <div class="section-head">
+        <div><h2 id="identity-title">K. Identitas pemilik</h2><p>Catat identitas pemilik dan kondisi umum bangunan gedung.</p></div>
+        <span id="save-status" role="status">Penyimpanan di browser ini</span>
+      </div>
+      <div class="identity-grid">
+        <div><h3>Identitas pemilik bangunan gedung</h3><div id="owner-fields" class="form-grid"></div></div>
+        <div><h3>Kondisi bangunan gedung</h3><div id="condition-fields" class="form-grid"></div></div>
+      </div>
+      <details class="building-details">
+        <summary>Data tambahan bangunan</summary>
+        <div id="building-fields" class="form-grid"></div>
+      </details>
+    </section>
+
+    <section class="checklist" id="pemeriksaan" aria-labelledby="check-title">
+      <div class="section-head check-head">
+        <div><h2 id="check-title">Daftar pemeriksaan</h2><p>Buka butir untuk mengisi hasil pemeriksaan atau menambah sampel.</p></div>
+        <div class="actions"><button id="print" type="button">Cetak</button><button id="export" class="dark" type="button">Unduh CSV</button></div>
+      </div>
+      <div class="filters">
+        <label>Cari butir<input id="search" type="search" placeholder="Contoh: ventilasi"></label>
+        <label>Kategori<select id="category"><option value="">Semua kategori</option></select></label>
+        <label>Isian<select id="status-filter"><option value="">Semua isian</option><option value="empty">Belum diisi</option><option value="filled">Sudah diisi</option><option value="issue">Ada temuan</option><option value="na">Tidak berlaku</option></select></label>
+      </div>
+      <nav id="category-nav" class="category-nav" aria-label="Bagian pemeriksaan"></nav>
+      <div class="result-line"><p id="result-count" class="result" aria-live="polite"></p><button type="button" id="toggle-groups">Ciutkan bagian</button></div>
+      <div id="groups"></div>
+      <div class="reset-wrap"><button id="legacy-export" type="button" hidden>Unduh rekap versi awal</button><button class="reset" id="reset" type="button">Hapus data pemeriksaan</button></div>
+    </section>
+  </main>
+  <footer class="shell footer"><span>Daftar Simak SLF</span><a href="https://peraturan.bpk.go.id/Details/161846/pp-no-16-tahun-2021" target="_blank" rel="noopener noreferrer">PP Nomor 16 Tahun 2021</a></footer>
+</body>
+</html>
