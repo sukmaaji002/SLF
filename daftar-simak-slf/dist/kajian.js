@@ -7,6 +7,7 @@ const editor = $("editor");
 const status = $("save-status");
 const dialog = $("preview-dialog");
 const reportUrls = [];
+let disposePagination;
 let workspace;
 let active = "cover";
 let saving = 0;
@@ -555,11 +556,15 @@ async function presentReport(print) {
   buttons.forEach((control) => { control.disabled = true; });
   status.textContent = "Menyiapkan laporan…";
   try {
-    await buildReport($("report"), structuredClone(current()), reportUrls);
+    const source = dom("article", { className: "report-print" });
+    await buildReport(source, structuredClone(current()), reportUrls);
+    disposePagination = await paginateReport(source, $("report"));
     dialog.showModal();
     status.textContent = "Laporan siap";
     if (print) window.print();
   } catch {
+    disposePagination?.();
+    disposePagination = undefined;
     status.textContent = "Laporan gagal disiapkan";
     reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   } finally {
@@ -613,6 +618,8 @@ async function start() {
   $("close-preview").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
     $("report").replaceChildren();
+    disposePagination?.();
+    disposePagination = undefined;
     reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   });
   $("backup").addEventListener("click", backup);

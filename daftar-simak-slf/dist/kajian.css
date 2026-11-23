@@ -109,32 +109,13 @@ dialog::backdrop { background: #132b27ab; }
 #project-form p { color: var(--muted); }
 #project-form .button-row { justify-content: end; }
 #preview-dialog { width: min(1000px, calc(100% - 24px)); max-height: 92dvh; padding: 0; background: #e9efed; }
-.preview-controls { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; }
-.paper { width: min(860px, calc(100% - 28px)); margin: 14px auto; padding: clamp(16px, 5vw, 54px); background: #fff; color: #172a27; overflow-wrap: anywhere; }
-.report-cover { display: grid; align-content: center; min-height: min(680px, 75dvh); text-align: center; padding: 24px 0; }
-.report-cover h1 { font-size: clamp(1.9rem, 5vw, 3.2rem); margin: 14px 0; text-transform: uppercase; }
-.paper-kicker { font-size: .9375rem; font-weight: 700; }
-.cover-building { font-size: 1.55rem; font-weight: 700; }
-.report-cover table { text-align: left; }
-.paper .cover-photo { width: min(100%, 500px); max-height: 95mm; margin: 16px auto; }
-.toc { list-style: none; padding-left: 0; }
-.toc > li { margin-bottom: 7px; }
-.toc > li > a { font-weight: 700; }
-.report-section { margin-top: 22px; scroll-margin-top: 70px; }
-.report-section h2 { font-size: 1.65rem; margin-bottom: 14px; }
-.paper h3 { margin: 14px 0 6px; }
-.paper h4 { margin: 8px 0 3px; }
-.report-text { white-space: pre-wrap; margin: 0 0 10px; }
-.paper table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 8px 0 12px; }
-.paper th, .paper td { padding: 6px; border: 1px solid #c7d4cf; text-align: left; vertical-align: top; white-space: pre-wrap; }
-.paper th { background: #e8efeb; }
-.paper figure { margin: 12px 0; }
-.paper img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; margin: 4px 0; }
-.caption, .paper figcaption { font-size: .9rem; font-weight: 650; }
-.result-values { margin: 3px 0 6px; }
-.result-values dt { font-weight: 650; }
-.result-values dd { margin-left: 0; margin-bottom: 3px; }
-.result-values img { max-height: 180px; }
+.preview-controls { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; }
+.pagination-stage { position: fixed; left: -10000px; top: 0; width: 210mm; visibility: hidden; pointer-events: none; }
+.report-print [id] { scroll-margin-top: 70px; }
+@media screen {
+  #report .pagedjs_pages { min-width: 210mm; padding: 14px; }
+  #report .pagedjs_page { margin: 0 auto 14px; background: #fff; box-shadow: 0 1px 5px #1d483326; }
+}
 @media(max-width: 800px) {
   .mast-inner, main { width: calc(100% - 28px); }
   .overview { align-items: start; flex-direction: column; gap: 15px; padding: 22px; }
@@ -150,21 +131,11 @@ dialog::backdrop { background: #132b27ab; }
   .form-grid { grid-template-columns: 1fr; }
   .standalone { max-width: 110px; text-align: right; }
 }
-@page { size: A4; margin: 16mm; }
+@page { size: A4; margin: 0; }
 @media print {
   :root, body { background: #fff; color: #000; }
   body > :not(#preview-dialog), #preview-dialog .preview-controls { display: none !important; }
   #preview-dialog::backdrop { display: none; }
   #preview-dialog[open] { display: block; position: static; width: 100%; max-width: none; height: auto; max-height: none; overflow: visible; margin: 0; border: 0; border-radius: 0; background: #fff; }
-  .paper { width: 100%; margin: 0; padding: 0; font: 11pt/1.4 "Segoe UI", sans-serif; }
-  .report-cover { min-height: 240mm; break-after: page; }
-  .report-cover h1 { font-size: 27pt; }
-  .paper > .report-section { break-before: page; margin-top: 0; }
-  .paper > .report-section h2, .paper h3, .paper h4, .caption { break-after: avoid; }
-  .paper h3 { margin-top: 11px; }
-  .paper h4 { margin-top: 6px; }
-  .report-text { margin-bottom: 7px; orphans: 3; widows: 3; }
-  .paper tr, .paper figure { break-inside: avoid; }
-  .paper thead { display: table-header-group; }
-  .paper a { text-decoration: none; }
+  #report .pagedjs_page:last-child { break-after: auto; }
 }
