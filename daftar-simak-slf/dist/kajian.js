@@ -402,7 +402,9 @@ function tableEditor(block) {
       dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
-      if (row.some((cell) => cell.trim()) && !confirm("Hapus baris tabel ini?")) return;
+      const populated = row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
+      if (populated && !confirm("Hapus baris tabel ini?")) return;
+      if (block.cellLinks) for (const column of row.keys()) delete block.cellLinks[tableCellKey(block, index, column)];
       block.rows.splice(index, 1);
       block.rowIds.splice(index, 1);
       save();
@@ -423,8 +425,15 @@ function tableEditor(block) {
       block.rows.forEach((row) => row.push(""));
     })));
   if (block.headers.length > 1) actions.append(button("Hapus kolom terakhir", () => {
-    if (block.rows.some((row) => row.at(-1).trim()) && !confirm("Hapus kolom terakhir beserta isinya?")) return;
-    change(() => { block.headers.pop(); block.columnIds.pop(); block.rows.forEach((row) => row.pop()); });
+    const column = block.headers.length - 1;
+    const populated = block.rows.some((row, index) => row[column].trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
+    if (populated && !confirm("Hapus kolom terakhir beserta isinya?")) return;
+    change(() => {
+      if (block.cellLinks) for (const row of block.rows.keys()) delete block.cellLinks[tableCellKey(block, row, column)];
+      block.headers.pop();
+      block.columnIds.pop();
+      block.rows.forEach((row) => row.pop());
+    });
   }));
   const editor = dom("div", {}, matrix, actions);
   if (tokenName(block.text) === "susunan tim pengkaji teknis") {

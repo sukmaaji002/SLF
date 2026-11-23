@@ -81,8 +81,12 @@ function ensureReportReferences(project) {
     for (const block of chapter.blocks) {
       if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();
       if (block.type !== "table") continue;
-      block.rowIds ??= block.rows.map(() => crypto.randomUUID());
-      block.columnIds ??= block.headers.map(() => crypto.randomUUID());
+      if (block.rowIds?.length !== block.rows.length) {
+        block.rowIds = block.rows.map((_, index) => block.rowIds?.[index] ?? crypto.randomUUID());
+      }
+      if (block.columnIds?.length !== block.headers.length) {
+        block.columnIds = block.headers.map((_, index) => block.columnIds?.[index] ?? crypto.randomUUID());
+      }
     }
   }
 }
