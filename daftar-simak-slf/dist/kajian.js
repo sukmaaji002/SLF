@@ -200,6 +200,11 @@ function refreshLinkedFields(except) {
   for (const details of editor.querySelectorAll(".linked-fields[open]")) {
     if (details !== except) details.refreshSources();
   }
+  const tableFields = [...editor.querySelectorAll(".table-link[data-linked]")];
+  if (tableFields.length) {
+    const sources = reportSources(current());
+    for (const details of tableFields) details.refreshValue(sources);
+  }
 }
 
 function purposeField(project) {
@@ -379,19 +384,17 @@ function tableEditor(block) {
   }
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
+  const sources = reportSources(current());
   const tableName = tokenName(block.text);
   const statusColumn = tableName === "rekap pemeriksaan dokumen" ?
     block.headers.findIndex((header) => tokenName(header) === "status verifikasi") : -1;
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
-    rows.append(dom("tr", {}, ...row.map((value, column) =>
-      dom("td", {}, tableCellField("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
-        row[column] = text;
-        refreshLinkedFields();
-        save();
-      }, column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
-        column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : null))), dom("td", {}, button("Hapus", () => {
+    rows.append(dom("tr", {}, ...row.map((_, column) =>
+      dom("td", {}, tableCellField(block, index, column, sources,
+        column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
+          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
       if (row.some((cell) => cell.trim()) && !confirm("Hapus baris tabel ini?")) return;
       block.rows.splice(index, 1);
       block.rowIds.splice(index, 1);
@@ -424,21 +427,70 @@ function tableEditor(block) {
   return editor;
 }
 
-function tableCellField(label, value, onInput, options) {
+function tableCellField(block, row, column, sources, options) {
+  const label = "Baris " + (row + 1) + ", kolom " + (column + 1);
+  const key = tableCellKey(block, row, column);
+  const value = block.rows[row][column];
   const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
-  const control = field(label, token ? "" : value, onInput);
+  const control = field(label, token ? "" : value, (text) => {
+    block.rows[row][column] = text;
+    refreshLinkedFields();
+    save();
+  });
+  const input = control.querySelector("input");
   if (token) {
     const example = inputExample(tokenName(token));
-    control.querySelector("input").placeholder = example ? "Contoh: " + example : token;
+    input.placeholder = example ? "Contoh: " + example : token;
   }
-  if (options) {
+  const choices = options.length ? options : choicesForInput(tokenName(token ?? block.headers[column]));
+  if (choices.length) {
     const id = "pilihan-" + crypto.randomUUID();
-    const input = control.querySelector("input");
     input.setAttribute("list", id);
     input.setAttribute("aria-label", label);
-    control.append(dom("datalist", { id }, ...options.map((option) => new Option(option, option))));
+    control.append(dom("datalist", { id }, ...choices.map((option) => new Option(option, option))));
   }
-  return control;
+  const summary = dom("summary");
+  const pick = dom("select", { ariaLabel: "Sumber data " + label.toLocaleLowerCase("id") });
+  const link = dom("details", { className: "table-link" }, summary, pick);
+  function refreshValue(registry) {
+    const source = block.cellLinks?.[key];
+    const entry = registry.get(source);
+    link.toggleAttribute("data-linked", Boolean(source));
+    input.readOnly = Boolean(source);
+    input.value = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
+    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" : token ? "Contoh: " + (inputExample(tokenName(token)) || token) : "";
+    summary.textContent = source ? "Data tertaut" : "Ambil data";
+  }
+  link.refreshValue = refreshValue;
+  function refreshOptions() {
+    if (!link.open) return;
+    const registry = reportSources(current());
+    const selected = block.cellLinks?.[key];
+    pick.replaceChildren(new Option("Isi manual", ""));
+    const groups = new Map();
+    for (const [id, entry] of registry) {
+      if (!entry.value || !tableSourceAvailable(id) || id === "cell:" + block.sourceId + ":" + key) continue;
+      if (!groups.has(entry.group)) groups.set(entry.group, []);
+      groups.get(entry.group).push(new Option(entry.label, id));
+    }
+    for (const [group, options] of groups) pick.append(dom("optgroup", { label: group }, ...options));
+    if (selected && ![...pick.options].some((option) => option.value === selected)) {
+      pick.append(new Option("Sumber belum tersedia", selected));
+    }
+    pick.value = selected ?? "";
+    refreshValue(registry);
+  }
+  link.addEventListener("toggle", refreshOptions);
+  pick.addEventListener("change", () => {
+    block.cellLinks ??= {};
+    if (pick.value) block.cellLinks[key] = pick.value;
+    else delete block.cellLinks[key];
+    refreshOptions();
+    refreshLinkedFields();
+    save();
+  });
+  refreshValue(sources);
+  return dom("div", {}, control, link);
 }
 
 async function imageData(file) {
@@ -591,6 +643,11 @@ function validateBackup(data) {
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
         clean.rowIds = importIds(block.rowIds, block.rows.length);
         clean.columnIds = importIds(block.columnIds, block.headers.length);
+        if (clean.rowIds && clean.columnIds && block.cellLinks && typeof block.cellLinks === "object") {
+          const keys = new Set(clean.rowIds.flatMap((row) => clean.columnIds.map((column) => row + ":" + column)));
+          clean.cellLinks = Object.fromEntries(Object.entries(block.cellLinks).filter(([key, id]) =>
+            keys.has(key) && validReportSource(id) && tableSourceAvailable(id)));
+        }
       }
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
       return clean;
