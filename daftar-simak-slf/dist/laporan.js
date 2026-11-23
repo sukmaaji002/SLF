@@ -264,7 +264,10 @@ async function buildReport(target, project, urls) {
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
       }
-      if (block.type === "photo") appendPhoto(section, block, id);
+      if (block.type === "photo") {
+        if (block.image) appendPhoto(section, block, id);
+        for (const [i, photo] of (block.photos ?? []).entries()) appendPhoto(section, photo, id + "-photo-" + i);
+      }
     }
     if (chapter.checklist) checklistTargets.push(section);
     attach(section);

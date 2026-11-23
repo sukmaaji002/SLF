@@ -360,6 +360,14 @@ function upgradeDisciplineDraft(project) {
 
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
+  for (const chapter of project.chapters) for (const block of chapter.blocks) {
+    if (block.type !== "photo" || !block.image) continue;
+    const first = importTextFormats({ image: block.image, text: block.text }, block, ["text"]);
+    block.photos = [first, ...(block.photos ?? [])];
+    block.text = "";
+    delete block.image;
+    setTextFormat(block, "text", undefined);
+  }
   if (typeof project.front.preface === "string") {
     project.front.preface = project.front.preface === prefaceOpening + "\n\n" + previousAcknowledgements ?
       frontDefaults.preface : project.front.preface.replace(acknowledgementsPlaceholder, acknowledgementsText);

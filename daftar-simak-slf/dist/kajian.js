@@ -728,7 +728,7 @@ function pictureEditor(block, label, isAttached = () => true) {
   return dom("div", {}, dom("label", {}, "Pilih " + label, upload), feedback, image, remove);
 }
 
-function sectionPhotoEditor(owner, label, isAttached) {
+function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
   const upload = dom("input", { type: "file", accept: "image/*", multiple: true, hidden: true, ariaLabel: label });
   const add = button(label, () => upload.click());
   const feedback = dom("p", { className: "hint", role: "status", hidden: true });
@@ -736,7 +736,9 @@ function sectionPhotoEditor(owner, label, isAttached) {
   const gallery = dom("div", { className: "section-photos" }, dom("div", { className: "button-row" }, add),
     upload, feedback, list);
   function renderPhotos() {
-    list.replaceChildren(...(owner.photos ?? []).map((photo, index) => {
+    const photos = owner.photos ?? [];
+    add.textContent = photos.length ? label.replace("Unggah", "Tambah") + " (" + photos.length + ")" : label;
+    list.replaceChildren(...photos.map((photo, index) => {
       const caption = boundField(photo, "text", "Keterangan foto " + (index + 1));
       const remove = button("Hapus foto " + (index + 1), () => {
         owner.photos = owner.photos.filter((entry) => entry !== photo);
@@ -762,6 +764,7 @@ function sectionPhotoEditor(owner, label, isAttached) {
       } catch { /* A photo that cannot be decoded does not prevent adding the others. */ }
     }
     if (isAttached() && photos.length) {
+      if (!owner.photos?.length && firstCaption) photos[0].text = firstCaption;
       (owner.photos ??= []).push(...photos);
       photoEditors.get(owner)?.();
       save();
@@ -811,7 +814,11 @@ function blockEditor(chapter, block, index, headingInfo) {
   }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
   if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
-  if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), pictureEditor(block, "foto", () => chapter.blocks.includes(block)));
+  if (block.type === "photo") {
+    const project = current();
+    wrapper.append(sectionPhotoEditor(block, "Unggah foto dokumentasi",
+      () => project.chapters.includes(chapter) && chapter.blocks.includes(block), block.text));
+  }
   return wrapper;
 }
 
@@ -903,7 +910,7 @@ function validateBackup(data) {
       }
       importTextFormats(clean, block, ["text", "body", ...tableFormatKeys]);
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
-      return block.type === "heading" ? restorePhotos(clean, block) : clean;
+      return block.type === "heading" || block.type === "photo" ? restorePhotos(clean, block) : clean;
     });
     return restorePhotos(importTextFormats({ title: chapter.title, blocks, checklist: chapter.checklist === true }, chapter, ["title"]), chapter);
   });
