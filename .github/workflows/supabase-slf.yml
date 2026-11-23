@@ -1,0 +1,57 @@
+name: Deploy Supabase SLF migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'daftar-simak-slf/supabase/migrations/**'
+      - '.github/workflows/supabase-slf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-slf-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check deployment credentials
+        id: credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SLF_SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SLF_SUPABASE_DB_PASSWORD }}
+        run: |
+          if [[ -z "$SUPABASE_ACCESS_TOKEN" || -z "$SUPABASE_DB_PASSWORD" ]]; then
+            echo '::notice::Supabase migration skipped. Configure both SLF Supabase repository secrets.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@v3
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          version: '3.3.0'
+
+      - name: Apply pending migrations
+        if: steps.credentials.outputs.ready == 'true'
+        working-directory: daftar-simak-slf
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SLF_SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SLF_SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: pxjwdwjcqwsdgmncbeza
+        run: |
+          supabase init
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          supabase db push --yes --remote
