@@ -33,12 +33,13 @@ function draft(name, template) {
 
 const current = () => workspace.projects.find(({ id }) => id === workspace.current);
 
-async function save() {
+async function save(markDirty = true) {
   ensureReportReferences(current());
+  if (markDirty !== false) slfRememberEdit(current().id);
   const revision = ++saving;
   status.textContent = "Menyimpan…";
   try {
-    await storeValue(database, "workspace", "drafts", workspace);
+    await storeValue(database, "workspace", slfWorkspaceKey(slfCloudOwner()), workspace);
     if (revision === saving) status.textContent = "Tersimpan di browser ini";
   } catch {
     if (revision === saving) status.textContent = "Gagal menyimpan. Unduh cadangan sebelum menutup.";
@@ -260,14 +261,15 @@ function purposeField(project) {
   return dom("div", { className: "purpose-field" }, dom("label", {}, "Tujuan kajian", select), manual);
 }
 
-function setCurrent(id) {
+function setCurrent(id, dirty = false) {
   workspace.current = id;
   active = "cover";
   const url = new URL(location.href);
   url.searchParams.set("proyek", id);
   history.replaceState(null, "", url);
-  save();
+  save(dirty);
   render();
+  slfUpdateAccountControls();
 }
 
 function outlineEntry(label, id, marker) {
@@ -299,7 +301,7 @@ function renderOutline() {
 
 function render() {
   const project = current();
-  $("projects").replaceChildren(...workspace.projects.map(({ id, name }) => new Option(name, id)));
+  $("projects").replaceChildren(...slfProjectOptions());
   $("projects").value = project.id;
   $("template-label").textContent = reportTemplates[project.template].label;
   renderOutline();
@@ -473,7 +475,22 @@ function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });
   if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
   if (embed) params.set("embed", "1");
+  if (slfCloudOwner()) params.set("cloud", "1");
   return "./daftar-simak.html?" + params + (item ? "#butir-" + item : "");
+}
+
+function checklistEditorLink(project, item, label) {
+  const link = dom("a", { href: projectChecklistUrl(project, item), target: "_blank", rel: "noopener" }, label);
+  if (slfCloudOwner()) {
+    link.removeAttribute("target");
+    link.onclick = (event) => {
+      event.preventDefault();
+      slfChecklistItem = item;
+      active = "checklist";
+      render();
+    };
+  }
+  return link;
 }
 
 function renderChecklistMap(project) {
@@ -498,7 +515,7 @@ function renderChecklistMap(project) {
         const section = document.getElementById("checklist-links-" + to.block);
         if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
       }, "quiet");
-      rows.push([dom("a", { href: projectChecklistUrl(project, item.id), target: "_blank", rel: "noopener" }, label), summary, reference, jump]);
+      rows.push([checklistEditorLink(project, item.id, label), summary, reference, jump]);
     }
     list.replaceChildren(rows.length ? reportTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
       dom("p", {}, "Tidak ada butir yang cocok."));
@@ -539,7 +556,7 @@ function editorChecklistTable(project, checklist, blockIndex) {
     const to = checklistDestination(project, item);
     if (to?.chapter !== active || to.block !== blockIndex) continue;
     const summary = checklistSummary(item, checklist.checks[item.id]);
-    rows.push([dom("a", { href: projectChecklistUrl(project, item.id), target: "_blank", rel: "noopener" }, item.title),
+    rows.push([checklistEditorLink(project, item.id, item.title),
       summary || "Belum diisi", checklistReference(item.id, project.intensity?.region === "tegal")]);
   }
   return reportTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
@@ -555,7 +572,7 @@ function renderCover(project) {
   editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
       guidedField(project.cover, key, label, type))),
-    dom("hr"), pictureEditor(project.cover, "foto sampul"));
+    dom("hr"), pictureEditor(project.cover, "foto sampul", () => workspace.projects.includes(project)));
   editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
     project.name = value;
     $("projects").selectedOptions[0].textContent = value;
@@ -590,10 +607,12 @@ function renderFront(project) {
 function renderChecklistEditor(project) {
   if (active === "checklist") title("Lampiran", "Daftar simak kajian");
   const url = projectChecklistUrl(project);
+  const item = slfChecklistItem;
+  slfChecklistItem = "";
   editor.append(dom("div", { className: "checklist-head" },
     dom("p", { className: "lead" }, "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."),
     dom("a", { href: url, target: "_blank", rel: "noopener" }, "Buka layar penuh")),
-    dom("iframe", { src: projectChecklistUrl(project, null, true), title: "Daftar simak proyek", className: "checklist-frame" }));
+    dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
 
 function renderIntensityAnalysis(project, checklist) {
@@ -1088,9 +1107,9 @@ async function importBackup(file) {
       const blob = await (await fetch(photo)).blob();
       await checklistPhoto(project.id, key, blob);
     }
-    localStorage.setItem("daftar-simak-slf:v2:" + project.id, JSON.stringify(checklist));
+    localStorage.setItem(slfChecklistKey(project.id, slfCloudOwner()), JSON.stringify(checklist));
     workspace.projects.push(project);
-    setCurrent(project.id);
+    setCurrent(project.id, true);
   } catch {
     status.textContent = "Impor gagal. Periksa file cadangan atau ruang penyimpanan browser.";
   } finally {
@@ -1136,7 +1155,15 @@ async function start() {
   const sizeNavigation = () => { $("section-navigation").open = !narrowLayout.matches; };
   sizeNavigation();
   narrowLayout.addEventListener("change", sizeNavigation);
-  $("projects").addEventListener("change", () => setCurrent($("projects").value));
+  $("projects").addEventListener("change", () => {
+    const id = $("projects").value;
+    if (workspace.projects.some((entry) => entry.id === id)) {
+      setCurrent(id);
+      if (slfCloudOwner()) slfQueueCloud(() => slfSyncCloud()).catch(() => {});
+    } else {
+      slfQueueCloud(() => slfOpenDraft(id)).catch(() => {});
+    }
+  });
   const chapterDialog = $("chapter-dialog");
   const chapterForm = $("chapter-form");
   const chapterPosition = chapterForm.elements.position;
@@ -1184,7 +1211,7 @@ async function start() {
     $("project-dialog").close();
     form.reset();
     explain();
-    setCurrent(project.id);
+    setCurrent(project.id, true);
   });
   $("preview").addEventListener("click", () => presentReport(false));
   $("print").addEventListener("click", () => presentReport(true));
@@ -1202,12 +1229,15 @@ async function start() {
     if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
   });
   window.addEventListener("storage", (event) => {
-    if (event.key !== "daftar-simak-slf:v2:" + current().id) return;
+    if (event.key !== slfChecklistKey(current().id, slfCloudOwner())) return;
+    slfRememberEdit(current().id);
+    if (slfCloudOwner()) save(false);
     refreshLinkedFields();
     refreshChecklistViews();
   });
   render();
-  await save();
+  await save(false);
+  initSlfCloud();
 }
 
 start();

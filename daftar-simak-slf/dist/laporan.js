@@ -29,7 +29,7 @@ async function storeValue(database, storeName, key, value) {
 
 function readChecklist(id) {
   try {
-    return JSON.parse(localStorage.getItem("daftar-simak-slf:v2:" + id)) ?? { identity: {}, checks: {} };
+    return JSON.parse(localStorage.getItem(slfChecklistKey(id, slfCloudOwner()))) ?? { identity: {}, checks: {} };
   } catch {
     return { identity: {}, checks: {} };
   }
@@ -68,7 +68,21 @@ function checklistPhotos(checklist) {
 
 function checklistPhoto(id, key, blob) {
   photoDatabase ??= openStore("daftar-simak-slf", "photos");
-  return storeValue(photoDatabase, "photos", id + ":" + key, blob);
+  return storeValue(photoDatabase, "photos", slfPhotoKey(id, key, slfCloudOwner()), blob);
+}
+
+async function storeChecklistPhotos(id, files, owner) {
+  const entries = Object.entries(files);
+  if (!entries.length) return;
+  photoDatabase ??= openStore("daftar-simak-slf", "photos");
+  const db = await photoDatabase;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("photos", "readwrite");
+    const store = tx.objectStore("photos");
+    for (const [key, blob] of entries) store.put(blob, slfPhotoKey(id, key, owner));
+    tx.oncomplete = resolve;
+    tx.onabort = () => reject(tx.error);
+  });
 }
 
 function chapterLabel(project, index) {

@@ -21,6 +21,10 @@
   <script src="contoh-isian.js" defer></script>
   <script src="vendor/paged-0.4.3.min.js" defer></script>
   <script src="pagination.js" defer></script>
+  <script src="vendor/supabase-2.119.2.min.js" defer></script>
+  <script src="cloud-config.js" defer></script>
+  <script src="cloud.js" defer></script>
+  <script src="cloud-workspace.js" defer></script>
   <script src="kajian.js" defer></script>
 </head>
 <body data-screen="kajian">
@@ -28,6 +32,16 @@
     <div class="mast-inner">
       <a class="app-brand" href="./index.html" aria-label="Ruang Kajian SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian</a>
       <a class="standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
+      <div id="cloud-controls" class="cloud-controls" hidden>
+        <span id="cloud-email"></span>
+        <div class="button-row">
+          <button id="cloud-login" type="button">Masuk / Daftar</button>
+          <button id="cloud-sync" type="button" hidden>Sinkronkan</button>
+          <button id="cloud-copy" type="button" hidden>Simpan salinan perubahan</button>
+          <button id="cloud-logout" type="button" hidden>Keluar</button>
+        </div>
+        <span id="cloud-status" class="hint" role="status">Mode lokal</span>
+      </div>
     </div>
   </header>
   <main>
@@ -67,6 +81,23 @@
       </section>
     </div>
   </main>
+  <dialog id="cloud-dialog" aria-labelledby="cloud-dialog-title">
+    <form id="cloud-auth">
+      <h2 id="cloud-dialog-title">Masuk</h2>
+      <label>Email<input name="email" type="email" autocomplete="email" required></label>
+      <label>Kata sandi<input name="password" type="password" autocomplete="current-password" required></label>
+      <p id="cloud-auth-message" class="hint" role="status"></p>
+      <div class="button-row">
+        <button id="cloud-cancel" type="button">Tutup</button>
+        <button id="cloud-submit" class="primary" type="submit">Masuk</button>
+      </div>
+      <div id="cloud-mode-actions" class="button-row">
+        <button class="quiet" type="button" data-auth-mode="login">Sudah punya akun</button>
+        <button class="quiet" type="button" data-auth-mode="signup">Buat akun</button>
+        <button class="quiet" type="button" data-auth-mode="recover">Lupa kata sandi</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="project-dialog">
     <form id="project-form">
       <h2>Proyek kajian baru</h2>

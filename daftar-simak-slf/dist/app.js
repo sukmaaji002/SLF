@@ -4,8 +4,16 @@ const byId = (id) => document.getElementById(id);
 const projectId = new URLSearchParams(location.search).get("proyek");
 const tegalReference = new URLSearchParams(location.search).get("acuan") === "tegal";
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
-const storageKey = "daftar-simak-slf:v2" + (projectMode ? ":" + projectId : "");
-const photoKey = (key) => projectMode ? projectId + ":" + key : key;
+const cloudChecklist = projectMode && new URLSearchParams(location.search).has("cloud");
+const cloudOwner = cloudChecklist && window.parent !== window ? window.parent.slfCloudOwner?.() || "" : "";
+if (cloudChecklist && !cloudOwner) {
+  const query = new URLSearchParams({ proyek: projectId, bagian: "simak", butir: location.hash.slice(7) });
+  location.replace("./index.html?" + query);
+}
+const storageKey = slfChecklistKey(projectMode ? projectId : "", cloudOwner);
+const photoKey = (key) => slfPhotoKey(projectMode ? projectId : "", key, cloudOwner);
+const slfChecklistWriting = () => photoWrites > 0;
+globalThis.slfChecklistWriting = slfChecklistWriting;
 if (projectMode) {
   document.getElementById("project-editor").href = "./index.html?proyek=" + encodeURIComponent(projectId);
   if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embedded-checklist");
@@ -296,6 +304,11 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
   remove.hidden = !row[property];
 
   async function changePhoto(file) {
+    if (cloudOwner && file && (!Object.hasOwn(slfCloudPhotoTypes, file.type) || file.size > 50_000_000 || !file.size)) {
+      feedback.textContent = "Pilih foto JPEG, PNG, WebP, GIF, AVIF, BMP, atau TIFF dengan ukuran sampai 50 MB.";
+      input.value = "";
+      return;
+    }
     version++;
     photoWrites++;
     input.disabled = remove.disabled = true;
