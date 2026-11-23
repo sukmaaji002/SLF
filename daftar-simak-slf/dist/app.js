@@ -55,6 +55,26 @@ const periodFields = [
 ];
 const nonconformity = ["nonconformity", "Uraian ketidaksesuaian", "long"];
 const disruption = ["disruption", "Uraian gangguan", "long"];
+const checklistExamples = {
+  ownerName: "PT Pengelola Gedung Contoh",
+  ownerAddress: "Jl. Melati No. 10, Kota Contoh",
+  building: "Gedung Pelayanan Utama",
+  use: "pelayanan kesehatan rawat jalan",
+  location: "lantai 1, koridor timur, titik P-01",
+  observation: "cat permukaan mengelupas pada dinding koridor timur",
+  measurement: "90 cm, diukur pada titik yang dicatat",
+  direction: "membuka ke arah koridor",
+  conformity: "bandingkan kondisi aktual dengan gambar rujukan yang diperiksa",
+  nonconformity: "lebar bukaan berbeda dari gambar A-03, lihat lembar ukur",
+  ndt: "nomor laporan uji, lokasi titik uji, dan ringkasan hasil aktual",
+  test: "fungsi diperiksa pada titik P-01, hasil dicatat di lembar uji",
+  disruption: "sirkulasi terganggu oleh barang di depan pintu servis",
+  note: "lihat Foto 2.3. Bagian di atas plafon belum dapat diakses",
+  component: "saluran drainase sisi timur",
+  routine: "pembersihan rutin sesuai catatan pemeliharaan",
+  periodic: "pemeriksaan berkala sesuai jadwal dan buku log",
+  unscheduled: "pembersihan tambahan setelah terjadi genangan, jika tercatat",
+};
 const categories = [];
 const items = [];
 let idb;
@@ -95,7 +115,7 @@ function button(text, action) {
   return node;
 }
 
-function field([key, title, type], data, onChange, context) {
+function field([key, title, type], data, onChange, context, item) {
   const label = el("label", "", title);
   label.classList.toggle("has-value", Boolean(data[key]?.trim()));
   const output = el("span", "print-value", data[key] || "–");
@@ -113,6 +133,12 @@ function field([key, title, type], data, onChange, context) {
     control.type = type || "text";
   }
   control.setAttribute("aria-label", context ? title + " — " + context : title);
+  if (!Array.isArray(type) && type !== "date" && Object.hasOwn(checklistExamples, key)) {
+    const example = key === "measurement" && item?.unit ? "masukkan angka hasil ukur dalam " + item.unit :
+      key === "location" && !item ? "Jl. Melati No. 10, Kota Contoh" :
+      title === "Nama bangunan pembanding" ? "gedung servis di sisi timur" : checklistExamples[key];
+    control.placeholder = "Contoh: " + example;
+  }
   control.value = data[key] || "";
   control.addEventListener("input", () => {
     data[key] = control.value;
@@ -367,7 +393,7 @@ function renderItem(item) {
     if (item.title === "Jarak Antar Bangunan" && Number(row.key) > 3) {
       group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context).label);
     }
-    for (const definition of definitionsFor(item)) group.append(field(definition, row, onRowChange, context).label);
+    for (const definition of definitionsFor(item)) group.append(field(definition, row, onRowChange, context, item).label);
     for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
     sample.append(group);
     if (Number(row.key) > item.initialCount) {
