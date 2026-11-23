@@ -17,9 +17,9 @@ const reportPrintStyle = `
   .report-print h2 { font-size: 18pt; margin: 0 0 15px; break-after: avoid; }
   .report-print h3 { margin: 11px 0 6px; break-after: avoid; }
   .report-print h4 { margin: 6px 0 3px; break-after: avoid; }
-  .report-print .front-doc { font-size: 12pt; line-height: 1.47; }
+  .report-print .front-doc { font-size: 11pt; line-height: 1.4; }
   .report-print .report-text { white-space: pre-wrap; margin: 0 0 9px; orphans: 3; widows: 3; }
-  .report-print .front-doc .report-text { margin-bottom: 13px; }
+  .report-print .front-doc .report-text { margin-bottom: 10px; }
   .report-print .report-signoff { margin-top: 16px; break-inside: avoid; }
   .report-print .report-signoff p { margin: 0 0 3px; }
   .report-print ul { list-style: none; margin: 0 0 5px; padding: 0; }
