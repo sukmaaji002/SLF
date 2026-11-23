@@ -219,9 +219,15 @@ const coverFields = [
   ["use", "Fungsi bangunan"], ["owner", "Pemilik / pemberi tugas"], ["consultant", "Penyedia jasa / pengkaji"],
   ["city", "Kota / kabupaten"], ["date", "Tanggal laporan", "date"], ["number", "Nomor / revisi laporan"],
 ];
+const approvalPlaceholder = "[Isi pernyataan pengesahan setelah pemeriksaan dan penelaahan laporan selesai.]";
+const approvalStatement = [
+  "Pemeriksaan bangunan dan penelaahan laporan ini telah selesai dilaksanakan sesuai dengan ruang lingkup kajian. Penelaahan mencakup dokumen administrasi dan teknis, hasil pemeriksaan lapangan, serta bukti yang mendasari kesimpulan dan rekomendasi dalam laporan.",
+  "Dengan ini, kami mengesahkan laporan ini sebagai dokumen hasil kajian teknis kelaikan fungsi [nama bangunan]. Rekomendasi dan tindak lanjut yang tercantum dalam laporan menjadi acuan bagi pihak terkait sesuai dengan tanggung jawab masing-masing.",
+].join("\n\n");
+
 const frontDefaults = {
   preface: "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.\n\n[Tambahkan ucapan terima kasih dan keterangan yang diperlukan.]",
-  approval: "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]\n\n[Isi pernyataan pengesahan setelah pemeriksaan dan penelaahan laporan selesai.]",
+  approval: "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]\n\n" + approvalStatement,
 };
 const frontFields = [
   ["preface", "Kata pengantar"], ["approval", "Lembar pengesahan"],
@@ -275,6 +281,13 @@ function upgradeDisciplineDraft(project) {
     }
   }
   project.narrativeRevision = disciplineNarrativeRevision;
+}
+
+function upgradeReportDraft(project) {
+  upgradeDisciplineDraft(project);
+  if (typeof project.front.approval === "string") {
+    project.front.approval = project.front.approval.replace(approvalPlaceholder, approvalStatement);
+  }
 }
 
 function headingEntries(chapter, chapterIndex) {

@@ -500,7 +500,7 @@ async function importBackup(file) {
   try {
     const raw = JSON.parse(await file.text());
     const { project, checklist } = validateBackup(raw);
-    upgradeDisciplineDraft(project);
+    upgradeReportDraft(project);
     for (const key of checklistPhotos(checklist)) {
       const photo = raw.photos?.[key];
       if (typeof photo !== "string" || !/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(photo)) continue;
@@ -545,7 +545,7 @@ async function start() {
     const project = draft("Kajian baru", preset);
     workspace = { projects: [project], current: project.id };
   }
-  for (const project of workspace.projects) upgradeDisciplineDraft(project);
+  for (const project of workspace.projects) upgradeReportDraft(project);
   const requested = new URLSearchParams(location.search).get("proyek");
   if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
   $("projects").addEventListener("change", () => setCurrent($("projects").value));
