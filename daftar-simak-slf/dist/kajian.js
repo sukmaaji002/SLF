@@ -129,6 +129,23 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         setLinks({ ...getLinks(), [token]: { value: input } });
         updatePreview();
         save();
+      }, token === "tanggal pemeriksaan" ? "date" : "text");
+      const manualInput = manual.querySelector("input");
+      const choices = Object.hasOwn(inputChoices, token) ? inputChoices[token] : null;
+      const pick = choices ? dom("select", { ariaLabel: "Pilihan isian " + name },
+        new Option("Pilih isian", ""), ...choices.map((option) => new Option(option, option))) : null;
+      const choiceField = pick ? dom("label", {}, "Pilihan isian", pick) : null;
+      if (pick) pick.addEventListener("change", () => {
+        if (!pick.value) return;
+        const previousValue = manualInput.value.trim();
+        const replace = token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
+        if (replace || !previousValue) manualInput.value = pick.value;
+        else if (!previousValue.split(", ").includes(pick.value)) manualInput.value = previousValue + ", " + pick.value;
+        select.value = "manual";
+        pick.value = "";
+        updateValue();
+        manualInput.dispatchEvent(new Event("input"));
+        manualInput.focus();
       });
       const scope = auto === "project:scope" ? scopeField(project, () => {
         sources.get("project:scope").value = scopeValue(project.scope);
@@ -140,13 +157,14 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const updateValue = () => {
         manual.hidden = select.value !== "manual";
         value.hidden = select.value === "manual";
+        if (choiceField) choiceField.hidden = select.value !== "manual" && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
         value.textContent = (select.value ? sources.get(select.value)?.value : automaticValue(token, sources)) ||
           (select.value ? "Sumber kosong atau sudah dihapus" : "Isian belum tersedia");
       };
       select.addEventListener("change", () => {
         const links = { ...getLinks() };
-        if (select.value === "manual") links[token] = { value: manual.querySelector("input").value };
+        if (select.value === "manual") links[token] = { value: manualInput.value };
         else if (select.value) links[token] = { source: select.value };
         else delete links[token];
         setLinks(links);
@@ -158,6 +176,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const entry = dom("div", { className: "link-entry" }, dom("label", {}, name[0].toLocaleUpperCase("id") + name.slice(1), select));
       if (hint) entry.append(dom("p", { className: "hint" }, hint));
       if (scope) entry.append(scope);
+      if (choiceField) entry.append(choiceField);
       entry.append(manual, value);
       if (example) entry.append(dom("p", { className: "field-example" }, dom("strong", {}, "Contoh isian"), " · " + example));
       grid.append(entry);
@@ -355,13 +374,19 @@ function tableEditor(block) {
   }
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
+  const tableName = tokenName(block.text);
+  const statusColumn = tableName === "rekap pemeriksaan dokumen" ?
+    block.headers.findIndex((header) => tokenName(header) === "status verifikasi") : -1;
+  const toolColumn = tableName === "daftar alat pemeriksaan" ?
+    block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
     rows.append(dom("tr", {}, ...row.map((value, column) =>
       dom("td", {}, tableCellField("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
         row[column] = text;
         refreshLinkedFields();
         save();
-      }))), dom("td", {}, button("Hapus", () => {
+      }, column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
+        column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : null))), dom("td", {}, button("Hapus", () => {
       if (row.some((cell) => cell.trim()) && !confirm("Hapus baris tabel ini?")) return;
       block.rows.splice(index, 1);
       block.rowIds.splice(index, 1);
@@ -394,12 +419,17 @@ function tableEditor(block) {
   return editor;
 }
 
-function tableCellField(label, value, onInput) {
+function tableCellField(label, value, onInput, options) {
   const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
   const control = field(label, token ? "" : value, onInput);
   if (token) {
     const example = inputExample(tokenName(token));
     control.querySelector("input").placeholder = example ? "Contoh: " + example : token;
+  }
+  if (options) {
+    const id = "pilihan-" + crypto.randomUUID();
+    control.querySelector("input").setAttribute("list", id);
+    control.append(dom("datalist", { id }, ...options.map((option) => new Option(option, option))));
   }
   return control;
 }

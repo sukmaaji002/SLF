@@ -125,7 +125,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     const check = checklist.checks[item.id];
     if (!check || check.na) continue;
     for (const row of check.rows) {
-      if (cleanValue(row.location) && item.title !== "Jarak Antar Bangunan") locations.add(cleanValue(row.location));
+      if (cleanValue(row.location) && tokenName(item.title) !== "jarak antar bangunan") locations.add(cleanValue(row.location));
       if (row.photo || row.ndtPhoto) hasPhotos = true;
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!cleanValue(row[key]) || key === "photo" || key === "ndtPhoto") continue;
@@ -209,7 +209,7 @@ function resolveReportText(text, sources, links) {
     const key = tokenName(label);
     const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
     const value = link ? (link.source ? sources.get(link.source)?.value : link.value) : automaticValue(key, sources);
-    return value?.trim() || original;
+    return (key === "tanggal pemeriksaan" ? inspectionDate(value) : value?.trim()) || original;
   });
 }
 
