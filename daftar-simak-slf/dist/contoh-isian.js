@@ -1,6 +1,7 @@
 "use strict";
 
 const inputExamples = {
+  "lokasi komponen proteksi kebakaran": "ruang panel alarm lantai dasar dan koridor timur",
   "metode pemeriksaan yang digunakan": "telaah dokumen, observasi visual, dan pengukuran lapangan pada titik yang dicatat",
   "tanggal pemeriksaan": "12 Mei 2026, sesuai tanggal pada identitas daftar simak",
   "daftar alat pemeriksaan": "meteran laser, lux meter, dan kamera lapangan, sesuai alat yang benar-benar digunakan",

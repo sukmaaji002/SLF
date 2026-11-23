@@ -38,6 +38,16 @@ const linkedMethodNarratives = {
     "Alat yang tercatat dalam tabel pemeriksaan meliputi [daftar alat pemeriksaan]."),
 };
 
+const contextualNarratives = {
+  "Kondisi eksisting": { marker: "tanggal", replacement: "tanggal pemeriksaan", previous: "Pada saat observasi [tanggal], bangunan berada dalam kondisi [ringkasan kondisi umum]. Pemanfaatan utama teridentifikasi pada [area atau unit]. Dokumentasi berupa [denah, foto, atau catatan lapangan] digunakan untuk menunjukkan kondisi yang dapat diverifikasi." },
+  "Proteksi kebakaran": { marker: "lokasi", replacement: "lokasi komponen proteksi kebakaran", previous: "Sarana proteksi kebakaran yang ditinjau meliputi [sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia]. Hasil verifikasi pada [lokasi] adalah [kondisi, fungsi terverifikasi, atau temuan]. Bukti pemeriksaan berupa [daftar simak, hasil uji, atau foto]." },
+};
+
+function contextualNarrative(title) {
+  const { marker, replacement, previous } = contextualNarratives[title];
+  return previous.replace("[" + marker + "]", "[" + replacement + "]");
+}
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -89,7 +99,7 @@ const reportTemplates = {
         ["Identitas dan fungsi bangunan", {"body":"Bangunan yang dikaji adalah [nama bangunan], milik atau dikelola oleh [nama pemilik/pengelola]. Berdasarkan [dokumen], fungsi bangunan tercatat sebagai [fungsi dalam dokumen]. Pada saat pemeriksaan, unit [nama unit] dimanfaatkan untuk [fungsi aktual].","previous":"[Identifikasi nama, pemilik, fungsi, dan unit bangunan.]"}],
         ["Data teknis bangunan", {"body":"Data teknis dirangkum dari [sumber dokumen] dan [sumber verifikasi lapangan]. Parameter yang dicatat meliputi tahun pembangunan, luas persil, luas lantai, jumlah lantai, dan tinggi bangunan. Perbedaan data rencana dan data eksisting dicatat pada tabel data umum.","previous":"[Catat tahun pembangunan, luas, lantai, ketinggian, dan sumber data.]"}],
         {"table":"Data umum bangunan gedung","columns":["Parameter","Data rencana / izin","Data eksisting","Sumber"],"rows":[["Tahun pembangunan","[Data izin/rencana]","[Data terverifikasi]","[Rujukan]"],["Luas persil","[Data izin/rencana]","[Data terverifikasi]","[Rujukan]"],["Luas lantai","[Data izin/rencana]","[Data terverifikasi]","[Rujukan]"],["Jumlah lantai","[Data izin/rencana]","[Data terverifikasi]","[Rujukan]"],["Tinggi bangunan","[Data izin/rencana]","[Data terverifikasi]","[Rujukan]"]]},
-        ["Kondisi eksisting", {"body":"Pada saat observasi [tanggal], bangunan berada dalam kondisi [ringkasan kondisi umum]. Pemanfaatan utama teridentifikasi pada [area atau unit]. Dokumentasi berupa [denah, foto, atau catatan lapangan] digunakan untuk menunjukkan kondisi yang dapat diverifikasi.","previous":"[Jelaskan pemanfaatan aktual serta kondisi umum saat pemeriksaan. Tambahkan denah dan foto sesuai kebutuhan.]"}],
+        ["Kondisi eksisting", { body: contextualNarrative("Kondisi eksisting"), previous: "[Jelaskan pemanfaatan aktual serta kondisi umum saat pemeriksaan. Tambahkan denah dan foto sesuai kebutuhan.]" }],
       ],
       [
         "Tinjauan aspek dokumen administrasi",
@@ -127,7 +137,7 @@ const reportTemplates = {
         [
           "Keselamatan",
           {"body":"Penilaian utilitas keselamatan mencakup [sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait]. Rincian sistem yang diperiksa, lokasi, hasil, dan bukti pembanding dijabarkan pada subbagian berikut.","previous":"[Ringkas kondisi utilitas terkait keselamatan.]"},
-          ["Proteksi kebakaran", {"body":"Sarana proteksi kebakaran yang ditinjau meliputi [sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia]. Hasil verifikasi pada [lokasi] adalah [kondisi, fungsi terverifikasi, atau temuan]. Bukti pemeriksaan berupa [daftar simak, hasil uji, atau foto].","previous":"[Catat sistem pasif, aktif, dan sarana evakuasi yang diperiksa.]"}],
+          ["Proteksi kebakaran", { body: contextualNarrative("Proteksi kebakaran"), previous: "[Catat sistem pasif, aktif, dan sarana evakuasi yang diperiksa.]" }],
           ["Penangkal petir", {"body":"Sistem proteksi petir yang tersedia diidentifikasi sebagai [jenis atau konfigurasi]. Pemeriksaan mencakup [komponen yang dapat diverifikasi] dan didukung [hasil pengukuran atau dokumen yang tersedia]. Hasil dan keterbatasan pemeriksaan adalah [hasil serta batasan].","previous":"[Catat instalasi, pembumian, dan hasil pengujian yang tersedia.]"}],
           ["Instalasi listrik", {"body":"Instalasi listrik yang ditinjau mencakup [sumber, panel, jaringan distribusi, dan perangkat proteksi]. Pada [lokasi panel atau sistem] tercatat [kondisi aktual], berdasarkan [observasi, dokumen, atau hasil pengujian]. Bagian yang memerlukan tindak lanjut adalah [temuan].","previous":"[Catat sumber, panel, distribusi, perlindungan, dan kondisi instalasi.]"}],
         ],
@@ -372,6 +382,12 @@ function upgradeReportDraft(project) {
           if (block.links?.tanggal && !block.links["tanggal pemeriksaan"]) {
             block.links["tanggal pemeriksaan"] = block.links.tanggal;
           }
+        }
+        if (Object.hasOwn(contextualNarratives, block.text)) {
+          const { marker, replacement, previous } = contextualNarratives[block.text];
+          if (block.body !== previous) continue;
+          block.body = contextualNarrative(block.text);
+          if (block.links?.[marker] && !block.links[replacement]) block.links[replacement] = block.links[marker];
         }
       }
     }
