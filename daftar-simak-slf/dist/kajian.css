@@ -96,6 +96,12 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .linked-content h4 { margin-top: 12px; }
 .link-entry { min-width: 0; display: grid; gap: 4px; align-content: start; }
 .link-entry .hint { overflow-wrap: anywhere; }
+.field-example { color: #37594c; background: #e9f2eb; border-left: 3px solid #a9c8b9; padding: 6px 8px; font-size: .875rem; overflow-wrap: anywhere; }
+.scope-options { min-width: 0; margin: 4px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.scope-options legend { font-weight: 650; font-size: .9rem; }
+.scope-options .scope-choice { display: flex; align-items: start; gap: 7px; padding: 3px 0; font-weight: 500; }
+.scope-choice input[type="checkbox"] { width: 16px; min-height: 16px; height: 16px; margin: 3px 0 0; flex: none; accent-color: var(--dark); }
+.scope-options > label:last-child { margin-top: 6px; }
 .linked-preview { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .purpose-field { display: grid; gap: 8px; margin-bottom: 14px; }
 .block .purpose-field { margin-bottom: 0; }

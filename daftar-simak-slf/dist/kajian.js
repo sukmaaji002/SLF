@@ -60,6 +60,29 @@ function boundField(data, key, label, type, changed = save) {
   return field(label, data[key], (value) => { data[key] = value; changed(); }, type);
 }
 
+function scopeField(project, onChange) {
+  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Bidang yang diperiksa"));
+  const selected = () => new Set(project.scope?.parts ?? []);
+  const change = (changes) => {
+    project.scope = { ...project.scope, ...changes };
+    onChange();
+  };
+  for (const [id, label] of scopeOptions) {
+    const control = dom("input", { type: "checkbox", checked: selected().has(id) });
+    control.addEventListener("change", () => {
+      const parts = selected();
+      if (control.checked) parts.add(id);
+      else parts.delete(id);
+      change({ parts: [...parts] });
+    });
+    form.append(dom("label", { className: "scope-choice" }, control, label));
+  }
+  const other = field("Bidang atau sistem lain", project.scope?.other, (value) => change({ other: value }));
+  other.querySelector("input").placeholder = "Contoh: sistem gas medis";
+  form.append(other);
+  return form;
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks) {
   const summary = dom("summary", {}, "Isian tertaut");
   const content = dom("div", { className: "linked-content" });
@@ -89,23 +112,35 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
       const select = dom("select", { ariaLabel: "[" + name + "]" });
+      const combined = token === "nama dan alamat bangunan";
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
-        token === "nama dan alamat bangunan" ? "Otomatis · Nama dan alamat bangunan" : "Belum ditautkan";
-      select.append(new Option(autoLabel, ""), new Option("Isi manual", "manual"));
+        "Otomatis · Nama dan alamat bangunan";
+      if (auto || combined) select.append(new Option(autoLabel, ""));
+      select.append(new Option("Isi manual", "manual"));
       for (const [group, entries] of groups) {
         select.append(dom("optgroup", { label: group }, ...entries.map(([id, label]) => new Option(label, id))));
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
-      select.value = saved?.source ?? (saved ? "manual" : "");
+      select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : "");
       const value = dom("p", { className: "hint" });
+      const example = inputExample(token);
+      const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
       const manual = field("Isi " + name, saved?.value, (input) => {
         setLinks({ ...getLinks(), [token]: { value: input } });
         updatePreview();
         save();
       });
+      const scope = auto === "project:scope" ? scopeField(project, () => {
+        sources.get("project:scope").value = scopeValue(project.scope);
+        updateValue();
+        updatePreview();
+        refreshLinkedFields(details);
+        save();
+      }) : null;
       const updateValue = () => {
         manual.hidden = select.value !== "manual";
         value.hidden = select.value === "manual";
+        if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
         value.textContent = (select.value ? sources.get(select.value)?.value : automaticValue(token, sources)) ||
           (select.value ? "Sumber kosong atau sudah dihapus" : "Isian belum tersedia");
       };
@@ -120,7 +155,12 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         save();
       });
       updateValue();
-      grid.append(dom("div", { className: "link-entry" }, dom("label", {}, "[" + name + "]", select), manual, value));
+      const entry = dom("div", { className: "link-entry" }, dom("label", {}, name[0].toLocaleUpperCase("id") + name.slice(1), select));
+      if (hint) entry.append(dom("p", { className: "hint" }, hint));
+      if (scope) entry.append(scope);
+      entry.append(manual, value);
+      if (example) entry.append(dom("p", { className: "field-example" }, dom("strong", {}, "Contoh isian"), " · " + example));
+      grid.append(entry);
     }
     updatePreview();
     content.replaceChildren(grid, dom("h4", {}, "Hasil di laporan"), preview);
@@ -132,8 +172,10 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
   return wrapper;
 }
 
-function refreshLinkedFields() {
-  for (const details of editor.querySelectorAll(".linked-fields[open]")) details.refreshSources();
+function refreshLinkedFields(except) {
+  for (const details of editor.querySelectorAll(".linked-fields[open]")) {
+    if (details !== except) details.refreshSources();
+  }
 }
 
 function purposeField(project) {
@@ -315,7 +357,7 @@ function tableEditor(block) {
   const rows = dom("tbody");
   for (const [index, row] of block.rows.entries()) {
     rows.append(dom("tr", {}, ...row.map((value, column) =>
-      dom("td", {}, field("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
+      dom("td", {}, tableCellField("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
         row[column] = text;
         refreshLinkedFields();
         save();
@@ -350,6 +392,16 @@ function tableEditor(block) {
       "Isi peran Penanggung jawab kajian pada baris yang sesuai agar nama dari tabel muncul otomatis dalam narasi Bab I."));
   }
   return editor;
+}
+
+function tableCellField(label, value, onInput) {
+  const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
+  const control = field(label, token ? "" : value, onInput);
+  if (token) {
+    const example = inputExample(tokenName(token));
+    control.querySelector("input").placeholder = example ? "Contoh: " + example : token;
+  }
+  return control;
 }
 
 async function imageData(file) {
@@ -515,6 +567,7 @@ function validateBackup(data) {
   };
   const purpose = pickText(source.purpose, ["mode", "custom"]);
   if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = purpose;
+  if (source.scope) project.scope = importScope(source.scope);
   if (source.cover?.image) {
     valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));
     project.cover.image = source.cover.image;
