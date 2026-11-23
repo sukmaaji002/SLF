@@ -20,8 +20,12 @@ const reportPrintStyle = `
   .report-print .front-doc { font-size: 11pt; line-height: 1.4; }
   .report-print .report-text { white-space: pre-wrap; margin: 0 0 9px; orphans: 3; widows: 3; }
   .report-print .front-doc .report-text { margin-bottom: 10px; }
-  .report-print .report-signoff { margin-top: 16px; break-inside: avoid; }
-  .report-print .report-signoff p { margin: 0 0 3px; }
+  .report-print #report-approval { font-size: 10.8pt; line-height: 1.37; }
+  .report-print #report-approval .report-text { margin-bottom: 8px; }
+  .report-print .report-signoff { width: 76mm; margin: 11px 0 0 auto; text-align: center; break-inside: avoid; }
+  .report-print .report-signoff p { margin: 0 0 2px; }
+  .report-print .signature-space { height: 24mm; }
+  .report-print .signatory-name { font-weight: 700; }
   .report-print ul { list-style: none; margin: 0 0 5px; padding: 0; }
   .report-print .sub-outline { padding-left: 15px; }
   .report-print .nested-outline { padding-left: 15px; }

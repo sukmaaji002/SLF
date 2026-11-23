@@ -195,11 +195,11 @@ async function buildReport(target, project, urls) {
     const section = reportSection(label, "report-" + key);
     section.classList.add("front-doc");
     section.append(...reportParagraphs(resolve(project.front[key] || "", project.frontLinks?.[key])));
-    if (key === "approval") {
-      const signoff = frontFields.slice(2).filter(([id]) => project.front[id]?.trim());
-      if (signoff.length) section.append(dom("div", { className: "report-signoff" },
-        ...signoff.map(([id]) => dom("p", {}, project.front[id]))));
-    }
+    if (key === "approval") section.append(dom("div", { className: "report-signoff" },
+      dom("p", {}, project.front.location?.trim() || "[Tempat dan tanggal pengesahan]"),
+      dom("p", {}, project.front.role?.trim() || "Direktur"),
+      dom("div", { className: "signature-space", ariaHidden: "true" }),
+      dom("p", { className: "signatory-name" }, project.front.signatory?.trim() || "[Nama Direktur]")));
     attach(section);
   }
   attach(contents);
