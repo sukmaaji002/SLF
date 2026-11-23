@@ -4,6 +4,10 @@ const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
+  "pengajuan/perpanjangan": ["project:application"],
+  "pengajuan atau perpanjangan": ["project:application"],
+  "susunan bab laporan": ["project:chapter-order"],
+  "nama penanggung jawab": ["project:team-lead"],
   "nama bangunan": ["cover:building", "identity:building"],
   "alamat": ["cover:address", "identity:location"],
   "alamat lengkap": ["cover:address", "identity:location"],
@@ -52,12 +56,18 @@ function ensureTableReferences(project) {
 
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
+  const teamLeads = new Set();
   function add(id, group, label, value) {
     sources.set(id, { group, label, value: cleanValue(value) });
   }
   const purpose = project.purpose;
   const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
   add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue);
+  const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
+  add("project:application", "Data kajian", "Jenis permohonan SLF", application);
+  const outline = project.chapters.map((chapter, index) => chapterLabel(project, index));
+  if (!project.chapters.some((chapter) => chapter.checklist)) outline.push("Lampiran · Daftar simak kajian");
+  add("project:chapter-order", "Data kajian", "Urutan bab dan lampiran", outline.join("\n"));
   for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key]);
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
     add("identity:" + key, "Identitas daftar simak", label, checklist.identity[key]);
@@ -77,6 +87,14 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const [index, chapter] of project.chapters.entries()) {
     for (const block of chapter.blocks) {
       if (block.type !== "table" || !block.sourceId) continue;
+      if (tokenName(block.text) === "susunan tim pengkaji teknis") {
+        const name = block.headers.findIndex((header) => tokenName(header) === "nama");
+        const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
+        const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
+        for (const row of block.rows) {
+          if (leadRoles.includes(tokenName(row[role] ?? "")) && cleanValue(row[name])) teamLeads.add(cleanValue(row[name]));
+        }
+      }
       for (const [ri, row] of block.rows.entries()) {
         for (const [ci, value] of row.entries()) {
           if (!cleanValue(value)) continue;
@@ -87,6 +105,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       }
     }
   }
+  add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", teamLeads.size === 1 ? [...teamLeads][0] : "");
   return sources;
 }
 

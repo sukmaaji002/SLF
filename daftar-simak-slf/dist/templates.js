@@ -9,6 +9,20 @@ const purposeOptions = [
   ["tindak-lanjut", "Verifikasi tindak lanjut rekomendasi", "memverifikasi tindak lanjut atas rekomendasi kajian teknis sebelumnya"],
 ];
 
+const originalIntroduction = {
+  "Latar belakang": "Pemanfaatan bangunan gedung perlu didukung oleh kondisi yang sesuai dengan fungsi serta persyaratan tata bangunan dan keandalan. Kajian teknis ini disusun untuk mendukung [pengajuan/perpanjangan] Sertifikat Laik Fungsi (SLF) atas [nama bangunan] yang berlokasi di [alamat lengkap]. Bangunan digunakan untuk [fungsi aktual]. Kajian ini dilatarbelakangi oleh [kondisi bangunan atau kebutuhan pemilik] dan mencakup bagian bangunan yang ditetapkan dalam lingkup pekerjaan.",
+  "Maksud": "Pekerjaan ini dimaksudkan untuk menelaah kelengkapan dan kesesuaian dokumen administratif serta mengkaji kondisi teknis [nama bangunan] sesuai dengan fungsi [fungsi aktual]. Kajian disusun sebagai bahan pertimbangan dalam proses [pengajuan/perpanjangan] SLF.",
+  "Sistematika penyusunan": "Laporan ini dimulai dengan pendahuluan, metode dan landasan hukum, gambaran umum, serta tinjauan dokumen administrasi. Bagian berikutnya memuat pengkajian bidang arsitektur, struktur, dan MEP. Rekomendasi dan daftar simak melengkapi hasil pengkajian.",
+};
+const linkedIntroduction = {
+  "Latar belakang": originalIntroduction["Latar belakang"].replace(
+    "untuk mendukung [pengajuan/perpanjangan] Sertifikat Laik Fungsi (SLF) atas", "untuk [tujuan kajian] pada"),
+  "Maksud": originalIntroduction.Maksud.replace(
+    "Kajian disusun sebagai bahan pertimbangan dalam proses [pengajuan/perpanjangan] SLF.",
+    "Hasil kajian ini digunakan untuk [tujuan kajian]."),
+  "Sistematika penyusunan": "Susunan bab dalam laporan ini mengikuti urutan berikut.\n\n[susunan bab laporan]",
+};
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -16,11 +30,11 @@ const reportTemplates = {
     chapters: [
       [
         "Pendahuluan",
-        ["Latar belakang", {"body":"Pemanfaatan bangunan gedung perlu didukung oleh kondisi yang sesuai dengan fungsi serta persyaratan tata bangunan dan keandalan. Kajian teknis ini disusun untuk mendukung [pengajuan/perpanjangan] Sertifikat Laik Fungsi (SLF) atas [nama bangunan] yang berlokasi di [alamat lengkap]. Bangunan digunakan untuk [fungsi aktual]. Kajian ini dilatarbelakangi oleh [kondisi bangunan atau kebutuhan pemilik] dan mencakup bagian bangunan yang ditetapkan dalam lingkup pekerjaan.","previous":"Kajian teknis ini disusun sebagai bagian dari [pengajuan atau perpanjangan] Sertifikat Laik Fungsi untuk [nama bangunan] di [alamat]. Bangunan berfungsi sebagai [fungsi aktual]. Pengkajian dilakukan atas dasar [alasan dan kondisi yang melatarbelakangi pekerjaan]."}],
+        ["Latar belakang", { body: linkedIntroduction["Latar belakang"], previous: "Kajian teknis ini disusun sebagai bagian dari [pengajuan atau perpanjangan] Sertifikat Laik Fungsi untuk [nama bangunan] di [alamat]. Bangunan berfungsi sebagai [fungsi aktual]. Pengkajian dilakukan atas dasar [alasan dan kondisi yang melatarbelakangi pekerjaan]." }],
         [
           "Maksud, tujuan, dan sasaran",
           {"body":"Penelaahan dokumen dan pemeriksaan kondisi bangunan merupakan dasar untuk menyusun penilaian teknis atas [nama bangunan]. Hasilnya digunakan untuk mendokumentasikan kondisi yang dapat diverifikasi, mencatat kesenjangan terhadap acuan pemeriksaan, dan menyusun rekomendasi yang dapat ditindaklanjuti oleh [pemilik/pengelola bangunan].","previous":"[Jelaskan apa yang dinilai, tujuan pemeriksaan, dan keluaran yang diharapkan.]"},
-          ["Maksud", {"body":"Pekerjaan ini dimaksudkan untuk menelaah kelengkapan dan kesesuaian dokumen administratif serta mengkaji kondisi teknis [nama bangunan] sesuai dengan fungsi [fungsi aktual]. Kajian disusun sebagai bahan pertimbangan dalam proses [pengajuan/perpanjangan] SLF.","previous":"[Jelaskan kebutuhan pengkajian teknis untuk bangunan ini.]"}],
+          ["Maksud", { body: linkedIntroduction.Maksud, previous: "[Jelaskan kebutuhan pengkajian teknis untuk bangunan ini.]" }],
           ["Tujuan", { body: purposeText, previous: "[Tuliskan tujuan pemeriksaan administratif dan teknis.]" }],
           ["Sasaran", {"body":"Sasaran pekerjaan ini adalah tersusunnya data kondisi eksisting, daftar simak, dan rekomendasi yang dapat ditelusuri kembali ke dokumen, observasi, atau hasil uji. Objek yang ditinjau meliputi [unit atau area bangunan], sedangkan sistem yang diperiksa meliputi [sistem utama dalam lingkup kajian].","previous":"[Sebutkan objek dan aspek yang dinilai.]"}],
         ],
@@ -30,7 +44,7 @@ const reportTemplates = {
           ["Lingkup wilayah kegiatan", {"body":"Lokasi kegiatan berada di [alamat lengkap], [desa/kelurahan], [kecamatan], [kabupaten/kota], [provinsi]. Wilayah pemeriksaan meliputi [nama gedung atau blok], [lantai atau area], serta [prasarana tapak yang diperiksa]. Batas area kajian mengacu pada [gambar tapak atau uraian batas].","previous":"[Tuliskan alamat, batas tapak, dan cakupan bangunan.]"}],
           ["Lingkup materi pelaporan", {"body":"Laporan memuat profil objek kajian, daftar dokumen yang ditelaah, kondisi arsitektur, struktur, dan mekanikal, elektrikal, serta plambing (MEP), berikut bukti, temuan, dan rekomendasinya. Sumber data utama meliputi [dokumen, hasil survei, atau hasil uji]. Ruang atau komponen yang belum dapat diverifikasi karena [keterbatasan akses atau data] dicatat sebagai batasan kajian.","previous":"[Jelaskan dokumen, disiplin, dan batasan akses atau pengujian.]"}],
         ],
-        ["Sistematika penyusunan","Laporan ini dimulai dengan pendahuluan, metode dan landasan hukum, gambaran umum, serta tinjauan dokumen administrasi. Bagian berikutnya memuat pengkajian bidang arsitektur, struktur, dan MEP. Rekomendasi dan daftar simak melengkapi hasil pengkajian."],
+        ["Sistematika penyusunan", { body: linkedIntroduction["Sistematika penyusunan"], previous: originalIntroduction["Sistematika penyusunan"] }],
         ["Tim pengkaji teknis", {"body":"Kajian teknis atas [nama bangunan] dilaksanakan oleh [nama penyedia jasa atau tim]. Koordinasi pekerjaan dan penelaahan laporan menjadi tanggung jawab [nama penanggung jawab]. Pembagian bidang, nama pengkaji, dan rujukan kompetensinya tercantum dalam tabel susunan tim.","previous":"[Cantumkan personel, bidang, kompetensi, dan penanggung jawab kajian.]"}],
         {"table":"Susunan tim pengkaji teknis","columns":["Nama","Peran / bidang","Kompetensi / dokumen pendukung"],"rows":[["[Nama pengkaji arsitektur]","Arsitektur","[Jenis dan nomor bukti kompetensi]"],["[Nama pengkaji struktur]","Struktur","[Jenis dan nomor bukti kompetensi]"],["[Nama pengkaji MEP]","MEP","[Jenis dan nomor bukti kompetensi]"]]},
       ],
@@ -332,7 +346,11 @@ function upgradeReportDraft(project) {
   if (project.template === "disiplin") {
     for (const chapter of project.chapters) {
       for (const block of chapter.blocks) {
-        if (block.type === "heading" && block.text === "Tujuan" && block.body === originalPurposeText) block.body = purposeText;
+        if (block.type !== "heading") continue;
+        if (block.text === "Tujuan" && block.body === originalPurposeText) block.body = purposeText;
+        if (Object.hasOwn(originalIntroduction, block.text) && block.body === originalIntroduction[block.text]) {
+          block.body = linkedIntroduction[block.text];
+        }
       }
     }
   }
