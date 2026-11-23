@@ -34,6 +34,10 @@ const tokenAliases = {
   "daftar dokumen": ["project:reviewed-documents"],
   "daftar alat pemeriksaan": ["project:inspection-tools"],
   "daftar bahan dan dokumen": ["project:intro-materials"],
+  "jenis dokumen dan nomor": ["project:reviewed-permit"],
+  "nama pengkaji arsitektur": ["project:reviewer-architecture"],
+  "nama pengkaji struktur": ["project:reviewer-structure"],
+  "nama pengkaji mep": ["project:reviewer-mep"],
 };
 
 const scopeOptions = [
@@ -72,14 +76,25 @@ function reportTokens(text) {
   return entries;
 }
 
-function ensureTableReferences(project) {
+function ensureReportReferences(project) {
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
+      if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();
       if (block.type !== "table") continue;
-      block.sourceId ??= crypto.randomUUID();
       block.rowIds ??= block.rows.map(() => crypto.randomUUID());
       block.columnIds ??= block.headers.map(() => crypto.randomUUID());
     }
+  }
+}
+
+function narrativeReference(id, token) {
+  return "narrative:" + id + ":" + encodeURIComponent(token);
+}
+
+function addNarrativeSources(add, id, text, links, label) {
+  for (const [token, name] of reportTokens(text)) {
+    const value = links?.[token]?.value;
+    if (cleanValue(value)) add(narrativeReference(id, token), "Isian bagian lain", label + " · " + name, value);
   }
 }
 
@@ -101,6 +116,8 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const teamLeads = new Set();
   const locations = new Set();
   const reviewedDocuments = new Set();
+  const permits = new Set();
+  const reviewers = new Map([["arsitektur", new Set()], ["struktur", new Set()], ["mep", new Set()]]);
   const tools = new Set();
   let hasResults = false;
   let hasPhotos = false;
@@ -117,6 +134,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   if (!project.chapters.some((chapter) => chapter.checklist)) outline.push("Lampiran · Daftar simak kajian");
   add("project:chapter-order", "Data kajian", "Urutan bab dan lampiran", outline.join("\n"));
   for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key]);
+  for (const [key, label] of frontFields.slice(0, 2)) {
+    addNarrativeSources(add, key, project.front[key] ?? "", project.frontLinks?.[key], label);
+  }
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
     const value = checklist.identity[key];
     add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value);
@@ -138,6 +158,10 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   }
   for (const [index, chapter] of project.chapters.entries()) {
     for (const block of chapter.blocks) {
+      if ((block.type === "heading" || block.type === "text") && block.sourceId) {
+        addNarrativeSources(add, block.sourceId, block.type === "heading" ? block.body : block.text, block.links,
+          chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
+      }
       if (block.type !== "table" || !block.sourceId) continue;
       const title = tokenName(block.text);
       const columns = block.headers.map(tokenName);
@@ -146,7 +170,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
         const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
         for (const row of block.rows) {
-          if (leadRoles.includes(tokenName(row[role] ?? "")) && cleanValue(row[name])) teamLeads.add(cleanValue(row[name]));
+          const roleName = tokenName(row[role] ?? "");
+          const person = cleanValue(row[name]);
+          if (!person) continue;
+          if (leadRoles.includes(roleName)) teamLeads.add(person);
+          reviewers.get(roleName)?.add(person);
         }
       }
       if (title === "daftar alat pemeriksaan") {
@@ -164,6 +192,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
           const number = cleanValue(row[reference]);
           const value = number ? document + " (" + number + ")" : document;
           reviewedDocuments.add(value);
+          if (/\b(?:pbg|imb)\b/i.test(document)) permits.add(value);
           add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
         }
       }
@@ -182,6 +211,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
   add("project:reviewed-documents", "Data kajian", "Daftar dokumen yang sudah ditelaah dari Bab IV", scopeList.format([...reviewedDocuments]));
+  add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", permits.size === 1 ? [...permits][0] : "");
+  for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
+    const names = reviewers.get(role);
+    add("project:reviewer-" + id, "Data kajian", "Pengkaji " + role + " dari tabel tim", names.size === 1 ? [...names][0] : "");
+  }
   add("project:inspection-tools", "Data kajian", "Nama alat dari tabel Daftar Alat Pemeriksaan", scopeList.format([...tools]));
   add("project:intro-materials", "Data kajian", "Sumber data yang diisi di Bab I",
     filledIntroSource(project, "dokumen, hasil survei, atau hasil uji", sources));
@@ -221,7 +255,7 @@ function importLinks(links) {
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
     if (typeof link.value === "string") pairs.push([tokenName(token), { value: link.value }]);
-    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell|document):[a-z\d.:/-]+$/i.test(link.source)) {
+    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
   }

@@ -32,7 +32,7 @@ function draft(name, template) {
 const current = () => workspace.projects.find(({ id }) => id === workspace.current);
 
 async function save() {
-  ensureTableReferences(current());
+  ensureReportReferences(current());
   const revision = ++saving;
   status.textContent = "Menyimpan…";
   try {
@@ -117,8 +117,10 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         "Otomatis · Nama dan alamat bangunan";
       if (auto || combined) select.append(new Option(autoLabel, ""));
       select.append(new Option("Isi manual", "manual"));
+      const ownSource = narrativeReference(data.sourceId ?? key, token);
       for (const [group, entries] of groups) {
-        select.append(dom("optgroup", { label: group }, ...entries.map(([id, label]) => new Option(label, id))));
+        const available = entries.filter(([id]) => id !== ownSource);
+        if (available.length) select.append(dom("optgroup", { label: group }, ...available.map(([id, label]) => new Option(label, id))));
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
       select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : "");
@@ -127,19 +129,22 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
       const manual = field("Isi " + name, saved?.value, (input) => {
         setLinks({ ...getLinks(), [token]: { value: input } });
+        if (sources.has(ownSource)) sources.get(ownSource).value = cleanValue(input);
         updatePreview();
+        refreshLinkedFields(details);
         save();
       }, token === "tanggal pemeriksaan" ? "date" : "text");
       const manualInput = manual.querySelector("input");
-      const choices = Object.hasOwn(inputChoices, token) ? inputChoices[token] : null;
-      const pick = choices ? dom("select", { ariaLabel: "Pilihan isian " + name },
-        new Option("Pilih isian", ""), ...choices.map((option) => new Option(option, option))) : null;
+      const choices = token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
+      const isExample = !Object.hasOwn(inputChoices, token);
+      const pick = choices.length ? dom("select", { ariaLabel: "Pilihan isian " + name },
+        new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option))) : null;
       const choiceField = pick ? dom("label", {}, "Pilihan isian", pick) : null;
       if (pick) pick.addEventListener("change", () => {
         if (!pick.value) return;
         const previousValue = manualInput.value.trim();
         const replace = token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
-        if (replace || !previousValue) manualInput.value = pick.value;
+        if (replace || isExample || !previousValue) manualInput.value = pick.value;
         else if (!previousValue.split(", ").includes(pick.value)) manualInput.value = previousValue + ", " + pick.value;
         select.value = "manual";
         pick.value = "";
@@ -573,7 +578,10 @@ function validateBackup(data) {
       valid(block && ["heading", "text", "table", "photo"].includes(block.type) && typeof block.text === "string");
       const clean = { type: block.type, text: block.text };
       if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; clean.depth = block.depth === 2 ? 2 : 1; }
-      if (block.type === "heading" || block.type === "text") clean.links = importLinks(block.links);
+      if (block.type === "heading" || block.type === "text") {
+        clean.links = importLinks(block.links);
+        if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
+      }
       if (block.type === "table") {
         valid(Array.isArray(block.headers) && block.headers.length && block.headers.every((value) => typeof value === "string") &&
           Array.isArray(block.rows) && block.rows.every((row) => Array.isArray(row) &&
