@@ -1159,7 +1159,7 @@ async function start() {
     const id = $("projects").value;
     if (workspace.projects.some((entry) => entry.id === id)) {
       setCurrent(id);
-      if (slfCloudOwner()) slfQueueCloud(() => slfSyncCloud()).catch(() => {});
+      slfRequestCloudSync();
     } else {
       slfQueueCloud(() => slfOpenDraft(id)).catch(() => {});
     }

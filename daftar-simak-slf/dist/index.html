@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="kajian.css">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
-  <link rel="stylesheet" href="akun.css">
+  <link rel="stylesheet" href="akun.css?v=2">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js" defer></script>
@@ -25,8 +25,8 @@
   <script src="vendor/supabase-2.119.2.min.js" defer></script>
   <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
-  <script src="cloud-workspace.js?v=2" defer></script>
-  <script src="kajian.js" defer></script>
+  <script src="cloud-workspace.js?v=3" defer></script>
+  <script src="kajian.js?v=2" defer></script>
 </head>
 <body data-screen="kajian">
   <header class="mast">
@@ -37,7 +37,6 @@
         <button id="cloud-login" type="button">Masuk / Daftar</button>
         <span id="cloud-status" role="status" hidden></span>
         <button id="cloud-copy" type="button" hidden>Simpan salinan perubahan</button>
-        <button id="cloud-sync" type="button" hidden>Sinkronkan</button>
         <details id="cloud-account" class="cloud-account" hidden>
           <summary><span id="cloud-avatar" class="cloud-avatar" aria-hidden="true"></span> Akun</summary>
           <div class="cloud-account-panel">

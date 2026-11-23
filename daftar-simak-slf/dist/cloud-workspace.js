@@ -5,6 +5,7 @@ let slfAccount;
 let slfDraftStore;
 let slfCloudRows = [];
 let slfCloudTimer;
+let slfPendingSync;
 let slfCloudQueue = Promise.resolve();
 let slfReleaseAccount;
 let slfAuthUser;
@@ -32,7 +33,7 @@ function slfCloudError(error) {
   if (error?.code === "PGRST205" || error?.code === "42P01") return "Basis data draf online belum disiapkan.";
   if (error?.name === "StorageApiError" || error?.status === 413) return "Foto gagal disinkronkan. Periksa ukuran foto dan kapasitas penyimpanan.";
   if (error instanceof Error && /^(Foto online|Ada foto Daftar Simak|Format draf|Rujukan foto)/.test(error.message)) return error.message;
-  return "Layanan online tidak dapat dihubungi. Coba Sinkronkan lagi.";
+  return "Layanan online belum dapat dihubungi.";
 }
 
 function slfLocalWorkspace() {
@@ -52,12 +53,26 @@ function slfUpdateAccountControls() {
   const email = slfAuthUser?.email ?? "";
   $("cloud-login").hidden = signedIn;
   $("cloud-status").hidden = !signedIn;
-  $("cloud-sync").hidden = !signedIn;
   $("cloud-copy").hidden = !slfAccount || !workspace?.cloud?.[workspace.current]?.conflict;
   account.hidden = !signedIn;
   if (!signedIn) account.open = false;
   $("cloud-avatar").textContent = email.charAt(0).toLocaleUpperCase("id") || "A";
   $("cloud-email").textContent = email;
+}
+
+function slfRequestCloudSync({ pull = true } = {}) {
+  if (!slfAuthUser) return;
+  if (slfPendingSync) {
+    slfPendingSync.pull ||= pull;
+    return;
+  }
+  const request = { pull };
+  slfPendingSync = request;
+  slfQueueCloud(() => {
+    slfPendingSync = undefined;
+    if (slfAccount) return slfSyncCloud(request);
+    if (slfAuthUser && navigator.onLine) return slfChangeAccount(slfAuthUser);
+  }).catch(() => {});
 }
 
 function slfRememberEdit(projectId) {
@@ -66,7 +81,7 @@ function slfRememberEdit(projectId) {
   slfCloudStatus("Perubahan menunggu sinkronisasi.");
   clearTimeout(slfCloudTimer);
   slfCloudTimer = setTimeout(() => {
-    slfQueueCloud(() => slfSyncCloud({ pull: false })).catch(() => {});
+    slfRequestCloudSync({ pull: false });
   }, 1200);
 }
 
@@ -104,6 +119,10 @@ async function slfInstallRemote(snapshot, id, state, store) {
 
 async function slfSyncCloud({ pull = true } = {}) {
   if (!slfAccount) return;
+  if (!navigator.onLine) {
+    slfCloudStatus("Offline. Sinkronisasi dilanjutkan otomatis saat terhubung.");
+    return;
+  }
   const store = slfDraftStore;
   const state = workspace;
   let failed;
@@ -231,7 +250,7 @@ async function slfChangeAccount(user) {
         slfChecklistItem = checklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
       }
     } else {
-      slfCloudStatus(user ? "Akun sedang diedit di tab lain. Tutup tab itu lalu klik Sinkronkan." : "Mode lokal");
+      slfCloudStatus(user ? "Akun terbuka di tab lain. Sinkronisasi dilanjutkan otomatis setelah tab itu ditutup." : "Mode lokal");
     }
     if (dialog.open) dialog.close();
     render();
@@ -239,7 +258,7 @@ async function slfChangeAccount(user) {
     slfUpdateAccountControls();
     if (slfAccount) await slfSyncCloud();
   } finally {
-    main.inert = false;
+    main.inert = Boolean(slfAuthUser && !slfAccount);
   }
 }
 
@@ -381,9 +400,6 @@ function initSlfCloud() {
       await slfChangeAccount(undefined);
     }).catch(() => {});
   });
-  $("cloud-sync").addEventListener("click", () => {
-    slfQueueCloud(() => slfAccount ? slfSyncCloud() : slfChangeAccount(slfAuthUser)).catch(() => {});
-  });
   $("cloud-copy").addEventListener("click", () => { slfQueueCloud(slfCopyConflict).catch(() => {}); });
   slfCloud.auth.onAuthStateChange((event, session) => {
     if (!["INITIAL_SESSION", "SIGNED_IN", "SIGNED_OUT", "PASSWORD_RECOVERY"].includes(event)) return;
@@ -393,9 +409,16 @@ function initSlfCloud() {
     }, 0);
   });
   const refresh = () => {
-    if (slfAccount && !document.hidden) slfQueueCloud(() => slfSyncCloud()).catch(() => {});
+    if (!document.hidden) slfRequestCloudSync();
+    else if (slfAccount && Object.values(workspace.cloud).some((entry) => entry.dirty && !entry.conflict)) {
+      slfRequestCloudSync({ pull: false });
+    }
   };
-  window.addEventListener("online", refresh);
+  window.addEventListener("online", () => slfRequestCloudSync());
+  window.addEventListener("offline", () => {
+    if (slfAccount) slfCloudStatus("Offline. Sinkronisasi dilanjutkan otomatis saat terhubung.");
+  });
   window.addEventListener("focus", refresh);
+  document.addEventListener("visibilitychange", refresh);
   setInterval(refresh, 20000);
 }

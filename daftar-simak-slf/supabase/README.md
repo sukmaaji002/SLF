@@ -27,7 +27,7 @@ Isian, foto, dan akun pelanggan hanya tersimpan di Supabase. Workflow hanya mene
 
 ## Pemakaian
 
-- Masuk, buka draf, lalu edit isian atau unggah foto. Tunggu status **Draf tersinkron** sebelum pindah perangkat. Tombol **Sinkronkan** juga bisa dipakai setelah koneksi pulih.
+- Masuk, buka draf, lalu edit isian atau unggah foto. Perubahan dikirim otomatis dan dicoba lagi setelah koneksi pulih. Tunggu status **Draf tersinkron** sebelum pindah perangkat. Saat editor dibuka kembali, draf diperbarui otomatis dari Supabase.
 - Untuk memindahkan draf lama, unduh cadangan dari mode lokal, masuk, dan impor cadangan sebagai draf akun. Guest dan tiap akun punya cache lokal yang berbeda.
 - Jika perangkat lain sudah menyimpan versi baru, **Simpan salinan perubahan** menyimpan edit perangkat ini sebagai draf terpisah.
 - Foto ditransfer sebagai file privat dan hanya diunduh saat draf terkait dibuka. Foto yang dikeluarkan dari draf berhenti tampil di laporan. Berkas foto lama tetap berada di bucket privat hingga admin membersihkan objek tak terpakai. Hindari menghapus objek yang masih dirujuk oleh `payload.media`.

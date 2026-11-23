@@ -27,8 +27,6 @@
     color: var(--muted);
   }
 
-  #cloud-sync { flex-shrink: 0; border-color: transparent; background: transparent; }
-  #cloud-sync:hover { background: var(--panel); }
   #cloud-copy { flex-shrink: 0; }
 
   .cloud-account { position: relative; }
