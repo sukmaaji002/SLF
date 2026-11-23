@@ -31,6 +31,7 @@ function draft(name, template) {
 const current = () => workspace.projects.find(({ id }) => id === workspace.current);
 
 async function save() {
+  ensureTableReferences(current());
   const revision = ++saving;
   status.textContent = "Menyimpan…";
   try {
@@ -56,6 +57,82 @@ function field(label, value, onInput, type = "text") {
 
 function boundField(data, key, label, type, changed = save) {
   return field(label, data[key], (value) => { data[key] = value; changed(); }, type);
+}
+
+function linkedText(project, data, key, label, getLinks, setLinks) {
+  const summary = dom("summary", {}, "Isian tertaut");
+  const content = dom("div", { className: "linked-content" });
+  const details = dom("details", { className: "linked-fields" }, summary, content);
+  const wrapper = dom("div", { className: "wide" }, boundField(data, key, label, "area", () => {
+    update();
+    save();
+  }), details);
+
+  function update() {
+    const text = data[key] || "";
+    const fields = reportTokens(text);
+    details.hidden = fields.size === 0;
+    summary.textContent = "Isian tertaut (" + fields.size + ")";
+    if (!details.open || !fields.size) return;
+    const sources = reportSources(project);
+    const groups = new Map();
+    for (const [id, source] of sources) {
+      if (!groups.has(source.group)) groups.set(source.group, []);
+      groups.get(source.group).push([id, source.label]);
+    }
+    const grid = dom("div", { className: "form-grid" });
+    const preview = dom("p", { className: "linked-preview" });
+    const updatePreview = () => { preview.textContent = resolveReportText(text, sources, getLinks()); };
+    for (const [token, name] of fields) {
+      const links = getLinks();
+      const saved = Object.hasOwn(links, token) ? links[token] : undefined;
+      const auto = automaticSource(token, sources);
+      const select = dom("select");
+      const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
+        token === "nama dan alamat bangunan" ? "Otomatis · Nama dan alamat bangunan" : "Belum ditautkan";
+      select.append(new Option(autoLabel, ""), new Option("Isi manual", "manual"));
+      for (const [group, entries] of groups) {
+        select.append(dom("optgroup", { label: group }, ...entries.map(([id, label]) => new Option(label, id))));
+      }
+      if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
+      select.value = saved?.source ?? (saved ? "manual" : "");
+      const value = dom("p", { className: "hint" });
+      const manual = field("Isi " + name, saved?.value, (input) => {
+        setLinks({ ...getLinks(), [token]: { value: input } });
+        updatePreview();
+        save();
+      });
+      const updateValue = () => {
+        manual.hidden = select.value !== "manual";
+        value.hidden = select.value === "manual";
+        value.textContent = (select.value ? sources.get(select.value)?.value : automaticValue(token, sources)) ||
+          (select.value ? "Sumber kosong atau sudah dihapus" : "Isian belum tersedia");
+      };
+      select.addEventListener("change", () => {
+        const links = { ...getLinks() };
+        if (select.value === "manual") links[token] = { value: manual.querySelector("input").value };
+        else if (select.value) links[token] = { source: select.value };
+        else delete links[token];
+        setLinks(links);
+        updateValue();
+        updatePreview();
+        save();
+      });
+      updateValue();
+      grid.append(dom("div", { className: "link-entry" }, dom("label", {}, "[" + name + "]", select), manual, value));
+    }
+    updatePreview();
+    content.replaceChildren(grid, dom("h4", {}, "Hasil di laporan"), preview);
+  }
+
+  details.addEventListener("toggle", update);
+  details.refreshSources = update;
+  update();
+  return wrapper;
+}
+
+function refreshLinkedFields() {
+  for (const details of editor.querySelectorAll(".linked-fields[open]")) details.refreshSources();
 }
 
 function setCurrent(id) {
@@ -107,7 +184,7 @@ function title(type, label) {
 
 function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
-  editor.append(dom("p", { className: "lead" }, "Isian ini dipakai pada sampul laporan."),
+  editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
       boundField(project.cover, key, label, type))),
     dom("hr"), pictureEditor(project.cover, "foto sampul"));
@@ -122,7 +199,9 @@ function renderFront(project) {
   title("Bagian awal", "Bagian awal & daftar isi");
   editor.append(dom("p", { className: "lead" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
-      boundField(project.front, key, label, index < 2 ? "area" : "text"))),
+      index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
+        (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
+        boundField(project.front, key, label))),
     dom("h3", {}, "Susunan bab"),
     dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
       const titles = [...headingEntries(chapter, index)].filter(([bi]) => chapter.blocks[bi].text.trim());
@@ -177,6 +256,7 @@ function renderChapter(project) {
     save();
   }), chapterActions);
   if (chapter.checklist) return renderChecklistEditor(project);
+  editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
   const headings = headingEntries(chapter, index);
   for (const [bi, block] of chapter.blocks.entries()) editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
   const actions = dom("div", { className: "button-row add-block" });
@@ -200,6 +280,7 @@ function tableEditor(block) {
   for (const [index, value] of block.headers.entries()) {
     header.append(dom("th", { scope: "col" }, field("Kolom " + (index + 1), value, (text) => {
       block.headers[index] = text;
+      refreshLinkedFields();
       save();
     })));
   }
@@ -209,10 +290,12 @@ function tableEditor(block) {
     rows.append(dom("tr", {}, ...row.map((value, column) =>
       dom("td", {}, field("Baris " + (index + 1) + ", kolom " + (column + 1), value, (text) => {
         row[column] = text;
+        refreshLinkedFields();
         save();
       }))), dom("td", {}, button("Hapus", () => {
       if (row.some((cell) => cell.trim()) && !confirm("Hapus baris tabel ini?")) return;
       block.rows.splice(index, 1);
+      block.rowIds.splice(index, 1);
       save();
       render();
     }, "danger"))));
@@ -221,11 +304,18 @@ function tableEditor(block) {
   matrix.append(table);
   const change = (edit) => { edit(); save(); render(); };
   const actions = dom("div", { className: "button-row" },
-    button("＋ Baris", () => change(() => block.rows.push(block.headers.map(() => "")))),
-    button("＋ Kolom", () => change(() => { block.headers.push("Kolom baru"); block.rows.forEach((row) => row.push("")); })));
+    button("＋ Baris", () => change(() => {
+      block.rows.push(block.headers.map(() => ""));
+      block.rowIds.push(crypto.randomUUID());
+    })),
+    button("＋ Kolom", () => change(() => {
+      block.headers.push("Kolom baru");
+      block.columnIds.push(crypto.randomUUID());
+      block.rows.forEach((row) => row.push(""));
+    })));
   if (block.headers.length > 1) actions.append(button("Hapus kolom terakhir", () => {
     if (block.rows.some((row) => row.at(-1).trim()) && !confirm("Hapus kolom terakhir beserta isinya?")) return;
-    change(() => { block.headers.pop(); block.rows.forEach((row) => row.pop()); });
+    change(() => { block.headers.pop(); block.columnIds.pop(); block.rows.forEach((row) => row.pop()); });
   }));
   return dom("div", {}, matrix, actions);
 }
@@ -302,8 +392,9 @@ function blockEditor(chapter, block, index, headingInfo) {
   }, "danger"));
   bar.append(controls);
   const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index }, bar);
-  if (block.type === "heading") wrapper.append(boundField(block, "text", "Judul subbab"), boundField(block, "body", "Isi subbab", "area"));
-  if (block.type === "text") wrapper.append(boundField(block, "text", "Isi paragraf", "area"));
+  const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; });
+  if (block.type === "heading") wrapper.append(boundField(block, "text", "Judul subbab"), linked("body", "Isi subbab"));
+  if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
   if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
   if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), pictureEditor(block, "foto", () => chapter.blocks.includes(block)));
   return wrapper;
@@ -362,12 +453,16 @@ function validateBackup(data) {
       valid(block && ["heading", "text", "table", "photo"].includes(block.type) && typeof block.text === "string");
       const clean = { type: block.type, text: block.text };
       if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; clean.depth = block.depth === 2 ? 2 : 1; }
+      if (block.type === "heading" || block.type === "text") clean.links = importLinks(block.links);
       if (block.type === "table") {
         valid(Array.isArray(block.headers) && block.headers.length && block.headers.every((value) => typeof value === "string") &&
           Array.isArray(block.rows) && block.rows.every((row) => Array.isArray(row) &&
             row.length === block.headers.length && row.every((value) => typeof value === "string")));
         clean.headers = block.headers;
         clean.rows = block.rows;
+        if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
+        clean.rowIds = importIds(block.rowIds, block.rows.length);
+        clean.columnIds = importIds(block.columnIds, block.headers.length);
       }
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
       return clean;
@@ -378,7 +473,9 @@ function validateBackup(data) {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
     ...(source.narrativeRevision === disciplineNarrativeRevision ? { narrativeRevision: disciplineNarrativeRevision } : {}),
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
-    front: pickText(source.front, frontFields.map(([key]) => key)), chapters,
+    front: pickText(source.front, frontFields.map(([key]) => key)),
+    frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },
+    chapters,
   };
   if (source.cover?.image) {
     valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));
@@ -490,6 +587,9 @@ async function start() {
   $("restore").addEventListener("click", () => $("backup-file").click());
   $("backup-file").addEventListener("change", () => {
     if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
+  });
+  window.addEventListener("storage", (event) => {
+    if (event.key === "daftar-simak-slf:v2:" + current().id) refreshLinkedFields();
   });
   render();
   await save();
