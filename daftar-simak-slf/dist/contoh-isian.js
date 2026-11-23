@@ -1,6 +1,9 @@
 "use strict";
 
 const inputExamples = {
+  "metode pemeriksaan yang digunakan": "telaah dokumen, observasi visual, dan pengukuran lapangan pada titik yang dicatat",
+  "tanggal pemeriksaan": "12 Mei 2026, sesuai tanggal pada identitas daftar simak",
+  "daftar alat pemeriksaan": "meteran laser, lux meter, dan kamera lapangan, sesuai alat yang benar-benar digunakan",
   "tujuan kajian": "mendukung perpanjangan Sertifikat Laik Fungsi",
   "nama bangunan": "Gedung Pelayanan Utama",
   "alamat lengkap": "Jl. Melati No. 10, Kelurahan Sukamaju, Kecamatan Tengah, Kota Contoh",
@@ -230,6 +233,13 @@ const inputExamples = {
 };
 
 const inputHints = {
+  "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
+  "daftar dokumen": "Otomatis memakai baris berstatus Terverifikasi atau Telah ditelaah dari Rekap Pemeriksaan Dokumen di Bab IV, jika tersedia.",
+  "tanggal pemeriksaan": "Mengikuti Tanggal pemeriksaan di identitas daftar simak. Pilih Isi manual jika tanggal observasi berbeda.",
+  "area atau posisi sampel": "Lokasi diambil dari isian sampel daftar simak. Gunakan sumber lain jika narasi hanya membahas titik tertentu.",
+  "daftar alat pemeriksaan": "Nama alat diambil dari kolom Alat pada tabel di bab ini.",
+  "daftar bahan dan dokumen": "Isian dapat mengikuti sumber data yang dicatat di Lingkup Materi Pelaporan pada Bab I.",
+  "peraturan, standar teknis, dan dokumen rencana yang relevan": "Pilih jenis acuan, lalu lengkapi judul, nomor, tahun atau edisi, dan bagian yang benar-benar dipakai.",
   "disiplin atau sistem yang diperiksa": "Pilih bidang atau sistem yang benar-benar masuk lingkup pemeriksaan proyek ini.",
   "sistem utama dalam lingkup kajian": "Gunakan pilihan bidang pemeriksaan yang sama, atau pilih sumber lain jika cakupan sasaran berbeda.",
   "lantai atau area": "Sebutkan lantai dan ruang yang benar-benar diperiksa.",
@@ -237,6 +247,32 @@ const inputHints = {
   "gambar tapak atau uraian batas": "Isi nomor gambar, revisi, atau batas persil yang dipakai sebagai acuan.",
   "dokumen, hasil survei, atau hasil uji": "Cantumkan jenis data dan nomor, revisi, atau tanggal jika tersedia.",
   "keterbatasan akses atau data": "Sebutkan bagian yang belum dapat diperiksa dan alasannya.",
+};
+
+const inputChoices = {
+  "metode pemeriksaan yang digunakan": ["telaah dokumen", "observasi visual", "pengukuran lapangan", "pengujian fungsi", "telaah hasil uji terdahulu"],
+  "fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan": ["keterwakilan setiap lantai atau zona", "perbedaan fungsi ruang", "variasi kondisi komponen", "riwayat kerusakan atau gangguan"],
+  "tabel atau lampiran": ["tabel titik pemeriksaan", "lampiran denah titik sampel", "lampiran daftar simak"],
+  "daftar dokumen": ["PBG atau IMB", "gambar rencana", "gambar terbangun", "laporan pemeliharaan", "laporan uji yang tersedia"],
+  "dokumen rujukan": ["dokumen perizinan yang ditelaah", "gambar rencana yang disetujui", "gambar terbangun revisi yang digunakan"],
+  "gambar terbangun atau data lapangan": ["gambar terbangun yang tersedia", "hasil ukur lapangan", "catatan observasi dan foto"],
+  "area atau posisi sampel": ["ruang pelayanan lantai dasar", "koridor lantai yang ditinjau", "ruang utilitas atau servis"],
+  "daftar simak atau dokumentasi foto": ["daftar simak kajian", "dokumentasi foto pemeriksaan", "lembar catatan lapangan"],
+  "jenis uji, metode, dan acuan atau keterangan tidak dilakukan": ["Tidak ada pengujian tambahan pada lingkup kajian ini", "Pengukuran lapangan dilakukan pada titik yang dicatat dalam lembar ukur", "Hasil pengujian yang tersedia ditelaah sesuai ruang lingkup kajian"],
+  "batasan pengamatan atau pengujian": ["akses ke ruang tertentu terbatas", "pengamatan hanya pada komponen yang terlihat", "pengukuran dilakukan pada jam operasional"],
+  "daftar alat pemeriksaan": ["meteran pita", "meteran laser", "lux meter", "termohigrometer", "kamera lapangan"],
+  "daftar bahan dan dokumen": ["gambar situasi atau denah", "lembar ukur", "catatan pemeriksaan", "laporan uji", "dokumentasi foto"],
+  "peraturan, standar teknis, dan dokumen rencana yang relevan": ["peraturan bangunan gedung yang digunakan", "standar teknis yang dipakai pada aspek pemeriksaan", "dokumen perizinan dan gambar rencana yang ditelaah"],
+  "ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan": ["dokumen tata ruang yang ditelaah", "PBG atau IMB yang tersedia", "gambar situasi dan denah rencana"],
+  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": ["acuan struktur yang digunakan", "acuan proteksi kebakaran yang digunakan", "acuan instalasi listrik yang digunakan", "acuan proteksi petir yang digunakan"],
+  "parameter dan rujukan": ["lebar jalur evakuasi sesuai rujukan yang dicatat", "temperatur ruang sesuai acuan yang digunakan", "dimensi elemen sesuai gambar rencana"],
+  "standar atau dokumen pembanding": ["gambar ventilasi atau sanitasi", "standar pencahayaan yang digunakan", "dokumen instalasi air bersih"],
+  "ruang atau sistem": ["ruang tunggu dan ventilasinya", "ruang pelayanan dan pencahayaan", "toilet dan sistem sanitasi"],
+  "parameter, satuan, dan rujukan": ["pencahayaan dalam lux", "suhu dalam derajat Celsius", "kelembapan dalam persen"],
+  "ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan": ["acuan ruang gerak", "acuan kenyamanan termal", "acuan getaran atau kebisingan yang digunakan"],
+  "fungsi ruang": ["ruang tunggu", "ruang pelayanan", "ruang kantor", "ruang servis"],
+  "acuan aksesibilitas atau dokumen teknis": ["ketentuan aksesibilitas yang digunakan", "gambar jalur akses", "gambar rencana sarana bangunan"],
+  "parameter jalur, fasilitas, atau peralatan yang berlaku": ["lebar bebas koridor", "dimensi akses masuk", "dimensi dan kelengkapan tangga", "dimensi toilet aksesibel"],
 };
 
 function inputExample(token) {
