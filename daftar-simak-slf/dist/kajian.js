@@ -344,7 +344,12 @@ function tableEditor(block) {
     if (block.rows.some((row) => row.at(-1).trim()) && !confirm("Hapus kolom terakhir beserta isinya?")) return;
     change(() => { block.headers.pop(); block.columnIds.pop(); block.rows.forEach((row) => row.pop()); });
   }));
-  return dom("div", {}, matrix, actions);
+  const editor = dom("div", {}, matrix, actions);
+  if (tokenName(block.text) === "susunan tim pengkaji teknis") {
+    editor.prepend(dom("p", { className: "hint" },
+      "Isi peran Penanggung jawab kajian pada baris yang sesuai agar nama dari tabel muncul otomatis dalam narasi Bab I."));
+  }
+  return editor;
 }
 
 async function imageData(file) {

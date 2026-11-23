@@ -348,7 +348,8 @@ function upgradeReportDraft(project) {
       for (const block of chapter.blocks) {
         if (block.type !== "heading") continue;
         if (block.text === "Tujuan" && block.body === originalPurposeText) block.body = purposeText;
-        if (Object.hasOwn(originalIntroduction, block.text) && block.body === originalIntroduction[block.text]) {
+        if (Object.hasOwn(originalIntroduction, block.text) && block.body === originalIntroduction[block.text] &&
+            !Object.hasOwn(block.links ?? {}, "pengajuan/perpanjangan")) {
           block.body = linkedIntroduction[block.text];
         }
       }
