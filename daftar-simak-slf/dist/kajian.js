@@ -87,7 +87,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
-      const select = dom("select");
+      const select = dom("select", { ariaLabel: "[" + name + "]" });
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
         token === "nama dan alamat bangunan" ? "Otomatis · Nama dan alamat bangunan" : "Belum ditautkan";
       select.append(new Option(autoLabel, ""), new Option("Isi manual", "manual"));
