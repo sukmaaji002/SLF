@@ -257,7 +257,7 @@ function pictureEditor(block, label, isAttached = () => true) {
       if (!isAttached()) return;
       block.image = data;
       image.src = data;
-      image.hidden = false;
+      image.hidden = remove.hidden = false;
       feedback.textContent = "Foto ditambahkan";
       save();
     } catch {
@@ -275,14 +275,6 @@ function pictureEditor(block, label, isAttached = () => true) {
     save();
   }, "quiet");
   remove.hidden = !block.image;
-  upload.addEventListener("change", () => { if (upload.files[0]) {
-    const observer = new MutationObserver(() => {
-      if (image.hidden) return;
-      remove.hidden = false;
-      observer.disconnect();
-    });
-    observer.observe(image, { attributes: true, attributeFilter: ["hidden"] });
-  } });
   return dom("div", {}, dom("label", {}, "Pilih " + label, upload), feedback, image, remove);
 }
 

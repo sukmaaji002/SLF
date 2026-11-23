@@ -155,6 +155,9 @@ async function buildReport(target, project, urls) {
     dom("h1", {}, title),
     dom("p", { className: "cover-building" }, data.building || project.name),
     dom("p", {}, data.address || data.city || ""));
+  if (imageSource.test(data.image || "")) {
+    cover.append(dom("img", { className: "cover-photo", src: data.image, alt: data.building || project.name }));
+  }
   const coverDetails = coverFields.filter(([key]) => !["title", "building", "address"].includes(key) && data[key]?.trim());
   if (coverDetails.length) cover.append(reportTable(["Identitas laporan", "Keterangan"], coverDetails.map(([key, label]) => [label, data[key]])));
   target.append(cover);
@@ -176,11 +179,12 @@ async function buildReport(target, project, urls) {
   target.append(contents);
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
-    let sub = 0;
+    const headings = headingEntries(chapter, index);
     for (const [bi, block] of chapter.blocks.entries()) {
       const id = section.id + "-block-" + bi;
       if (block.type === "heading") {
-        if (block.text.trim()) section.append(dom("h3", { id }, (index + 1) + "." + (++sub) + " " + block.text));
+        const { number, nested } = headings.get(bi);
+        if (block.text.trim()) section.append(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }, number + " " + block.text));
         section.append(...reportParagraphs(block.body));
       }
       if (block.type === "text") section.append(...reportParagraphs(block.text));
@@ -213,8 +217,14 @@ async function buildReport(target, project, urls) {
     const firstChapter = sections.findIndex((section) => section.id.startsWith("report-chapter-"));
     sections.splice(firstChapter < 0 ? 0 : firstChapter, 0, list);
   }
-  const toc = dom("ol", { className: "toc" }, ...sections.map((section) => dom("li", {},
-    dom("a", { href: "#" + section.id }, section.firstElementChild.textContent))));
+  const toc = dom("ul", { className: "toc" }, ...sections.map((section) => {
+    const entry = dom("li", {}, dom("a", { href: "#" + section.id }, section.firstElementChild.textContent));
+    const headings = [...section.querySelectorAll(".chapter-heading")];
+    if (headings.length) entry.append(dom("ul", { className: "sub-outline" }, ...headings.map((heading) =>
+      dom("li", { className: heading.tagName === "H4" ? "nested-outline" : "" },
+        dom("a", { href: "#" + heading.id }, heading.textContent)))));
+    return entry;
+  }));
   contents.firstElementChild.after(toc);
   await Promise.all(checklistTargets.map((section) => renderChecklist(section, project, urls)));
   await Promise.all(Array.from(target.querySelectorAll("img"), (image) => image.decode().catch(() => {})));
