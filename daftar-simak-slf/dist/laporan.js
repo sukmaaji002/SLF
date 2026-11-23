@@ -218,7 +218,8 @@ async function buildReport(target, project, urls) {
         const label = "Tabel " + (tableEntries.length + 1) + " · " + (block.text || "Tabel kajian");
         tableEntries.push([id, label]);
         section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
-          reportTable(block.headers.map((text) => resolve(text)), block.rows.map((row) => row.map((text) => resolve(text))))));
+          reportTable(block.headers.map((text) => resolve(text)), block.rows.map((row, ri) =>
+            row.map((_, ci) => resolve(tableCellValue(block, ri, ci, sources)))))));
       }
       if (block.type === "photo" && imageSource.test(block.image || "")) {
         const label = "Gambar " + (figureEntries.length + 1) + " · " + (block.text || "Dokumentasi");

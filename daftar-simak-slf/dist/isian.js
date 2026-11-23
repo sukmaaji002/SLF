@@ -91,6 +91,20 @@ function narrativeReference(id, token) {
   return "narrative:" + id + ":" + encodeURIComponent(token);
 }
 
+function tableCellKey(block, row, column) {
+  return block.rowIds?.[row] + ":" + block.columnIds?.[column];
+}
+
+function tableCellValue(block, row, column, sources) {
+  const source = block.cellLinks?.[tableCellKey(block, row, column)];
+  return source ? sources.get(source)?.value || "" : block.rows[row][column];
+}
+
+function tableSourceAvailable(id) {
+  return !id.startsWith("document:") && (!id.startsWith("project:") ||
+    ["project:purpose", "project:scope", "project:application", "project:chapter-order"].includes(id));
+}
+
 function addNarrativeSources(add, id, text, links, label) {
   for (const [token, name] of reportTokens(text)) {
     const value = links?.[token]?.value;
@@ -119,6 +133,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const permits = new Set();
   const reviewers = new Map([["arsitektur", new Set()], ["struktur", new Set()], ["mep", new Set()]]);
   const tools = new Set();
+  const tables = [];
   let hasResults = false;
   let hasPhotos = false;
   function add(id, group, label, value) {
@@ -163,13 +178,27 @@ function reportSources(project, checklist = readChecklist(project.id)) {
           chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
       }
       if (block.type !== "table" || !block.sourceId) continue;
+      tables.push(block);
+      for (const [ri, row] of block.rows.entries()) {
+        for (const [ci, value] of row.entries()) {
+          const key = tableCellKey(block, ri, ci);
+          if (!cleanValue(value) || block.cellLinks?.[key]) continue;
+          const rowName = cleanValue(row[0]) || "Baris " + (ri + 1);
+          const name = [chapterLabel(project, index), block.text || "Tabel", rowName, block.headers[ci]].join(" · ");
+          add("cell:" + block.sourceId + ":" + key, "Tabel kajian", name, value);
+        }
+      }
+    }
+  }
+  for (const block of tables) {
       const title = tokenName(block.text);
       const columns = block.headers.map(tokenName);
+      const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
       if (title === "susunan tim pengkaji teknis") {
         const name = block.headers.findIndex((header) => tokenName(header) === "nama");
         const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
         const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
-        for (const row of block.rows) {
+        for (const row of rows) {
           const roleName = tokenName(row[role] ?? "");
           const person = cleanValue(row[name]);
           if (!person) continue;
@@ -179,13 +208,13 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       }
       if (title === "daftar alat pemeriksaan") {
         const column = columns.indexOf("alat");
-        for (const row of block.rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
+        for (const row of rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
       }
       if (title === "rekap pemeriksaan dokumen") {
         const name = columns.indexOf("dokumen");
         const reference = columns.indexOf("nomor / tanggal");
         const verification = columns.indexOf("status verifikasi");
-        for (const [ri, row] of block.rows.entries()) {
+        for (const [ri, row] of rows.entries()) {
           const document = cleanValue(row[name]);
           const status = tokenName(row[verification] ?? "");
           if (!document || !["terverifikasi", "telah ditelaah", "ditelaah", "sesuai", "valid"].includes(status)) continue;
@@ -196,15 +225,6 @@ function reportSources(project, checklist = readChecklist(project.id)) {
           add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
         }
       }
-      for (const [ri, row] of block.rows.entries()) {
-        for (const [ci, value] of row.entries()) {
-          if (!cleanValue(value)) continue;
-          const rowName = cleanValue(row[0]) || "Baris " + (ri + 1);
-          const name = [chapterLabel(project, index), block.text || "Tabel", rowName, block.headers[ci]].join(" · ");
-          add("cell:" + [block.sourceId, block.rowIds[ri], block.columnIds[ci]].join(":"), "Tabel kajian", name, value);
-        }
-      }
-    }
   }
   add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", teamLeads.size === 1 ? [...teamLeads][0] : "");
   add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
@@ -248,6 +268,7 @@ function resolveReportText(text, sources, links) {
 }
 
 const sourceUuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
+const validReportSource = (source) => typeof source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(source);
 
 function importLinks(links) {
   if (!links || typeof links !== "object" || Array.isArray(links)) return {};
@@ -255,7 +276,7 @@ function importLinks(links) {
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
     if (typeof link.value === "string") pairs.push([tokenName(token), { value: link.value }]);
-    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(link.source)) {
+    else if (validReportSource(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
   }
