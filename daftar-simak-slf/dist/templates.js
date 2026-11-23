@@ -230,18 +230,38 @@ const coverFields = [
 ];
 const approvalPlaceholder = "[Isi pernyataan pengesahan setelah pemeriksaan dan penelaahan laporan selesai.]";
 const acknowledgementsPlaceholder = "[Tambahkan ucapan terima kasih dan keterangan yang diperlukan.]";
-const acknowledgementsText = [
+const previousAcknowledgements = [
   "Kami menyampaikan terima kasih kepada [pemilik/pengelola bangunan] atas dukungan dalam penyediaan dokumen dan akses pemeriksaan, serta kepada tim pengkaji, petugas lapangan, dan seluruh pihak yang membantu pengumpulan data, pemeriksaan, dan penelaahan laporan ini.",
   "Laporan ini disusun berdasarkan data yang tersedia dan lingkup pemeriksaan yang ditetapkan. Kami menghargai masukan yang disertai informasi pendukung untuk penyempurnaan laporan. Semoga laporan ini bermanfaat sebagai rujukan dalam menindaklanjuti temuan dan menjaga keandalan fungsi bangunan.",
 ].join("\n\n");
-const approvalStatement = [
+const previousApprovalStatement = [
   "Pemeriksaan bangunan dan penelaahan laporan ini telah selesai dilaksanakan sesuai dengan ruang lingkup kajian. Penelaahan mencakup dokumen administrasi dan teknis, hasil pemeriksaan lapangan, serta bukti yang mendasari kesimpulan dan rekomendasi dalam laporan.",
   "Dengan ini, kami mengesahkan laporan ini sebagai dokumen hasil kajian teknis kelaikan fungsi [nama bangunan]. Rekomendasi dan tindak lanjut yang tercantum dalam laporan menjadi acuan bagi pihak terkait sesuai dengan tanggung jawab masing-masing.",
 ].join("\n\n");
 
+const prefaceOpening = "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.";
+const approvalIdentity = "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]";
+
+const acknowledgementsText = [
+  "Tim pengkaji menyusun laporan ini untuk memberikan gambaran kondisi bangunan pada saat pemeriksaan. Penelaahan dimulai dengan mengenali fungsi dan pemanfaatan bangunan, meninjau kelengkapan informasi yang tersedia, dan membandingkannya dengan hasil pengamatan lapangan. Uraian teknis mengikuti bidang yang diperiksa, dengan memperhatikan tata bangunan, keselamatan, kesehatan, kenyamanan, serta kemudahan. Hasil pengamatan, pengukuran, atau pengujian yang menjadi dasar penilaian dicatat pada bagian yang berkaitan dengan masing-masing temuan.",
+  "Naskah disusun agar pembaca dapat mengikuti hubungan antara data, temuan, kesimpulan, dan rekomendasi. Bab pendahuluan serta metode menjelaskan objek dan dasar pemeriksaan. Bab gambaran umum dan tinjauan dokumen memberikan konteks bagi pembahasan teknis. Bagian hasil pengkajian memuat kondisi yang teramati, sedangkan daftar simak dan dokumentasi berfungsi sebagai rujukan untuk menelusuri butir pemeriksaan. Rekomendasi merangkum tindak lanjut yang dinilai perlu berdasarkan hasil kajian.",
+  "Kami menyampaikan terima kasih kepada [pemilik/pengelola bangunan] atas dukungan dalam penyediaan dokumen, pemberian akses, dan koordinasi selama pemeriksaan. Kami juga berterima kasih kepada tim pengkaji, petugas lapangan, tenaga administrasi, dan pihak pendukung yang membantu penyiapan data, pendokumentasian kondisi bangunan, serta penelaahan laporan. Kerja sama tersebut membantu tim mencatat temuan secara runtut dan menyiapkan bahan yang dapat ditinjau kembali.",
+  "Ruang lingkup dan batasan kajian dicantumkan agar pembaca dapat menafsirkan hasil sesuai dengan kondisi saat pemeriksaan dan informasi yang tersedia. Bila ada data tambahan yang belum tercakup, perubahan penggunaan ruang, atau pekerjaan perbaikan setelah pemeriksaan, informasi tersebut dapat digunakan sebagai dasar penelaahan lanjutan. Kami menghargai masukan yang disertai bukti pendukung sehingga temuan atau kesimpulan dapat ditinjau dengan alasan yang jelas.",
+  "Semoga laporan ini membantu pemilik, pengelola, dan pihak terkait menentukan prioritas tindak lanjut serta memantau penyelesaian rekomendasi. Kami berharap hasil kajian dapat digunakan sebagai rujukan dalam pemeliharaan dan pengelolaan bangunan sesuai fungsi yang diperiksa, serta memudahkan komunikasi antara pihak yang bertanggung jawab atas pelaksanaan maupun verifikasi pekerjaan lanjutan.",
+].join("\n\n");
+
+const approvalStatement = [
+  "Pemeriksaan bangunan dan penelaahan laporan ini telah selesai dilaksanakan sesuai dengan ruang lingkup kajian. Pemeriksaan mencakup penelusuran dokumen administratif dan teknis, pengamatan kondisi bangunan, serta pengukuran atau pengujian yang tercatat dalam laporan. Penelaahan dilakukan terhadap data yang tersedia dan bukti yang menjadi dasar temuan, dengan memperhatikan lokasi, waktu, dan metode pemeriksaan yang dicantumkan.",
+  "Dalam penelaahan laporan, tim meninjau keterkaitan antara identitas objek, ruang lingkup, metode, hasil pemeriksaan, dan kesimpulan. Keterangan tentang kondisi bangunan dirujukkan pada dokumen, hasil pengamatan, daftar simak, hasil pengukuran atau pengujian, serta dokumentasi yang tersedia. Temuan yang memerlukan tindakan dicantumkan bersama rekomendasi agar dasar penilaian dan tindak lanjutnya dapat ditelusuri.",
+  "Penelaahan juga mencakup kesesuaian antara uraian pada setiap bidang dan ringkasan hasil kajian. Rekomendasi yang disusun mempertimbangkan kondisi yang tercatat, dampak temuan, serta kebutuhan perbaikan atau verifikasi lanjutan. Bagian yang belum terverifikasi, data yang belum lengkap, atau area dengan keterbatasan akses dicatat sesuai batasan pemeriksaan dalam laporan.",
+  "Dengan ini, kami mengesahkan laporan ini sebagai dokumen hasil kajian teknis kelaikan fungsi [nama bangunan]. Pengesahan diberikan atas naskah dengan nomor dan revisi yang tercantum pada lembar ini. Kesimpulan yang dimuat berlaku dalam lingkup kajian dan berdasarkan kondisi serta bukti yang tersedia pada saat pemeriksaan.",
+  "Laporan yang disahkan digunakan sebagai rujukan bagi pemilik, pengelola, dan pihak terkait dalam menindaklanjuti rekomendasi sesuai tanggung jawab masing-masing. Pelaksanaan tindak lanjut dapat dicatat bersama bukti penyelesaiannya. Jika kemudian terdapat perubahan kondisi bangunan, perubahan pemanfaatan, atau informasi baru yang berpengaruh terhadap hasil kajian, kebutuhan penelaahan kembali ditentukan berdasarkan perubahan tersebut.",
+  "Sebagai bagian dari pengendalian dokumen, perubahan isi setelah pengesahan dicatat dalam revisi laporan. Naskah revisi ditelaah kembali apabila perubahan memengaruhi data, temuan, kesimpulan, atau rekomendasi. Pihak yang mengesahkan laporan dicantumkan di bawah ini.",
+].join("\n\n");
+
 const frontDefaults = {
-  preface: "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.\n\n" + acknowledgementsText,
-  approval: "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]\n\n" + approvalStatement,
+  preface: prefaceOpening + "\n\n" + acknowledgementsText,
+  approval: approvalIdentity + "\n\n" + approvalStatement,
 };
 const frontFields = [
   ["preface", "Kata pengantar"], ["approval", "Lembar pengesahan"],
@@ -300,10 +320,12 @@ function upgradeDisciplineDraft(project) {
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   if (typeof project.front.preface === "string") {
-    project.front.preface = project.front.preface.replace(acknowledgementsPlaceholder, acknowledgementsText);
+    project.front.preface = project.front.preface === prefaceOpening + "\n\n" + previousAcknowledgements ?
+      frontDefaults.preface : project.front.preface.replace(acknowledgementsPlaceholder, acknowledgementsText);
   }
   if (typeof project.front.approval === "string") {
-    project.front.approval = project.front.approval.replace(approvalPlaceholder, approvalStatement);
+    project.front.approval = project.front.approval === approvalIdentity + "\n\n" + previousApprovalStatement ?
+      frontDefaults.approval : project.front.approval.replace(approvalPlaceholder, approvalStatement);
   }
   if (project.template === "disiplin") {
     for (const chapter of project.chapters) {
