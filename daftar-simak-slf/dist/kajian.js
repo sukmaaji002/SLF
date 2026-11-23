@@ -313,8 +313,7 @@ function render() {
   renderChapter(project);
 }
 
-function intensityTable(project, checklist, linkToInputs = false) {
-  const { data, land, metrics, note } = calculateIntensity(project, checklist);
+function intensityTable({ data, land, metrics, note }) {
   const panel = dom("div", { className: "intensity-results" });
   const local = data.local;
   const site = data.region === "manual" ? [
@@ -335,7 +334,7 @@ function intensityTable(project, checklist, linkToInputs = false) {
       href: perbupTegalUrl + "#page=" + metric.page, target: "_blank", rel: "noopener",
     }, bounds) : bounds || "—";
     const standard = metric.source ? dom("div", {}, limit, dom("div", { className: "hint" }, metric.source)) : limit;
-    return [metric.name, linkToInputs && metric.id ? dom("a", { href: projectChecklistUrl(project, metric.id), target: "_blank", rel: "noopener" }, label) : label,
+    return [metric.name, label,
       intensityValue(metric.value, suffix), standard, metric.status];
   })));
   if (note) panel.append(dom("p", {}, note));
@@ -385,19 +384,18 @@ function additionalIntensityFields(data, changed) {
     list.lastElementChild?.querySelector("input")?.focus();
   });
   renderRows();
-  return dom("section", { className: "intensity-additional" }, dom("h3", {}, "Parameter tambahan"),
+  return dom("details", { className: "block" }, dom("summary", {}, "Parameter tambahan"),
     list, dom("div", { className: "button-row" }, add));
 }
 
 
 function renderIntensity(project) {
-  title("Data kajian", "Intensitas dan tata ruang");
+  title("Data awal", "Intensitas dan tata ruang");
   const data = importIntensity(project.intensity);
   const grid = dom("div", { className: "form-grid" });
   const criteria = dom("div", { className: "intensity-criteria" });
-  const results = dom("div", { className: "auto-checklist", id: "intensity-live", ariaLive: "polite" });
-  const refresh = () => results.replaceChildren(intensityTable(project, readChecklist(project.id), true));
-  const changed = () => { project.intensity = data; refresh(); save(); };
+  const changed = () => { project.intensity = data; save(); };
+  const checklist = readChecklist(project.id);
   const area = boundField(data, "land", "Luas persil yang diperhitungkan (m²)", "text", changed, false);
   Object.assign(area.querySelector("input"), { inputMode: "decimal", placeholder: "Contoh: 900 atau 1.250,5" });
   const select = (key, label, choices, blank, onChange = changed) => {
@@ -442,16 +440,32 @@ function renderIntensity(project) {
         })));
     }
   }
-  grid.append(area, select("region", "Metode pembanding", [["manual", "Acuan daerah setempat"], ["tegal", "Kabupaten Tegal · Perbup 12/2026"]],
-    "Hitung tanpa pembanding", () => { showCriteria(); changed(); }));
+  grid.append(area);
+  for (const metric of comparisonMetrics) {
+    const unit = metric.direct || metric.unit === "lantai" ? metric.unit : "m²";
+    const input = field(metric.areaLabel + " (" + unit + ")", initialIntensityMeasurement(data, checklist, metric).raw, (value) => {
+      data.measurements[metric.key] = value;
+      changed();
+    }, "text");
+    Object.assign(input.querySelector("input"), {
+      inputMode: unit === "lantai" ? "numeric" : "decimal",
+      placeholder: unit === "lantai" ? "Contoh: 2" : unit === "m" ? "Contoh: 12,5" : "Contoh: 600",
+    });
+    input.querySelector("input").dataset.intensityMeasurement = metric.key;
+    grid.append(input);
+  }
+  const references = dom("details", { className: "block" }, dom("summary", {}, "Acuan tata ruang"),
+    select("region", "Sumber acuan tata ruang", [["manual", "Acuan daerah setempat"], ["tegal", "Kabupaten Tegal · Perbup 12/2026"]],
+      "Belum ditentukan", () => { showCriteria(); changed(); }), criteria);
   showCriteria();
-  const diagram = dom("input", { type: "checkbox", checked: data.diagram });
-  diagram.addEventListener("change", () => { data.diagram = diagram.checked; changed(); });
-  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, luas daerah hijau, luas dasar basemen, jumlah lantai, dan jarak sempadan diambil dari daftar simak."),
-    grid, criteria, additionalIntensityFields(data, changed), results, siteDiagram(),
-    dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan"),
-    dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, unggah denah terbangun atau gambar ukur yang telah diperiksa di Bab III."));
-  refresh();
+  editor.append(dom("p", { className: "lead" }, "Isi data awal persil dan bangunan. Data ini dipakai otomatis pada pembahasan intensitas di bab kajian."),
+    grid, references, additionalIntensityFields(data, changed));
+  const destination = intensityDestination(project);
+  if (destination) editor.append(button("Buka pembahasan di Bab " + roman(destination.chapter + 1), () => {
+    active = destination.chapter;
+    render();
+    $("intensity-analysis")?.scrollIntoView({ block: "start" });
+  }, "quiet"));
 }
 
 
@@ -501,10 +515,18 @@ function refreshChecklistViews() {
     search?.dispatchEvent(new Event("input"));
   }
   if (active === "intensity") {
-    $("intensity-live")?.replaceChildren(intensityTable(current(), readChecklist(current().id), true));
+    const data = importIntensity(current().intensity);
+    const checklist = readChecklist(current().id);
+    for (const metric of comparisonMetrics) {
+      const input = editor.querySelector('[data-intensity-measurement="' + metric.key + '"]');
+      if (input && input !== document.activeElement && !Object.hasOwn(data.measurements, metric.key)) {
+        input.value = initialIntensityMeasurement(data, checklist, metric).raw;
+      }
+    }
   }
   if (typeof active === "number") {
     const checklist = readChecklist(current().id);
+    $("intensity-analysis-table")?.replaceChildren(intensityTable(calculateIntensity(current(), checklist)));
     for (const table of editor.querySelectorAll("[data-checklist-block]")) {
       table.replaceChildren(editorChecklistTable(current(), checklist, Number(table.dataset.checklistBlock)));
     }
@@ -574,6 +596,23 @@ function renderChecklistEditor(project) {
     dom("iframe", { src: projectChecklistUrl(project, null, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
 
+function renderIntensityAnalysis(project, checklist) {
+  const data = importIntensity(project.intensity);
+  const table = dom("div", { className: "auto-checklist", id: "intensity-analysis-table" }, intensityTable(calculateIntensity(project, checklist)));
+  const edit = button("Ubah data awal intensitas", () => { active = "intensity"; render(); $("section-title").focus(); }, "quiet");
+  const diagram = dom("input", { type: "checkbox", checked: data.diagram });
+  diagram.addEventListener("change", () => {
+    project.intensity = { ...importIntensity(project.intensity), diagram: diagram.checked };
+    save();
+  });
+  return dom("details", { className: "block", id: "intensity-analysis", open: true },
+    dom("summary", {}, "Perbandingan intensitas dan sempadan"),
+    dom("p", { className: "hint" }, "Tabel ini mengambil data awal intensitas dan acuan tata ruang proyek."),
+    edit, table,
+    dom("details", {}, dom("summary", {}, "Skema tapak ilustratif"), siteDiagram(),
+      dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan")));
+}
+
 function renderChapter(project) {
   const index = active;
   const chapter = project.chapters[index];
@@ -616,9 +655,11 @@ function renderChapter(project) {
     editor.append(dom("details", { className: "block", id: "checklist-links-" + blockIndex },
       dom("summary", {}, "Hasil daftar simak dan acuan untuk subbab ini"), wrapper));
   }
+  const intensity = intensityDestination(project);
   appendChecklist(-1);
   for (const [bi, block] of chapter.blocks.entries()) {
     editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
+    if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
     appendChecklist(bi);
   }
   const actions = dom("div", { className: "button-row add-block" });

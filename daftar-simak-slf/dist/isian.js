@@ -111,7 +111,7 @@ function tableCellValue(block, row, column, sources) {
 function tableSourceAvailable(id) {
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
     ["project:purpose", "project:scope", "project:application", "project:chapter-order",
-      "project:land-area", "project:kdb", "project:klb", "project:kdh", "project:ktb", "project:kbg", "project:gsb", "project:saluran", "project:sungai"].includes(id));
+      "project:land-area", "project:kdb", "project:klb", "project:kdh", "project:ktb", "project:kbg", "project:gsb", "project:saluran", "project:sungai"].includes(id) || comparisonMetrics.some(({ key }) => id === "project:measurement-" + key));
 }
 
 function addNarrativeSources(add, id, text, links, label) {
@@ -151,7 +151,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const intensity = calculateIntensity(project, checklist);
   if (intensity.land.value > 0) add("project:land-area", "Intensitas dan tata ruang", "Luas persil", intensityValue(intensity.land.value, " m²"));
   for (const metric of intensity.metrics) {
-    if (!metric.custom && metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
+    if (metric.custom) continue;
+    const unit = metric.direct || metric.unit === "lantai" ? intensityUnit(metric) : " m²";
+    if (metric.measurement.value !== null) add("project:measurement-" + metric.key, "Data awal intensitas", metric.areaLabel,
+      intensityValue(metric.measurement.value, unit));
+    if (metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
       intensityValue(metric.value, intensityUnit(metric)));
   }
   const purpose = project.purpose;

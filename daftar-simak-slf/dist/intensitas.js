@@ -112,6 +112,17 @@ const setbackMetrics = [
   { id: "K.1-1-7", rowKey: "2", key: "sungai", name: "Garis Sempadan Sungai", areaLabel: "Jarak dari titik ukur sungai", side: "Min", unit: "m", direct: true },
 ];
 const comparisonMetrics = [...intensityMetrics, ...setbackMetrics];
+function intensityDestination(project) {
+  const heading = {
+    disiplin: "intensitas bangunan", ringkas: "tata bangunan dan lingkungan", simak: "tinjauan kesesuaian bangunan gedung",
+  }[project.template];
+  for (const [chapter, entry] of project.chapters.entries()) {
+    const block = entry.blocks.findIndex((item) => item.type === "heading" && tokenName(item.text) === heading);
+    if (block >= 0) return { chapter, block };
+  }
+  return null;
+}
+
 const formatIntensity = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 4 });
 const intensityOptions = (choices, id) => choices.find(([key]) => key === id)?.[1] || "";
 
@@ -121,6 +132,8 @@ const localIntensityKeys = ["municipality", "province", "zone", "road", "use", "
 function importIntensity(source = {}) {
   return {
     land: typeof source?.land === "string" ? source.land : "",
+    measurements: Object.fromEntries(comparisonMetrics.flatMap(({ key }) =>
+      typeof source?.measurements?.[key] === "string" ? [[key, source.measurements[key]]] : [])),
     region: ["tegal", "manual"].includes(source?.region) ? source.region : "",
     local: Object.fromEntries(localIntensityKeys.map((key) => [key, typeof source?.local?.[key] === "string" ? source.local[key] : ""])),
     zone: intensityOptions(intensityZones, source?.zone) ? source.zone : "",
@@ -223,13 +236,23 @@ function intensitySourceUrl(text) {
 }
 
 
+function initialIntensityMeasurement(data, checklist, metric) {
+  if (Object.hasOwn(data.measurements, metric.key)) {
+    return { raw: data.measurements[metric.key], notApplicable: false };
+  }
+  const check = checklist.checks[metric.id];
+  return {
+    raw: !check?.na ? check?.rows.find((row) => metric.rowKey ? row.key === metric.rowKey : row.measurement?.trim())?.measurement || "" : "",
+    notApplicable: check?.na === true,
+  };
+}
+
 function calculateIntensity(project, checklist) {
   const data = importIntensity(project.intensity);
   const land = parseArea(data.land);
   const limits = getIntensityLimits(data);
   const metrics = comparisonMetrics.map((metric) => {
-    const check = checklist.checks[metric.id];
-    const raw = !check?.na ? check?.rows.find((row) => metric.rowKey ? row.key === metric.rowKey : row.measurement?.trim())?.measurement : "";
+    const { raw, notApplicable } = initialIntensityMeasurement(data, checklist, metric);
     const floors = metric.unit === "lantai";
     const measurement = floors ? parseFloors(raw) : metric.direct ? parseDistance(raw) : parseArea(raw);
     let value = null;
@@ -241,7 +264,7 @@ function calculateIntensity(project, checklist) {
     const siteSetback = data.region === "tegal" && (metric.key === "saluran" || metric.key === "sungai");
     const limit = siteSetback ? tegalSetbackLimit(data, metric) :
       limits.bounds?.[metric.key] ?? { value: limits.values?.[metric.key] };
-    const status = check?.na ? "Tidak berlaku" : compareIntensity(metric, measurement, land, value, limit, siteSetback ? { bounds: true } : limits);
+    const status = notApplicable ? "Tidak berlaku" : compareIntensity(metric, measurement, land, value, limit, siteSetback ? { bounds: true } : limits);
     return { ...metric, measurement, value, limit: limit.value, source: limit.source, status };
   });
   return { data, land, metrics: [...metrics, ...additionalIntensityResults(data, land)], note: limits.note };

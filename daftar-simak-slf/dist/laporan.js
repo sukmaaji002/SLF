@@ -186,9 +186,7 @@ async function buildReport(target, project, urls) {
   const intensity = calculateIntensity(project, checklist);
   const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram || intensity.data.additional.some((entry) => entry.name.trim()) ||
     intensity.metrics.some((metric) => metric.measurement.value !== null || metric.measurement.error));
-  const intensityHeading = {
-    disiplin: "Intensitas bangunan", ringkas: "Tata bangunan dan lingkungan", simak: "Tinjauan kesesuaian bangunan gedung",
-  }[project.template];
+  const intensityTarget = intensityDestination(project);
   let intensityRendered = false;
   function appendIntensity(section) {
     intensityRendered = true;
@@ -196,7 +194,7 @@ async function buildReport(target, project, urls) {
     const label = "Tabel " + (tableEntries.length + 1) + " · Perbandingan intensitas, sempadan, dan parameter tambahan";
     tableEntries.push([id, label]);
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
-      intensityTable(project, checklist)));
+      intensityTable(intensity)));
     if (intensity.data.diagram) {
       const figure = siteDiagram();
       figure.id = "report-site-diagram";
@@ -245,7 +243,7 @@ async function buildReport(target, project, urls) {
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         for (const [i, photo] of (block.photos ?? []).entries()) appendPhoto(section, photo, id + "-photo-" + i);
-        if (showIntensity && !intensityRendered && block.text === intensityHeading) appendIntensity(section);
+        if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
       }
       if (block.type === "text") section.append(...reportParagraphs(block.text, getTextFormat(block, "text"), resolveToken(block.links)));
