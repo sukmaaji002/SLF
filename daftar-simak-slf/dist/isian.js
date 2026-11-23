@@ -4,6 +4,8 @@ const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
+  "disiplin atau sistem yang diperiksa": ["project:scope"],
+  "sistem utama dalam lingkup kajian": ["project:scope"],
   "pengajuan/perpanjangan": ["project:application"],
   "pengajuan atau perpanjangan": ["project:application"],
   "susunan bab laporan": ["project:chapter-order"],
@@ -28,6 +30,28 @@ const tokenAliases = {
   "tanggal laporan": ["cover:date"],
   "tanggal pemeriksaan": ["identity:date"],
 };
+
+const scopeOptions = [
+  ["arsitektur", "Arsitektur dan tata bangunan"],
+  ["struktur", "Struktur"],
+  ["mep", "Mekanikal, elektrikal, dan plambing (MEP)"],
+  ["kebakaran", "Proteksi kebakaran"],
+  ["akses", "Aksesibilitas dan sarana bangunan"],
+];
+const scopeList = new Intl.ListFormat("id", { type: "conjunction" });
+
+function scopeValue(scope) {
+  const choices = scopeOptions.filter(([id]) => scope?.parts?.includes(id)).map(([, label]) => label.toLocaleLowerCase("id").replace("(mep)", "(MEP)"));
+  const other = cleanValue(scope?.other);
+  if (other) choices.push(other);
+  return scopeList.format(choices);
+}
+
+function importScope(scope) {
+  const parts = scopeOptions.filter(([id]) => Array.isArray(scope?.parts) && scope.parts.includes(id)).map(([id]) => id);
+  const other = typeof scope?.other === "string" ? scope.other : "";
+  return { parts, other };
+}
 
 function cleanValue(value) {
   if (typeof value !== "string" || !value.trim() || /\[[^\[\]]+\]/.test(value)) return "";
@@ -63,6 +87,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const purpose = project.purpose;
   const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
   add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue);
+  add("project:scope", "Data kajian", "Pilihan bidang pemeriksaan", scopeValue(project.scope));
   const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
   add("project:application", "Data kajian", "Jenis permohonan SLF", application);
   const outline = project.chapters.map((chapter, index) => chapterLabel(project, index));
