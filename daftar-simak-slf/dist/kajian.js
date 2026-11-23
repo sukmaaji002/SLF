@@ -328,10 +328,9 @@ function intensityTable(project, checklist, linkToInputs = false) {
   if (context) panel.append(dom("p", {}, context));
   panel.append(dom("p", {}, "Luas persil: " + intensityValue(land.value, " m²")));
   panel.append(reportTable(["Koefisien", "Luas dari daftar simak", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
-    const suffix = metric.percent ? "%" : "";
-    const label = metric.areaLabel + " · " + intensityValue(metric.area.value, " m²");
-    const bounds = [metric.range?.min == null ? "" : "Min. " + intensityValue(metric.range.min, suffix),
-      metric.range?.max == null ? "" : "Maks. " + intensityValue(metric.range.max, suffix)].filter(Boolean).join(" · ");
+    const suffix = intensityUnit(metric);
+    const label = metric.areaLabel + " · " + intensityValue(metric.measurement.value, metric.unit === "lantai" ? " lantai" : " m²");
+    const bounds = metric.limit == null ? "" : (metric.side === "Min" ? "Min. " : "Maks. ") + intensityValue(metric.limit, suffix);
     const limit = bounds && data.region === "tegal" ? dom("a", {
       href: perbupTegalUrl + "#page=" + metric.page, target: "_blank", rel: "noopener",
     }, bounds) : bounds || "—";
@@ -346,7 +345,7 @@ function intensityTable(project, checklist, linkToInputs = false) {
   }
   if (data.region === "tegal") {
     panel.append(dom("p", {}, intensityReviewNote),
-      dom("p", {}, dom("a", { href: perbupTegalUrl, target: "_blank", rel: "noopener" }, "Perbup Tegal No. 12 Tahun 2026, Lampiran III.A–C"),
+      dom("p", {}, dom("a", { href: perbupTegalUrl, target: "_blank", rel: "noopener" }, "Perbup Tegal No. 12 Tahun 2026, Lampiran intensitas dan tata bangunan"),
         " · ", dom("a", { href: rtrwTegalUrl, target: "_blank", rel: "noopener" }, "RTRW Kabupaten Tegal 2023–2043")));
   }
   return panel;
@@ -388,13 +387,13 @@ function renderIntensity(project) {
           localField("zone", "Zona / subzona"), localField("road", "Kelas jalan"),
           localField("use", "Fungsi bangunan"), localField("source", "Judul dan nomor dokumen acuan", "Contoh: RDTR, KRK, atau dokumen izin"),
           localField("reference", "Pasal / tabel / halaman"), localField("sourceUrl", "Tautan resmi (opsional)", "https://", "url")),
-        dom("p", { className: "hint" }, "Isi minimum, maksimum, atau keduanya sesuai dokumen. Biarkan kosong jika batasnya belum tersedia."),
-        dom("div", { className: "form-grid" }, ...areaMetrics.flatMap(({ key, name, percent }) =>
-          [["Min","minimum"],["Max","maksimum"]].map(([side,direction]) => {
-            const field = localField(key + side, name + " " + direction + (percent ? " (%)" : " (rasio)"));
-            field.querySelector("input").inputMode = "decimal";
-            return field;
-          }))));
+        dom("p", { className: "hint" }, "Isi lima batas sesuai dokumen acuan. Biarkan kolom kosong jika batasnya belum tersedia."),
+        dom("div", { className: "form-grid" }, ...intensityMetrics.map(({ key, name, unit, side }) => {
+          const label = name + (side === "Min" ? " Minimum" : " Maksimum") + " (" + unit + ")";
+          const field = localField(key + side, label);
+          field.querySelector("input").inputMode = unit === "lantai" ? "numeric" : "decimal";
+          return field;
+        })));
     }
   }
   grid.append(area, select("region", "Metode pembanding", [["manual", "Acuan daerah setempat"], ["tegal", "Kabupaten Tegal · Perbup 12/2026"]],
@@ -402,7 +401,7 @@ function renderIntensity(project) {
   showCriteria();
   const diagram = dom("input", { type: "checkbox", checked: data.diagram });
   diagram.addEventListener("change", () => { data.diagram = diagram.checked; changed(); });
-  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, dan luas daerah hijau diambil dari daftar simak."),
+  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, luas daerah hijau, luas dasar basemen, dan jumlah lantai diambil dari daftar simak."),
     grid, criteria, results, siteDiagram(),
     dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan"),
     dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, unggah denah terbangun atau gambar ukur yang telah diperiksa di Bab III."));

@@ -5,7 +5,7 @@ const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
   "luas persil": ["project:land-area"],
-  "kdb": ["project:kdb"], "klb": ["project:klb"], "kdh": ["project:kdh"],
+  "kdb": ["project:kdb"], "klb": ["project:klb"], "kdh": ["project:kdh"], "ktb": ["project:ktb"], "kbg": ["project:kbg"],
   "disiplin atau sistem yang diperiksa": ["project:scope"],
   "sistem utama dalam lingkup kajian": ["project:scope"],
   "pengajuan/perpanjangan": ["project:application"],
@@ -109,7 +109,7 @@ function tableCellValue(block, row, column, sources) {
 function tableSourceAvailable(id) {
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
     ["project:purpose", "project:scope", "project:application", "project:chapter-order",
-      "project:land-area", "project:kdb", "project:klb", "project:kdh"].includes(id));
+      "project:land-area", "project:kdb", "project:klb", "project:kdh", "project:ktb", "project:kbg"].includes(id));
 }
 
 function addNarrativeSources(add, id, text, links, label) {
@@ -150,7 +150,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   if (intensity.land.value > 0) add("project:land-area", "Intensitas dan tata ruang", "Luas persil", intensityValue(intensity.land.value, " m²"));
   for (const metric of intensity.metrics) {
     if (metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
-      intensityValue(metric.value, metric.percent ? "%" : ""));
+      intensityValue(metric.value, intensityUnit(metric)));
   }
   const purpose = project.purpose;
   const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
