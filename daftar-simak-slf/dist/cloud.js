@@ -148,4 +148,3 @@ function slfCreateDraftStore(client, owner, photos) {
     },
   };
 }
-

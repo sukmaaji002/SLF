@@ -21,5 +21,3 @@ Rujukan: [URL redirect](https://supabase.com/docs/guides/auth/redirect-urls), [C
 - Cadangan proyek mencakup foto. Gunakan cadangan berkala selama memakai paket gratis.
 
 SDK browser: @supabase/supabase-js 2.119.2, bundel UMD resmi dari npm dan lisensi MIT.
-
-

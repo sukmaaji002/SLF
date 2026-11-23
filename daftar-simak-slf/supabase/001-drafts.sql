@@ -50,4 +50,3 @@ create policy slf_photos_select on storage.objects for select to authenticated
   using (bucket_id = 'slf-photos' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 commit;
-

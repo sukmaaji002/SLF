@@ -354,5 +354,3 @@ function initSlfCloud() {
   window.addEventListener("focus", refresh);
   setInterval(refresh, 20000);
 }
-
-
