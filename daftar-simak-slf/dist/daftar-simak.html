@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Form kajian pemeriksaan bangunan gedung untuk Sertifikat Laik Fungsi.">
-  <meta name="theme-color" content="#103c37">
+  <meta name="theme-color" content="#f3f5f8">
   <title>Daftar Simak SLF</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="format-teks.css">
+  <link rel="stylesheet" href="ruang-kerja.css">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="acuan-simak.js" defer></script>
@@ -15,32 +16,26 @@
   <script src="simak-form.js" defer></script>
   <script src="app.js" defer></script>
 </head>
-<body>
+<body data-screen="simak">
   <header class="top">
     <div class="shell top-inner">
-      <a class="brand" href="#judul"><span class="mark" aria-hidden="true">✓</span> Daftar Simak SLF</a>
+      <a class="app-brand" href="#judul" aria-label="Daftar Simak SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Pemeriksaan</a>
       <nav aria-label="Navigasi utama"><a id="project-editor" href="./index.html">Editor kajian</a><a href="#identitas">Identitas &amp; kondisi</a><a href="#pemeriksaan">Pemeriksaan</a></nav>
     </div>
   </header>
-  <main class="shell">
+  <main class="shell checklist-shell">
     <section class="hero" aria-labelledby="judul">
-      <div class="hero-copy">
-        <p class="eyebrow">Sertifikat Laik Fungsi</p>
-        <h1 id="judul">Daftar Simak SLF</h1>
-        <p class="intro">Form kajian pemeriksaan bangunan gedung. Catat kondisi faktual, hasil pengukuran, dan kesesuaian setiap komponen.</p>
-        <a class="button primary" href="#pemeriksaan">Buka daftar simak</a>
-      </div>
-      <aside class="progress-card" aria-labelledby="progress-title">
-        <h2 id="progress-title">Progres pemeriksaan</h2>
+      <h1 id="judul">Daftar simak</h1>
+      <aside class="progress-card" aria-label="Progres pemeriksaan">
         <div class="progress-numbers"><strong id="percent">0%</strong><span id="count"></span></div>
-        <progress id="progress" value="0" max="100" aria-labelledby="progress-title"></progress>
+        <progress id="progress" value="0" max="100" aria-label="Progres pemeriksaan"></progress>
         <p id="findings" aria-live="polite"></p>
       </aside>
     </section>
 
     <section class="panel identity" id="identitas" aria-labelledby="identity-title">
       <div class="section-head">
-        <div><h2 id="identity-title">K. Identitas pemilik</h2><p>Catat identitas pemilik dan kondisi umum bangunan gedung.</p></div>
+        <h2 id="identity-title">Identitas dan kondisi bangunan</h2>
         <span id="save-status" role="status">Penyimpanan di browser ini</span>
       </div>
       <div class="identity-grid">
@@ -55,8 +50,8 @@
 
     <section class="checklist" id="pemeriksaan" aria-labelledby="check-title">
       <div class="section-head check-head">
-        <div><h2 id="check-title">Daftar pemeriksaan</h2><p>Buka butir untuk mengisi hasil pemeriksaan atau menambah sampel.</p></div>
-        <div class="actions"><button id="simak-preview" type="button">Pratinjau formulir</button><button id="print" type="button">Cetak / PDF</button><button id="export" class="dark" type="button">Unduh CSV</button></div>
+        <h2 id="check-title">Butir pemeriksaan</h2>
+        <div class="actions"><button id="simak-preview" type="button">Pratinjau formulir</button><button id="print" class="primary" type="button">Cetak / PDF</button><button id="export" type="button">Unduh CSV</button></div>
       </div>
       <div class="filters">
         <label>Cari butir<input id="search" type="search" placeholder="Contoh: ventilasi"></label>

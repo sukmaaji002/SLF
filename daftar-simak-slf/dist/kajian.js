@@ -4,6 +4,7 @@ const $ = (id) => document.getElementById(id);
 const database = openStore("ruang-kajian-slf", "workspace");
 const preset = "disiplin";
 const editor = $("editor");
+const narrowLayout = matchMedia("(max-width: 760px)");
 const status = $("save-status");
 const dialog = $("preview-dialog");
 const reportUrls = [];
@@ -270,7 +271,14 @@ function setCurrent(id) {
 }
 
 function outlineEntry(label, id, marker) {
-  const control = button("", () => { active = id; render(); }, "outline-entry");
+  const control = button("", () => {
+    active = id;
+    render();
+    if (narrowLayout.matches) {
+      $("section-navigation").open = false;
+      $("section-title").focus();
+    }
+  }, "outline-entry");
   control.append(dom("span", { className: "nav-marker", ariaHidden: "true" }, marker), dom("span", {}, label));
   if (active === id) control.setAttribute("aria-current", "page");
   return control;
@@ -279,13 +287,13 @@ function outlineEntry(label, id, marker) {
 function renderOutline() {
   const project = current();
   const nav = $("outline");
-  nav.replaceChildren(outlineEntry("Sampul", "cover", "01"), outlineEntry("Bagian awal & daftar isi", "front", "02"));
-  nav.append(outlineEntry("Intensitas dan tata ruang", "intensity", "∑"), outlineEntry("Peta tautan dan acuan", "links", "↗"));
+  nav.replaceChildren(outlineEntry("Sampul", "cover", ""), outlineEntry("Bagian awal & daftar isi", "front", ""));
+  nav.append(outlineEntry("Intensitas dan tata ruang", "intensity", ""), outlineEntry("Peta tautan dan acuan", "links", ""));
   for (const [index, chapter] of project.chapters.entries()) {
     nav.append(outlineEntry(chapter.title.trim() || "Bab tanpa judul", index, roman(index + 1)));
   }
   if (!project.chapters.some((chapter) => chapter.checklist)) {
-    nav.append(outlineEntry("Daftar simak", "checklist", "✓"));
+    nav.append(outlineEntry("Daftar simak", "checklist", ""));
   }
 }
 
@@ -1002,6 +1010,9 @@ async function start() {
   for (const project of workspace.projects) upgradeReportDraft(project);
   const requested = new URLSearchParams(location.search).get("proyek");
   if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
+  const sizeNavigation = () => { $("section-navigation").open = !narrowLayout.matches; };
+  sizeNavigation();
+  narrowLayout.addEventListener("change", sizeNavigation);
   $("projects").addEventListener("change", () => setCurrent($("projects").value));
   const chapterDialog = $("chapter-dialog");
   const chapterForm = $("chapter-form");
