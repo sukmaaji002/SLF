@@ -91,8 +91,15 @@ function reportParagraphs(text) {
     .map((paragraph) => dom("p", { className: "report-text" }, paragraph));
 }
 
-async function renderChecklist(target, project, urls) {
-  const { identity, checks } = readChecklist(project.id);
+async function renderChecklist(target, project, urls, checklist) {
+  const { checks } = checklist;
+  const identity = { ...checklist.identity };
+  for (const [key, value] of Object.entries({
+    building: project.cover.building, location: project.cover.address,
+    use: project.cover.use, ownerName: project.cover.owner,
+  })) {
+    if (!cleanValue(identity[key]) && cleanValue(value)) identity[key] = value;
+  }
   const rows = Object.entries(checklistIdentityLabels).filter(([key]) => identity[key]?.trim())
     .map(([key, label]) => [label, identity[key]]);
   if (rows.length) target.append(reportTable(["Data pemeriksaan", "Isian"], rows));
@@ -148,7 +155,16 @@ async function renderChecklist(target, project, urls) {
 
 async function buildReport(target, project, urls) {
   target.replaceChildren();
-  const data = project.cover;
+  const checklist = readChecklist(project.id);
+  const sources = reportSources(project, checklist);
+  const resolve = (text, links) => resolveReportText(text, sources, links);
+  const data = {
+    ...project.cover,
+    building: automaticValue("nama bangunan", sources) || project.cover.building,
+    address: automaticValue("alamat bangunan", sources) || project.cover.address,
+    use: automaticValue("fungsi bangunan", sources) || project.cover.use,
+    owner: automaticValue("nama pemilik", sources) || project.cover.owner,
+  };
   const title = data.title || "Laporan Kajian Teknis Sertifikat Laik Fungsi";
   const cover = dom("section", { className: "report-cover" },
     dom("p", { className: "paper-kicker" }, "Sertifikat Laik Fungsi"),
@@ -170,7 +186,7 @@ async function buildReport(target, project, urls) {
   for (const [key, label] of frontFields.slice(0, 2)) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
     const section = reportSection(label, "report-" + key);
-    section.append(...reportParagraphs(project.front[key] || ""));
+    section.append(...reportParagraphs(resolve(project.front[key] || "", project.frontLinks?.[key])));
     if (key === "approval") for (const [id] of frontFields.slice(2)) {
       if (project.front[id]) section.append(dom("p", {}, project.front[id]));
     }
@@ -185,14 +201,14 @@ async function buildReport(target, project, urls) {
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }, number + " " + block.text));
-        section.append(...reportParagraphs(block.body));
+        section.append(...reportParagraphs(resolve(block.body, block.links)));
       }
-      if (block.type === "text") section.append(...reportParagraphs(block.text));
+      if (block.type === "text") section.append(...reportParagraphs(resolve(block.text, block.links)));
       if (block.type === "table") {
         const label = "Tabel " + (tableEntries.length + 1) + " · " + (block.text || "Tabel kajian");
         tableEntries.push([id, label]);
         section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
-          reportTable(block.headers, block.rows)));
+          reportTable(block.headers.map((text) => resolve(text)), block.rows.map((row) => row.map((text) => resolve(text))))));
       }
       if (block.type === "photo" && imageSource.test(block.image || "")) {
         const label = "Gambar " + (figureEntries.length + 1) + " · " + (block.text || "Dokumentasi");
@@ -226,6 +242,6 @@ async function buildReport(target, project, urls) {
     return entry;
   }));
   contents.firstElementChild.after(toc);
-  await Promise.all(checklistTargets.map((section) => renderChecklist(section, project, urls)));
+  await Promise.all(checklistTargets.map((section) => renderChecklist(section, project, urls, checklist)));
   await Promise.all(Array.from(target.querySelectorAll("img"), (image) => image.decode().catch(() => {})));
 }
