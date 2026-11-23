@@ -179,7 +179,14 @@ function startRows(item) {
 }
 
 function getCheck(item) {
-  return state.checks[item.id] ?? { rows: startRows(item), nextRow: item.initialCount + 1 };
+  const saved = state.checks[item.id];
+  if (!saved) return { rows: startRows(item), nextRow: item.initialCount + 1 };
+  if (item.components) {
+    const missing = startRows(item).filter((row) => !saved.rows.some(({ key }) => key === row.key));
+    if (missing.length) state.checks[item.id] = { ...saved, rows: [...saved.rows, ...missing],
+      nextRow: Math.max(saved.nextRow, item.initialCount + 1) };
+  }
+  return state.checks[item.id];
 }
 
 function applyCheck(item, check) {

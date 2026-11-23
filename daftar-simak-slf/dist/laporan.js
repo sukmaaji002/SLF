@@ -184,7 +184,7 @@ async function buildReport(target, project, urls) {
     summaries.get(key).push({ item, summary, id });
   }
   const intensity = calculateIntensity(project, checklist);
-  const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram ||
+  const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram || intensity.data.additional.some((entry) => entry.name.trim()) ||
     intensity.metrics.some((metric) => metric.measurement.value !== null || metric.measurement.error));
   const intensityHeading = {
     disiplin: "Intensitas bangunan", ringkas: "Tata bangunan dan lingkungan", simak: "Tinjauan kesesuaian bangunan gedung",
@@ -193,7 +193,7 @@ async function buildReport(target, project, urls) {
   function appendIntensity(section) {
     intensityRendered = true;
     const id = "report-intensity-results";
-    const label = "Tabel " + (tableEntries.length + 1) + " · Perbandingan intensitas dan jumlah lantai";
+    const label = "Tabel " + (tableEntries.length + 1) + " · Perbandingan intensitas, sempadan, dan parameter tambahan";
     tableEntries.push([id, label]);
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
       intensityTable(project, checklist)));

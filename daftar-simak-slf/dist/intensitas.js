@@ -63,6 +63,42 @@ const tegalKbg = {
   campuran: [[3,3,3,3,6,8],[3,3,3,3,4,6],[2,2,2,2,3,4]],
   keagamaan: [[2,3,3,3,4,4],[2,3,3,3,3,3],[2,2,2,2,3,3]],
 };
+const tegalGsb = {
+  "arteri-primer": [20.5, 40], "arteri-sekunder": [20.5, 40],
+  "kolektor-primer": [14.5, 30], "kolektor-sekunder": [9.5, 30],
+  "lokal-primer": [10.75, 20], "lokal-sekunder": [6.75, 20],
+  "lingkungan-primer": [6.75, 10], "lingkungan-sekunder": [5.5, 10],
+};
+
+function importAdditionalIntensity(source) {
+  const param = Object.fromEntries(["name", "unit", "actual", "limit", "source"].map((key) =>
+    [key, typeof source?.[key] === "string" ? source[key] : ""]));
+  return { ...param, side: source?.side === "Max" ? "Max" : "Min" };
+}
+
+function parseDistance(raw) {
+  return parseIntensityNumber(raw?.trim().replace(/\s*m$/i, "").trim() || "", true);
+}
+
+function additionalIntensityResults(data, land) {
+  return data.additional.filter((param) => param.name.trim()).map((param) => {
+    const metric = { name: param.name.trim(), unit: param.unit.trim(), side: param.side, direct: true, custom: true, areaLabel: "Isian manual" };
+    const measurement = parseIntensityNumber(param.actual.trim());
+    const source = param.source.trim() || (data.region === "manual" && data.local.municipality.trim() ?
+      [data.local.source, data.local.reference].map((value) => value.trim()).filter(Boolean).join(" · ") : "");
+    const limit = { ...parseIntensityNumber(param.limit.trim()), unsourced: !source };
+    return { ...metric, measurement, value: measurement.value, limit: limit.value, source,
+      status: compareIntensity(metric, measurement, land, measurement.value, limit, { bounds: true }) };
+  });
+}
+
+function tegalSetbackLimit(data, metric) {
+  const source = data.tegalSetbacks.source.trim();
+  const result = parseDistance(data.tegalSetbacks[metric.key + "Min"]);
+  return { ...result, unsourced: !source, source };
+}
+
+
 const intensityMetrics = [
   { id: "K.1-1-0", key: "kdb", name: "KDB", areaLabel: "Luas lantai dasar", side: "Max", unit: "%", page: 54 },
   { id: "K.1-1-2", key: "klb", name: "KLB", areaLabel: "Luas total lantai", side: "Max", unit: "rasio", page: 56 },
@@ -70,11 +106,17 @@ const intensityMetrics = [
   { id: "K.1-1-1", key: "ktb", name: "KTB", areaLabel: "Luas dasar basemen", side: "Max", unit: "%", page: 61 },
   { id: "K.1-1-3", key: "kbg", name: "KBG", areaLabel: "Jumlah lantai bangunan", side: "Max", unit: "lantai", page: 66 },
 ];
+const setbackMetrics = [
+  { id: "K.1-1-7", rowKey: "1", key: "gsb", name: "Garis Sempadan Bangunan (GSB)", areaLabel: "Jarak bangunan dari as jalan", side: "Min", unit: "m", direct: true, page: 69 },
+  { id: "K.1-1-7", rowKey: "7", key: "saluran", name: "Garis Sempadan Saluran", areaLabel: "Jarak dari titik ukur saluran", side: "Min", unit: "m", direct: true },
+  { id: "K.1-1-7", rowKey: "2", key: "sungai", name: "Garis Sempadan Sungai", areaLabel: "Jarak dari titik ukur sungai", side: "Min", unit: "m", direct: true },
+];
+const comparisonMetrics = [...intensityMetrics, ...setbackMetrics];
 const formatIntensity = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 4 });
 const intensityOptions = (choices, id) => choices.find(([key]) => key === id)?.[1] || "";
 
 const localIntensityKeys = ["municipality", "province", "zone", "road", "use", "source", "reference", "sourceUrl",
-  ...intensityMetrics.map(({ key, side }) => key + side)];
+  ...comparisonMetrics.map(({ key, side }) => key + side)];
 
 function importIntensity(source = {}) {
   return {
@@ -85,6 +127,10 @@ function importIntensity(source = {}) {
     road: intensityOptions(intensityRoads, source?.road) ? source.road : "",
     use: intensityOptions(intensityFunctions, source?.use) ? source.use : "",
     diagram: source?.diagram === true,
+    tegalSetbacks: Object.fromEntries(["saluranMin", "sungaiMin", "source"].map((key) => [
+      key, typeof source?.tegalSetbacks?.[key] === "string" ? source.tegalSetbacks[key] : "",
+    ])),
+    additional: Array.isArray(source?.additional) ? source.additional.map(importAdditionalIntensity) : [],
   };
 }
 
@@ -109,15 +155,16 @@ function parseIntensityNumber(input, groupThousands = false) {
 function getIntensityLimits(data) {
   if (data.region === "manual") return localIntensityLimits(data);
   if (data.region !== "tegal") return { note: "Pilih metode pembanding jika ingin menilai hasil terhadap acuan daerah." };
+  const gsb = Object.hasOwn(intensityLimits, data.use) ? tegalGsb[data.road]?.[data.use === "industri" ? 1 : 0] : undefined;
   if (data.zone === "bersyarat") return {
-    values: { kdb: 15, klb: 0.15, kdh: 80, ktb: 0, kbg: 2 },
+    values: { kdb: 15, klb: 0.15, kdh: 80, ktb: 0, kbg: 2, gsb },
     conditional: true,
     note: "Pembanding ini hanya untuk kegiatan yang diperbolehkan bersyarat/terbatas oleh rencana tata ruang. Verifikasi peruntukan persil.",
   };
   const index = intensityZones.findIndex(([id]) => id === data.zone);
   const entry = Object.hasOwn(intensityLimits, data.use) ? intensityLimits[data.use] : undefined;
   if (index < 0 || index >= standardKdh.length || !entry) {
-    return { note: "Pilih zona dan fungsi yang tercantum dalam tabel Perbup. Untuk pilihan di luar tabel, periksa dokumen tata ruang lokasi." };
+    return { values: { gsb }, note: "Pilih zona dan fungsi yang tercantum dalam tabel Perbup. Untuk pilihan di luar tabel, periksa dokumen tata ruang lokasi." };
   }
   const roadGroup = intensityRoads.find(([id]) => id === data.road)?.[2];
   const conditional = data.use === "industri" && index < 3;
@@ -127,7 +174,7 @@ function getIntensityLimits(data) {
   return {
     values: {
       kdb: entry.kdb[index], klb: entry.klb[roadGroup]?.[index], kdh: (entry.kdh || standardKdh)[index],
-      ktb: entry.kdb[index], kbg: tegalKbg[data.use][roadGroup]?.[index],
+      ktb: entry.kdb[index], kbg: tegalKbg[data.use][roadGroup]?.[index], gsb,
     },
     conditional, note: notes.join(" "),
   };
@@ -138,9 +185,9 @@ function localIntensityLimits(data) {
   const local = data.local;
   const sourced = Boolean(local.municipality.trim() && local.source.trim());
   return {
-    bounds: Object.fromEntries(intensityMetrics.map(({ key, side, unit }) => {
+    bounds: Object.fromEntries(comparisonMetrics.map(({ key, side, unit }) => {
       const input = local[key + side];
-      const result = unit === "lantai" ? parseFloors(input) : parseIntensityNumber(input.trim().replace(unit === "%" ? /%$/ : /^$/, "").trim());
+      const result = unit === "lantai" ? parseFloors(input) : unit === "m" ? parseDistance(input) : parseIntensityNumber(input.trim().replace(unit === "%" ? /%$/ : /^$/, "").trim());
       return [key, { ...result, unsourced: !sourced }];
     })),
     note: "Gunakan batas untuk persil dan fungsi yang diperiksa sesuai dokumen yang berlaku. Perbandingan angka tidak menetapkan kelaikan fungsi.",
@@ -153,12 +200,12 @@ function parseFloors(raw) {
 }
 
 function compareIntensity(metric, measurement, land, value, limit, limits) {
-  if (measurement.error) return metric.unit === "lantai" ? "Periksa jumlah lantai" : "Periksa format luas";
-  if (metric.unit !== "lantai" && (land.error || land.value === 0)) return "Periksa luas persil";
+  if (measurement.error) return metric.unit === "lantai" ? "Periksa jumlah lantai" : metric.direct ? "Periksa format hasil ukur" : "Periksa format luas";
+  if (!metric.direct && metric.unit !== "lantai" && (land.error || land.value === 0)) return "Periksa luas persil";
   if (limit.error) return "Periksa batas acuan";
-  if (value === null) return metric.unit === "lantai" ? "Jumlah lantai belum diisi" : "Data luas belum lengkap";
+  if (value === null) return metric.unit === "lantai" ? "Jumlah lantai belum diisi" : metric.direct ? "Hasil ukur belum diisi" : "Data luas belum lengkap";
   if (limit.value == null) return "Acuan belum ditentukan";
-  if (limit.unsourced) return "Isi daerah dan sumber acuan";
+  if (limit.unsourced) return metric.custom ? "Isi sumber acuan" : "Lengkapi sumber acuan";
   const tolerance = Number.EPSILON * Math.max(1, Math.abs(value)) * 8;
   const within = metric.side === "Min" ? value >= limit.value - tolerance : value <= limit.value + tolerance;
   if (limits.conditional) return within ? "Dalam batas angka bersyarat" : "Di luar batas angka bersyarat";
@@ -180,30 +227,33 @@ function calculateIntensity(project, checklist) {
   const data = importIntensity(project.intensity);
   const land = parseArea(data.land);
   const limits = getIntensityLimits(data);
-  const metrics = intensityMetrics.map((metric) => {
+  const metrics = comparisonMetrics.map((metric) => {
     const check = checklist.checks[metric.id];
-    const raw = !check?.na ? check?.rows.find((row) => row.measurement?.trim())?.measurement : "";
+    const raw = !check?.na ? check?.rows.find((row) => metric.rowKey ? row.key === metric.rowKey : row.measurement?.trim())?.measurement : "";
     const floors = metric.unit === "lantai";
-    const measurement = floors ? parseFloors(raw) : parseArea(raw);
+    const measurement = floors ? parseFloors(raw) : metric.direct ? parseDistance(raw) : parseArea(raw);
     let value = null;
-    if (floors) value = measurement.value;
+    if (floors || metric.direct) value = measurement.value;
     else if (land.value > 0 && measurement.value !== null) {
       const ratio = measurement.value / land.value * (metric.unit === "%" ? 100 : 1);
       if (Number.isFinite(ratio)) value = ratio;
     }
-    const limit = limits.bounds?.[metric.key] ?? { value: limits.values?.[metric.key] };
-    const status = check?.na ? "Tidak berlaku" : compareIntensity(metric, measurement, land, value, limit, limits);
-    return { ...metric, measurement, value, limit: limit.value, status };
+    const siteSetback = data.region === "tegal" && (metric.key === "saluran" || metric.key === "sungai");
+    const limit = siteSetback ? tegalSetbackLimit(data, metric) :
+      limits.bounds?.[metric.key] ?? { value: limits.values?.[metric.key] };
+    const status = check?.na ? "Tidak berlaku" : compareIntensity(metric, measurement, land, value, limit, siteSetback ? { bounds: true } : limits);
+    return { ...metric, measurement, value, limit: limit.value, source: limit.source, status };
   });
-  return { data, land, metrics, note: limits.note };
+  return { data, land, metrics: [...metrics, ...additionalIntensityResults(data, land)], note: limits.note };
 }
 
 function intensityUnit(metric) {
-  return metric.unit === "rasio" ? "" : metric.unit === "lantai" ? " lantai" : "%";
+  if (metric.unit === "%") return "%";
+  return !metric.unit || metric.unit === "rasio" ? "" : " " + metric.unit;
 }
 
 function intensityValue(value, suffix = "") {
   return value == null ? "—" : formatIntensity.format(value) + suffix;
 }
 
-const intensityReviewNote = "KTB menggunakan batas umum. Untuk pengecualian basemen, periksa ketentuan persil dan isi batas melalui Acuan daerah setempat. Bandingkan dengan RDTR apabila telah ditetapkan. Untuk IMB/PBG sebelum Perbup berlaku, periksa ketentuan peralihan Lampiran Bab IV. Angka perbandingan tidak menetapkan kelaikan fungsi.";
+const intensityReviewNote = "GSB memakai batas umum untuk jalan utama. Gunakan titik ukur yang sama dengan dokumen acuan. KTB menggunakan batas umum. Untuk pengecualian basemen, periksa ketentuan persil dan isi batas melalui Acuan daerah setempat. Bandingkan dengan RDTR apabila telah ditetapkan. Untuk IMB/PBG sebelum Perbup berlaku, periksa ketentuan peralihan Lampiran Bab IV. Angka perbandingan tidak menetapkan kelaikan fungsi.";

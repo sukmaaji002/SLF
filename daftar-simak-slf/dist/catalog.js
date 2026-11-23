@@ -20,7 +20,7 @@ const catalog = [
           {"no":"5","title":"Jumlah Lantai Basemen","fields":"CMFK","page":2,"unit":"lantai"},
           {"no":"6","title":"Ketinggian Bangunan","fields":"CMFK","page":2,"unit":"m"},
           {"no":"7","title":"Luas Daerah Hijau Dalam Persil","fields":"CMFK","page":2,"unit":"m²"},
-          {"no":"8","title":"Jarak Sempadan Jalan/Sungai/Pantai/Danau/Rel Kereta Api/Jalur Tegangan Tinggi","fields":"CMK","page":2,"unit":"m","components":["Jalan","Sungai","Pantai","Danau","Rel Kereta Api","Jalur Tegangan Tinggi"]},
+          {"no":"8","title":"Jarak Sempadan Jalan/Sungai/Pantai/Danau/Rel Kereta Api/Jalur Tegangan Tinggi","fields":"CMK","page":2,"unit":"m","components":["Jalan","Sungai","Pantai","Danau","Rel Kereta Api","Jalur Tegangan Tinggi","Saluran / irigasi"]},
           {"no":"9","title":"Jarak Bangunan Gedung Dengan Batas Persil","fields":"CMK","page":2,"unit":"m","components":["Batas kiri","Batas kanan","Batas belakang","Batas depan"]},
           {"no":"10","title":"Jarak Antar Bangunan","fields":"SMCK","page":2,"unit":"m","samples":["Bangunan 1","Bangunan 2","Bangunan 3"],"sampleTitle":"Bangunan"},
         ],

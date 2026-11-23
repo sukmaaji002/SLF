@@ -327,15 +327,16 @@ function intensityTable(project, checklist, linkToInputs = false) {
   const context = site.map((value) => value.trim()).filter(Boolean).join(" · ");
   if (context) panel.append(dom("p", {}, context));
   panel.append(dom("p", {}, "Luas persil: " + intensityValue(land.value, " m²")));
-  panel.append(reportTable(["Koefisien", "Luas dari daftar simak", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
+  panel.append(reportTable(["Parameter", "Data ukur", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
     const suffix = intensityUnit(metric);
-    const label = metric.areaLabel + " · " + intensityValue(metric.measurement.value, metric.unit === "lantai" ? " lantai" : " m²");
+    const label = metric.areaLabel + " · " + intensityValue(metric.measurement.value, metric.direct || metric.unit === "lantai" ? suffix : " m²");
     const bounds = metric.limit == null ? "" : (metric.side === "Min" ? "Min. " : "Maks. ") + intensityValue(metric.limit, suffix);
-    const limit = bounds && data.region === "tegal" ? dom("a", {
+    const limit = bounds && data.region === "tegal" && metric.page ? dom("a", {
       href: perbupTegalUrl + "#page=" + metric.page, target: "_blank", rel: "noopener",
     }, bounds) : bounds || "—";
-    return [metric.name, linkToInputs ? dom("a", { href: projectChecklistUrl(project, metric.id), target: "_blank", rel: "noopener" }, label) : label,
-      intensityValue(metric.value, suffix), limit, metric.status];
+    const standard = metric.source ? dom("div", {}, limit, dom("div", { className: "hint" }, metric.source)) : limit;
+    return [metric.name, linkToInputs && metric.id ? dom("a", { href: projectChecklistUrl(project, metric.id), target: "_blank", rel: "noopener" }, label) : label,
+      intensityValue(metric.value, suffix), standard, metric.status];
   })));
   if (note) panel.append(dom("p", {}, note));
   if (data.region === "manual" && local.source.trim()) {
@@ -350,6 +351,44 @@ function intensityTable(project, checklist, linkToInputs = false) {
   }
   return panel;
 }
+
+function additionalIntensityFields(data, changed) {
+  const list = dom("div", { className: "intensity-criteria", id: "additional-parameters" });
+  function renderRows() {
+    list.replaceChildren(...data.additional.map((parameter, index) => {
+      const field = (key, name, hint, mode) => {
+        const label = boundField(parameter, key, name, "text", changed, false);
+        Object.assign(label.querySelector("input"), { placeholder: hint, inputMode: mode || "text" });
+        return label;
+      };
+      const side = dom("select", { ariaLabel: "Jenis batas parameter " + (index + 1) },
+        new Option("Minimum", "Min"), new Option("Maksimum", "Max"));
+      side.value = parameter.side;
+      side.addEventListener("change", () => { parameter.side = side.value; changed(); });
+      const remove = button("Hapus parameter " + (index + 1), () => {
+        data.additional.splice(index, 1);
+        renderRows();
+        changed();
+      }, "quiet");
+      return dom("fieldset", { className: "block" }, dom("legend", {}, "Parameter tambahan " + (index + 1)),
+        dom("div", { className: "form-grid" },
+          field("name", "Nama parameter", "Contoh: Lebar akses"), field("unit", "Satuan", "Contoh: m"),
+          field("actual", "Hasil ukur", "", "decimal"), field("limit", "Batas acuan", "", "decimal"),
+          dom("label", {}, "Jenis batas", side), field("source", "Sumber acuan parameter", "Opsional jika memakai acuan daerah yang sama")),
+        dom("div", { className: "button-row" }, remove));
+    }));
+  }
+  const add = button("＋ Tambah parameter", () => {
+    data.additional.push(importAdditionalIntensity({}));
+    renderRows();
+    changed();
+    list.lastElementChild?.querySelector("input")?.focus();
+  });
+  renderRows();
+  return dom("section", { className: "intensity-additional" }, dom("h3", {}, "Parameter tambahan"),
+    list, dom("div", { className: "button-row" }, add));
+}
+
 
 function renderIntensity(project) {
   title("Data kajian", "Intensitas dan tata ruang");
@@ -380,6 +419,13 @@ function renderIntensity(project) {
         select("road", "Kelas jalan di depan persil", intensityRoads, "Pilih kelas jalan"),
         select("use", "Fungsi bangunan", intensityFunctions, "Pilih fungsi bangunan")));
     }
+    if (data.region === "tegal") {
+      criteria.append(dom("p", { className: "hint" }, "Isi batas saluran dan sungai dari dokumen persil jika relevan. Gunakan titik ukur yang sama untuk data dan batas."),
+        dom("div", { className: "form-grid" },
+          boundField(data.tegalSetbacks, "saluranMin", "Garis Sempadan Saluran Minimum (m)", "text", changed, false),
+          boundField(data.tegalSetbacks, "sungaiMin", "Garis Sempadan Sungai Minimum (m)", "text", changed, false),
+          boundField(data.tegalSetbacks, "source", "Sumber acuan sempadan", "text", changed, false)));
+    }
     if (data.region === "manual") {
       criteria.append(
         dom("div", { className: "form-grid" },
@@ -387,8 +433,8 @@ function renderIntensity(project) {
           localField("zone", "Zona / subzona"), localField("road", "Kelas jalan"),
           localField("use", "Fungsi bangunan"), localField("source", "Judul dan nomor dokumen acuan", "Contoh: RDTR, KRK, atau dokumen izin"),
           localField("reference", "Pasal / tabel / halaman"), localField("sourceUrl", "Tautan resmi (opsional)", "https://", "url")),
-        dom("p", { className: "hint" }, "Isi lima batas sesuai dokumen acuan. Biarkan kolom kosong jika batasnya belum tersedia."),
-        dom("div", { className: "form-grid" }, ...intensityMetrics.map(({ key, name, unit, side }) => {
+        dom("p", { className: "hint" }, "Isi batas sesuai dokumen acuan. Gunakan titik ukur yang sama untuk data dan batas sempadan."),
+        dom("div", { className: "form-grid" }, ...comparisonMetrics.map(({ key, name, unit, side }) => {
           const label = name + (side === "Min" ? " Minimum" : " Maksimum") + " (" + unit + ")";
           const field = localField(key + side, label);
           field.querySelector("input").inputMode = unit === "lantai" ? "numeric" : "decimal";
@@ -401,8 +447,8 @@ function renderIntensity(project) {
   showCriteria();
   const diagram = dom("input", { type: "checkbox", checked: data.diagram });
   diagram.addEventListener("change", () => { data.diagram = diagram.checked; changed(); });
-  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, luas daerah hijau, luas dasar basemen, dan jumlah lantai diambil dari daftar simak."),
-    grid, criteria, results, siteDiagram(),
+  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, luas daerah hijau, luas dasar basemen, jumlah lantai, dan jarak sempadan diambil dari daftar simak."),
+    grid, criteria, additionalIntensityFields(data, changed), results, siteDiagram(),
     dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan"),
     dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, unggah denah terbangun atau gambar ukur yang telah diperiksa di Bab III."));
   refresh();
