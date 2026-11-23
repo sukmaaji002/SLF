@@ -152,6 +152,9 @@ dialog::backdrop { background: #132b27ab; }
   .report-cover h1 { font-size: 27pt; }
   .paper > .report-section { break-before: page; margin-top: 0; }
   .paper > .report-section h2, .paper h3, .paper h4, .caption { break-after: avoid; }
+  .paper h3 { margin-top: 11px; }
+  .paper h4 { margin-top: 6px; }
+  .report-text { margin-bottom: 7px; orphans: 3; widows: 3; }
   .paper tr, .paper figure { break-inside: avoid; }
   .paper thead { display: table-header-group; }
   .paper a { text-decoration: none; }
