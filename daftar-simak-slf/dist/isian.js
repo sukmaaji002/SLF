@@ -29,6 +29,11 @@ const tokenAliases = {
   "nomor dan revisi laporan": ["cover:number"],
   "tanggal laporan": ["cover:date"],
   "tanggal pemeriksaan": ["identity:date"],
+  "area atau posisi sampel": ["project:sample-locations"],
+  "daftar simak atau dokumentasi foto": ["project:checklist-evidence"],
+  "daftar dokumen": ["project:reviewed-documents"],
+  "daftar alat pemeriksaan": ["project:inspection-tools"],
+  "daftar bahan dan dokumen": ["project:intro-materials"],
 };
 
 const scopeOptions = [
@@ -78,9 +83,27 @@ function ensureTableReferences(project) {
   }
 }
 
+function filledIntroSource(project, token, sources) {
+  const section = project.chapters.flatMap((chapter) => chapter.blocks)
+    .find((block) => block.type === "heading" && tokenName(block.text) === "lingkup materi pelaporan");
+  const link = section?.links?.[token];
+  return cleanValue(link?.source ? sources.get(link.source)?.value : link?.value);
+}
+
+function inspectionDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return cleanValue(value);
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "UTC" }).format(date);
+}
+
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
   const teamLeads = new Set();
+  const locations = new Set();
+  const reviewedDocuments = new Set();
+  const tools = new Set();
+  let hasResults = false;
+  let hasPhotos = false;
   function add(id, group, label, value) {
     sources.set(id, { group, label, value: cleanValue(value) });
   }
@@ -95,14 +118,18 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   add("project:chapter-order", "Data kajian", "Urutan bab dan lampiran", outline.join("\n"));
   for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key]);
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
-    add("identity:" + key, "Identitas daftar simak", label, checklist.identity[key]);
+    const value = checklist.identity[key];
+    add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value);
   }
   for (const item of checklistItems) {
     const check = checklist.checks[item.id];
     if (!check || check.na) continue;
     for (const row of check.rows) {
+      if (cleanValue(row.location) && item.title !== "Jarak Antar Bangunan") locations.add(cleanValue(row.location));
+      if (row.photo || row.ndtPhoto) hasPhotos = true;
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!cleanValue(row[key]) || key === "photo" || key === "ndtPhoto") continue;
+        if (key !== "location") hasResults = true;
         const value = row[key] + (key === "measurement" && item.unit ? " " + item.unit : "");
         const name = [item.group.code + " " + item.title, row.label, label].filter(Boolean).join(" · ");
         add("check:" + [item.id, row.key, key].join(":"), "Hasil daftar simak", name, value);
@@ -112,12 +139,32 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const [index, chapter] of project.chapters.entries()) {
     for (const block of chapter.blocks) {
       if (block.type !== "table" || !block.sourceId) continue;
-      if (tokenName(block.text) === "susunan tim pengkaji teknis") {
+      const title = tokenName(block.text);
+      const columns = block.headers.map(tokenName);
+      if (title === "susunan tim pengkaji teknis") {
         const name = block.headers.findIndex((header) => tokenName(header) === "nama");
         const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
         const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
         for (const row of block.rows) {
           if (leadRoles.includes(tokenName(row[role] ?? "")) && cleanValue(row[name])) teamLeads.add(cleanValue(row[name]));
+        }
+      }
+      if (title === "daftar alat pemeriksaan") {
+        const column = columns.indexOf("alat");
+        for (const row of block.rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
+      }
+      if (title === "rekap pemeriksaan dokumen") {
+        const name = columns.indexOf("dokumen");
+        const reference = columns.indexOf("nomor / tanggal");
+        const verification = columns.indexOf("status verifikasi");
+        for (const [ri, row] of block.rows.entries()) {
+          const document = cleanValue(row[name]);
+          const status = tokenName(row[verification] ?? "");
+          if (!document || !["terverifikasi", "telah ditelaah", "ditelaah", "sesuai", "valid"].includes(status)) continue;
+          const number = cleanValue(row[reference]);
+          const value = number ? document + " (" + number + ")" : document;
+          reviewedDocuments.add(value);
+          add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
         }
       }
       for (const [ri, row] of block.rows.entries()) {
@@ -131,6 +178,15 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", teamLeads.size === 1 ? [...teamLeads][0] : "");
+  add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
+  const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
+  add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
+  add("project:reviewed-documents", "Data kajian", "Daftar dokumen yang sudah ditelaah dari Bab IV", scopeList.format([...reviewedDocuments]));
+  add("project:inspection-tools", "Data kajian", "Nama alat dari tabel Daftar Alat Pemeriksaan", scopeList.format([...tools]));
+  add("project:intro-materials", "Data kajian", "Sumber data yang diisi di Bab I",
+    filledIntroSource(project, "dokumen, hasil survei, atau hasil uji", sources));
+  add("project:intro-limits", "Data kajian", "Keterbatasan akses atau data yang diisi di Bab I",
+    filledIntroSource(project, "keterbatasan akses atau data", sources));
   return sources;
 }
 
@@ -165,7 +221,7 @@ function importLinks(links) {
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
     if (typeof link.value === "string") pairs.push([tokenName(token), { value: link.value }]);
-    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell):[a-z\d.:/-]+$/i.test(link.source)) {
+    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell|document):[a-z\d.:/-]+$/i.test(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
   }
