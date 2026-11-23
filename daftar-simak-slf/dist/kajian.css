@@ -97,6 +97,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .link-entry { min-width: 0; display: grid; gap: 4px; align-content: start; }
 .link-entry .hint { overflow-wrap: anywhere; }
 .linked-preview { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.purpose-field { display: grid; gap: 8px; margin-bottom: 14px; }
+.block .purpose-field { margin-bottom: 0; }
 .checklist-head { flex-wrap: wrap; margin-bottom: 8px; }
 .checklist-head p { margin: 0; }
 .checklist-frame { width: 100%; height: min(74dvh, 850px); min-height: 480px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }

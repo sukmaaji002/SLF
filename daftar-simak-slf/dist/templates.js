@@ -1,7 +1,7 @@
 "use strict";
 
 const originalPurposeText = "Kajian ini bertujuan membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, dan merumuskan tindak lanjut atas temuan yang didukung bukti pemeriksaan.";
-const purposeText = "Pekerjaan ini disusun untuk [tujuan kajian]. " + originalPurposeText;
+const purposeText = "Kajian ini disusun untuk [tujuan kajian]. Dalam lingkup tersebut, pengkaji membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, lalu merumuskan tindak lanjut berdasarkan bukti pemeriksaan.";
 const purposeOptions = [
   ["pengajuan", "Pengajuan SLF pertama", "mendukung pengajuan Sertifikat Laik Fungsi (SLF) pertama"],
   ["perpanjangan", "Perpanjangan SLF", "mendukung perpanjangan Sertifikat Laik Fungsi (SLF)"],

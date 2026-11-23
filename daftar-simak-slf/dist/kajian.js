@@ -135,6 +135,31 @@ function refreshLinkedFields() {
   for (const details of editor.querySelectorAll(".linked-fields[open]")) details.refreshSources();
 }
 
+function purposeField(project) {
+  const select = dom("select", { ariaLabel: "Tujuan kajian" });
+  select.append(new Option("Pilih tujuan kajian", ""),
+    ...purposeOptions.map(([id, label]) => new Option(label, id)),
+    new Option("Isi manual", "manual"));
+  select.value = project.purpose?.mode ?? "";
+  const manual = field("Tujuan kajian manual", project.purpose?.custom, (value) => update({ custom: value }));
+  manual.querySelector("input").placeholder = "Contoh: menilai kelaikan fungsi pada area renovasi";
+  const reflect = () => { manual.hidden = select.value !== "manual"; };
+
+  function update(changes) {
+    project.purpose = { ...project.purpose, ...changes };
+    refreshLinkedFields();
+    save();
+  }
+
+  select.addEventListener("change", () => {
+    reflect();
+    update({ mode: select.value });
+    if (select.value === "manual") manual.querySelector("input").focus();
+  });
+  reflect();
+  return dom("div", { className: "purpose-field" }, dom("label", {}, "Tujuan kajian", select), manual);
+}
+
 function setCurrent(id) {
   workspace.current = id;
   active = "cover";
@@ -198,6 +223,7 @@ function renderCover(project) {
 function renderFront(project) {
   title("Bagian awal", "Bagian awal & daftar isi");
   editor.append(dom("p", { className: "lead" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
+    purposeField(project),
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
         (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
@@ -393,7 +419,11 @@ function blockEditor(chapter, block, index, headingInfo) {
   bar.append(controls);
   const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index }, bar);
   const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; });
-  if (block.type === "heading") wrapper.append(boundField(block, "text", "Judul subbab"), linked("body", "Isi subbab"));
+  if (block.type === "heading") {
+    wrapper.append(boundField(block, "text", "Judul subbab"));
+    if (block.text === "Tujuan" && reportTokens(block.body).has("tujuan kajian")) wrapper.append(purposeField(current()));
+    wrapper.append(linked("body", "Isi subbab"));
+  }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
   if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
   if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), pictureEditor(block, "foto", () => chapter.blocks.includes(block)));
@@ -477,6 +507,8 @@ function validateBackup(data) {
     frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },
     chapters,
   };
+  const purpose = pickText(source.purpose, ["mode", "custom"]);
+  if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = purpose;
   if (source.cover?.image) {
     valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));
     project.cover.image = source.cover.image;
