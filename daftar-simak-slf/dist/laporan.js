@@ -113,73 +113,18 @@ function reportFormatted(element, text, format, prefix = "") {
 }
 
 async function renderChecklist(target, project, urls, checklist, summaryAnchors, primary) {
-  const { checks } = checklist;
-  const identity = { ...checklist.identity };
-  for (const [key, value] of Object.entries({
-    building: project.cover.building, location: project.cover.address,
-    use: project.cover.use, ownerName: project.cover.owner,
-  })) {
-    if (!cleanValue(identity[key]) && cleanValue(value)) identity[key] = value;
-  }
-  const rows = Object.entries(checklistIdentityLabels).filter(([key]) => identity[key]?.trim())
-    .map(([key, label]) => [label, formattedValue(identity[key], getTextFormat(checklist.identity, key) || getTextFormat(project.cover, { ownerName: "owner", location: "address" }[key] ?? key))]);
-  if (rows.length) target.append(reportTable(["Data pemeriksaan", "Isian"], rows));
-  let currentCategory;
-  let currentGroup;
-  let body;
-  const pendingPhotos = [];
-  for (const item of checklistItems) {
-    if (item.category !== currentCategory) {
-      currentCategory = item.category;
-      target.append(dom("h3", {}, item.category.code + " " + item.category.title));
-    }
-    if (item.group !== currentGroup) {
-      currentGroup = item.group;
-      body = dom("tbody");
-      target.append(dom("h4", {}, item.group.code + " " + item.group.title),
-        dom("table", {}, dom("thead", {}, dom("tr", {}, dom("th", {}, "Butir pemeriksaan"), dom("th", {}, "Hasil"), dom("th", {}, "Dasar aturan atau acuan teknis"))), body));
-    }
-    const check = checks[item.id];
-    const result = dom("td");
-    const name = [item.no, item.title].filter(Boolean).join(". ");
-    const label = dom("td", {}, name);
-    const summary = summaryAnchors.get(item.id);
-    if (summary) label.append(dom("br"), reportJump(summary, "Ringkasan di bab"));
-    body.append(dom("tr", primary ? { id: "report-check-" + item.id } : {}, label, result,
-      dom("td", {}, checklistReference(item.id, project.intensity?.region === "tegal"))));
-    if (check?.na) {
-      result.append("Tidak berlaku");
-      const reason = checklistReason(check);
-      if (reason) result.append(". ", formattedValue(reason, getTextFormat(check, "reason") || getTextFormat(check.rows[0], "note")));
-      continue;
-    }
-    const filled = check?.rows.filter((row) => Object.keys(checklistLabels).some((key) => row[key]?.trim()));
-    if (!filled?.length) {
-      result.textContent = "Belum diisi";
-      continue;
-    }
-    for (const row of filled) {
-      if (row.label) result.append(dom("strong", {}, row.label));
-      const values = dom("dl", { className: "result-values" });
-      for (const [key, label] of Object.entries(checklistLabels)) {
-        if (!row[key]?.trim()) continue;
-        const value = key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key];
-        const definition = reportFormatted(dom("dd"), value, getTextFormat(row, key));
-        values.append(dom("dt", {}, label), definition);
-        if (key === "photo" || key === "ndtPhoto") {
-          pendingPhotos.push(checklistPhoto(project.id, item.id + ":" + row.key + ":" + key).then(async (blob) => {
-            if (!blob) return;
-            const src = URL.createObjectURL(blob);
-            urls.push(src);
-            const image = dom("img", { src, alt: label });
-            try { await image.decode(); definition.append(image); } catch { /* The filename remains visible. */ }
-          }).catch(() => {}));
-        }
-      }
-      result.append(values);
+  const identity = structuredClone(checklist.identity);
+  for (const [key, coverKey] of Object.entries({ building: "building", location: "address", use: "use", ownerName: "owner" })) {
+    if (!cleanValue(identity[key]) && cleanValue(project.cover[coverKey])) {
+      identity[key] = project.cover[coverKey];
+      setTextFormat(identity, key, getTextFormat(project.cover, coverKey));
     }
   }
-  await Promise.all(pendingPhotos);
+  await renderSimakForm(target, { identity, checks: checklist.checks }, {
+    tegal: project.intensity?.region === "tegal",
+    anchors: primary, summaryAnchors, photoUrls: urls,
+    loadPhoto: (key) => checklistPhoto(project.id, key),
+  });
 }
 
 function reportJump(id, label) {

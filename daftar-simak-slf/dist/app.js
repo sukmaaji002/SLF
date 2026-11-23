@@ -80,7 +80,8 @@ const categories = [];
 const items = [];
 let idb;
 let photoWrites = 0;
-let printState;
+let simakPrintReady = false;
+let simakPhotoUrls = [];
 
 function load(key) {
   try {
@@ -548,24 +549,52 @@ byId("category").addEventListener("change", refresh);
 byId("status-filter").addEventListener("change", refresh);
 byId("export").addEventListener("click", exportCsv);
 byId("toggle-groups").addEventListener("click", toggleGroups);
-function preparePrint() {
-  if (printState) return;
-  const details = [...document.querySelectorAll("details")];
-  printState = details.map((node) => [node, node.open]);
-  for (const item of items) if (item.node.classList.contains("has-data") && !item.body.hasChildNodes()) renderItem(item);
-  for (const node of details) node.open = true;
+const simakDialog = byId("simak-print-dialog");
+const simakPaper = byId("simak-paper");
+document.head.append(dom("style", { textContent: simakFormStyle }));
+
+function clearSimakPaper() {
+  simakPrintReady = false;
+  simakPaper.replaceChildren();
+  simakPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+  simakPhotoUrls = [];
 }
 
-byId("print").addEventListener("click", async () => {
-  preparePrint();
-  await Promise.all([...document.querySelectorAll(".photo-field")].map((photo) => photo.photoReady));
-  window.print();
-});
-window.addEventListener("beforeprint", preparePrint);
-window.addEventListener("afterprint", () => {
-  for (const [node, open] of printState || []) node.open = open;
-  printState = null;
-});
+async function prepareSimakPaper() {
+  clearSimakPaper();
+  const urls = simakPhotoUrls;
+  const draft = dom("div");
+  simakPaper.append(draft);
+  await renderSimakForm(draft, structuredClone(state), {
+    tegal: tegalReference, photoUrls: urls, loadPhoto: (key) => photoStore("get", key),
+  });
+  if (urls !== simakPhotoUrls) {
+    urls.forEach((url) => URL.revokeObjectURL(url));
+    return;
+  }
+  simakPrintReady = true;
+}
+
+async function showSimakPaper(print) {
+  const controls = [byId("simak-preview"), byId("print")];
+  controls.forEach((button) => { button.disabled = true; });
+  try {
+    await prepareSimakPaper();
+    simakDialog.showModal();
+    if (print) window.print();
+  } catch {
+    byId("save-status").textContent = "Pratinjau formulir gagal disiapkan.";
+  } finally {
+    controls.forEach((button) => { button.disabled = false; });
+  }
+}
+byId("simak-preview").addEventListener("click", () => showSimakPaper(false));
+byId("print").addEventListener("click", () => showSimakPaper(true));
+byId("simak-print-preview").addEventListener("click", () => window.print());
+byId("simak-close").addEventListener("click", () => simakDialog.close());
+simakDialog.addEventListener("close", clearSimakPaper);
+window.addEventListener("beforeprint", () => { if (!simakPrintReady) prepareSimakPaper().catch(() => {}); });
+window.addEventListener("afterprint", () => { if (!simakDialog.open) clearSimakPaper(); });
 byId("legacy-export").hidden = !Object.keys(previous?.checks ?? {}).length;
 byId("legacy-export").addEventListener("click", () => {
   const labels = { pending: "Belum diperiksa", ok: "Sesuai", issue: "Perlu tindak lanjut", na: "Tidak berlaku" };

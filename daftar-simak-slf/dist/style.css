@@ -136,25 +136,15 @@ summary { cursor: pointer; font-weight: 700; }
   .item > summary, .item-body, .group > summary { padding-inline: 12px; }
 }
 @media (max-width: 420px) { .form-grid { grid-template-columns: 1fr; } }
-@page { margin: 12mm; }
+#simak-print-dialog { width: min(850px, calc(100% - 20px)); max-height: 94dvh; padding: 0; color: #111; border: 1px solid #bacfc6; border-radius: 10px; }
+#simak-print-dialog::backdrop { background: #142d26b0; }
+.simak-preview-actions { position: sticky; top: 0; z-index: 1; display: flex; gap: 8px; justify-content: flex-end; padding: 9px 12px; background: #eff5f0; border-bottom: 1px solid #d6e1da; }
+#simak-paper { padding: clamp(8px, 4vw, 34px); }
+@page { size: 215mm 330mm; margin: 15mm 16mm; }
 @media print {
-  body, .hero, .progress-card, .group > summary { color: #111; background: white; }
-  .top, .primary, .actions, .filters, .result-line, .category-nav, .reset-wrap, .footer, #save-status, .intro, .section-head p,
-  textarea, select, input, .item-body button, .applicable { display: none; }
-  .shell { width: 100%; }
-  .print-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 400; }
-  .catalog-section[hidden], .group[hidden], .item[hidden] { display: block; }
-  .item:not(.has-data) .item-body, .sample:not(.has-data), .sample .form-grid > :not(.has-value) { display: none; }
-  .item > summary { padding: 4px 8px; }
-  .group > summary { padding: 6px 8px; }
-  .group { margin-bottom: 7px; }
-  .catalog-section { margin-bottom: 12px; }
-  .sample { break-inside: avoid; margin-bottom: 3px; padding: 7px; }
-  summary { break-after: avoid; list-style: none; }
-  summary::-webkit-details-marker { display: none; }
-  .photo-preview { max-height: 140px; }
-  .hero { grid-template-columns: 1.4fr 1fr; margin: 0; padding: 0; }
-  .eyebrow { color: #111; }
-  .progress-card { padding: 12px; }
-  .checklist { margin-top: 14px; }
+  html, body { background: white; }
+  body > :not(#simak-print-dialog), .simak-preview-actions { display: none !important; }
+  #simak-print-dialog::backdrop { display: none; }
+  #simak-print-dialog { display: block !important; position: static; width: 100%; max-width: none; max-height: none; overflow: visible; padding: 0; border: 0; border-radius: 0; margin: 0; }
+  #simak-paper { padding: 0; }
 }

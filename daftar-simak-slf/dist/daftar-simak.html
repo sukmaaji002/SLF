@@ -11,6 +11,8 @@
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="acuan-simak.js" defer></script>
+  <script src="laporan.js" defer></script>
+  <script src="simak-form.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -54,7 +56,7 @@
     <section class="checklist" id="pemeriksaan" aria-labelledby="check-title">
       <div class="section-head check-head">
         <div><h2 id="check-title">Daftar pemeriksaan</h2><p>Buka butir untuk mengisi hasil pemeriksaan atau menambah sampel.</p></div>
-        <div class="actions"><button id="print" type="button">Cetak</button><button id="export" class="dark" type="button">Unduh CSV</button></div>
+        <div class="actions"><button id="simak-preview" type="button">Pratinjau formulir</button><button id="print" type="button">Cetak / PDF</button><button id="export" class="dark" type="button">Unduh CSV</button></div>
       </div>
       <div class="filters">
         <label>Cari butir<input id="search" type="search" placeholder="Contoh: ventilasi"></label>
@@ -68,5 +70,12 @@
     </section>
   </main>
   <footer class="shell footer"><span>Daftar Simak SLF</span><a href="https://peraturan.bpk.go.id/Details/161846/pp-no-16-tahun-2021" target="_blank" rel="noopener noreferrer">PP Nomor 16 Tahun 2021</a></footer>
+  <dialog id="simak-print-dialog" aria-label="Pratinjau formulir daftar simak">
+    <div class="simak-preview-actions">
+      <button id="simak-close" type="button">Tutup</button>
+      <button id="simak-print-preview" type="button">Cetak / PDF</button>
+    </div>
+    <article id="simak-paper" aria-label="Formulir daftar simak"></article>
+  </dialog>
 </body>
 </html>

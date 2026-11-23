@@ -89,7 +89,7 @@ async function paginateReport(source, target) {
   fragment.append(source);
   try {
     await document.fonts.ready;
-    await previewer.preview(fragment, [{ [location.href]: reportPrintStyle }], staging);
+    await previewer.preview(fragment, [{ [location.href]: reportPrintStyle + simakFormStyle }], staging);
     connectContents(staging);
     target.replaceChildren(...staging.childNodes);
     return dispose;
