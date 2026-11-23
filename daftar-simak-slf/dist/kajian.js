@@ -19,10 +19,10 @@ function draft(name, template) {
   return {
     id: crypto.randomUUID(), name, template,
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
-    front: {},
+    front: { ...frontDefaults },
     chapters: reportTemplates[template].chapters.map(([title, ...sections]) => ({
       title, checklist: sections.includes("@checklist"),
-      blocks: sections.filter((section) => section !== "@checklist").map(heading),
+      blocks: templateBlocks(sections),
     })),
   };
 }
@@ -108,7 +108,8 @@ function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
   editor.append(dom("p", { className: "lead" }, "Isian ini dipakai pada sampul laporan."),
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
-      boundField(project.cover, key, label, type))));
+      boundField(project.cover, key, label, type))),
+    dom("hr"), pictureEditor(project.cover, "foto sampul"));
   editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
     project.name = value;
     $("projects").selectedOptions[0].textContent = value;
@@ -122,8 +123,19 @@ function renderFront(project) {
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       boundField(project.front, key, label, index < 2 ? "area" : "text"))),
     dom("h3", {}, "Susunan bab"),
-    dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) =>
-      dom("li", {}, button(chapterLabel(project, index), () => { active = index; render(); }, "quiet")))));
+    dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
+      const titles = [...headingEntries(chapter, index)].filter(([bi]) => chapter.blocks[bi].text.trim());
+      const jump = (bi) => {
+        active = index;
+        render();
+        editor.querySelector(bi === undefined ? "input" : "#edit-block-" + bi + " input")?.focus();
+      };
+      const entry = dom("li", {}, button(chapterLabel(project, index), () => jump(), "quiet"));
+      if (titles.length) entry.append(dom("ul", { className: "sub-outline" }, ...titles.map(([bi, info]) =>
+        dom("li", { className: info.nested ? "nested-outline" : "" },
+          button(info.number + " " + chapter.blocks[bi].text, () => jump(bi), "quiet")))));
+      return entry;
+    })));
 }
 
 function renderChecklistEditor(project) {
@@ -164,7 +176,8 @@ function renderChapter(project) {
     save();
   }), chapterActions);
   if (chapter.checklist) return renderChecklistEditor(project);
-  for (const [bi, block] of chapter.blocks.entries()) editor.append(blockEditor(chapter, block, bi));
+  const headings = headingEntries(chapter, index);
+  for (const [bi, block] of chapter.blocks.entries()) editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
   const actions = dom("div", { className: "button-row add-block" });
   for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
     actions.append(button("＋ " + label, () => {
@@ -231,7 +244,7 @@ async function imageData(file) {
   }
 }
 
-function photoEditor(chapter, block) {
+function pictureEditor(block, label, isAttached = () => true) {
   const upload = dom("input", { type: "file", accept: "image/*" });
   const feedback = dom("p", { className: "hint", role: "status" });
   const image = dom("img", { className: "photo-thumb", alt: "Pratinjau dokumentasi", hidden: true });
@@ -241,7 +254,7 @@ function photoEditor(chapter, block) {
     upload.disabled = true;
     try {
       const data = await imageData(upload.files[0]);
-      if (!chapter.blocks.includes(block)) return;
+      if (!isAttached()) return;
       block.image = data;
       image.src = data;
       image.hidden = false;
@@ -254,13 +267,29 @@ function photoEditor(chapter, block) {
       upload.disabled = false;
     }
   });
-  return dom("div", {}, dom("label", {}, "Pilih foto", upload), feedback, image,
-    button("Hapus foto", () => { delete block.image; image.hidden = true; image.removeAttribute("src"); save(); }, "quiet"));
+  const remove = button("Hapus " + label, () => {
+    delete block.image;
+    image.hidden = remove.hidden = true;
+    image.removeAttribute("src");
+    feedback.textContent = "";
+    save();
+  }, "quiet");
+  remove.hidden = !block.image;
+  upload.addEventListener("change", () => { if (upload.files[0]) {
+    const observer = new MutationObserver(() => {
+      if (image.hidden) return;
+      remove.hidden = false;
+      observer.disconnect();
+    });
+    observer.observe(image, { attributes: true, attributeFilter: ["hidden"] });
+  } });
+  return dom("div", {}, dom("label", {}, "Pilih " + label, upload), feedback, image, remove);
 }
 
-function blockEditor(chapter, block, index) {
+function blockEditor(chapter, block, index, headingInfo) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
-  const bar = dom("div", { className: "block-head" }, dom("strong", {}, labels[block.type]));
+  const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
+  const bar = dom("div", { className: "block-head" }, dom("strong", {}, marker));
   const controls = dom("div", { className: "button-row" });
   for (const [delta, name] of [[-1, "Naikkan blok"], [1, "Turunkan blok"]]) {
     const control = button(name, () => {
@@ -279,11 +308,11 @@ function blockEditor(chapter, block, index) {
     render();
   }, "danger"));
   bar.append(controls);
-  const wrapper = dom("section", { className: "block" }, bar);
+  const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index }, bar);
   if (block.type === "heading") wrapper.append(boundField(block, "text", "Judul subbab"), boundField(block, "body", "Isi subbab", "area"));
   if (block.type === "text") wrapper.append(boundField(block, "text", "Isi paragraf", "area"));
   if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
-  if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), photoEditor(chapter, block));
+  if (block.type === "photo") wrapper.append(boundField(block, "text", "Keterangan foto"), pictureEditor(block, "foto", () => chapter.blocks.includes(block)));
   return wrapper;
 }
 
@@ -339,7 +368,7 @@ function validateBackup(data) {
     const blocks = chapter.blocks.map((block) => {
       valid(block && ["heading", "text", "table", "photo"].includes(block.type) && typeof block.text === "string");
       const clean = { type: block.type, text: block.text };
-      if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; }
+      if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; clean.depth = block.depth === 2 ? 2 : 1; }
       if (block.type === "table") {
         valid(Array.isArray(block.headers) && block.headers.length && block.headers.every((value) => typeof value === "string") &&
           Array.isArray(block.rows) && block.rows.every((row) => Array.isArray(row) &&
@@ -357,6 +386,10 @@ function validateBackup(data) {
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
     front: pickText(source.front, frontFields.map(([key]) => key)), chapters,
   };
+  if (source.cover?.image) {
+    valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));
+    project.cover.image = source.cover.image;
+  }
   const checks = {};
   for (const { id } of checklistItems) {
     const check = data.checklist?.checks?.[id];
