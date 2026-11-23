@@ -23,6 +23,21 @@ const linkedIntroduction = {
   "Sistematika penyusunan": "Susunan bab dalam laporan ini mengikuti urutan berikut.\n\n[susunan bab laporan]",
 };
 
+const originalMethodNarratives = {
+  "Metode pemeriksaan": "Pemeriksaan disusun dalam tahapan pengumpulan dokumen, telaah awal, verifikasi lapangan, dan analisis temuan. Pemilihan area dan komponen yang diperiksa mempertimbangkan [fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan]. Dasar pemilihan sampel dan batasan metode dicatat pada [tabel atau lampiran].",
+  "Observasi visual dan pengujian": "Observasi lapangan dilaksanakan pada [tanggal] di [area atau posisi sampel]. Kondisi komponen dicatat dalam [daftar simak atau dokumentasi foto]. Pengujian yang dilakukan meliputi [jenis uji, metode, dan acuan atau keterangan tidak dilakukan], dengan batasan [batasan pengamatan atau pengujian].",
+  "Alat dan bahan pemeriksaan": "Alat yang digunakan untuk dokumentasi, pengukuran, atau pengujian dicantumkan pada tabel pemeriksaan. Catatan alat mencakup jenis, fungsi, satuan, dan status kalibrasi apabila relevan. Bahan serta dokumen pendukung yang digunakan adalah [daftar bahan dan dokumen].",
+};
+const linkedMethodNarratives = {
+  "Metode pemeriksaan": originalMethodNarratives["Metode pemeriksaan"].replace(
+    "Pemeriksaan disusun dalam tahapan pengumpulan dokumen, telaah awal, verifikasi lapangan, dan analisis temuan.",
+    "Metode yang digunakan dalam pemeriksaan meliputi [metode pemeriksaan yang digunakan]."),
+  "Observasi visual dan pengujian": "Observasi lapangan dilaksanakan pada [tanggal pemeriksaan] di [area atau posisi sampel]. Kondisi komponen dicatat dalam [daftar simak atau dokumentasi foto]. Pelaksanaan pengujian dicatat sebagai berikut. [jenis uji, metode, dan acuan atau keterangan tidak dilakukan]. Batasan pemeriksaan meliputi [batasan pengamatan atau pengujian].",
+  "Alat dan bahan pemeriksaan": originalMethodNarratives["Alat dan bahan pemeriksaan"].replace(
+    "Alat yang digunakan untuk dokumentasi, pengukuran, atau pengujian dicantumkan pada tabel pemeriksaan.",
+    "Alat yang tercatat dalam tabel pemeriksaan meliputi [daftar alat pemeriksaan]."),
+};
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -52,11 +67,11 @@ const reportTemplates = {
         "Metode dan landasan hukum",
         [
           "Metode pemeriksaan",
-          {"body":"Pemeriksaan disusun dalam tahapan pengumpulan dokumen, telaah awal, verifikasi lapangan, dan analisis temuan. Pemilihan area dan komponen yang diperiksa mempertimbangkan [fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan]. Dasar pemilihan sampel dan batasan metode dicatat pada [tabel atau lampiran].","previous":"[Jelaskan urutan pemeriksaan dan dasar penentuan sampel.]"},
+          { body: linkedMethodNarratives["Metode pemeriksaan"], previous: "[Jelaskan urutan pemeriksaan dan dasar penentuan sampel.]" },
           ["Pemeriksaan dokumen", {"body":"Dokumen yang tersedia untuk ditelaah meliputi [daftar dokumen]. Identitas objek, fungsi, dimensi utama, dan spesifikasi yang tercantum pada [dokumen rujukan] dibandingkan dengan [gambar terbangun atau data lapangan]. Dokumen yang belum tersedia atau belum dapat diverifikasi dicatat dalam rekap pemeriksaan.","previous":"[Catat dokumen yang diperiksa, sumbernya, dan cara membandingkannya dengan kondisi terbangun.]"}],
-          ["Observasi visual dan pengujian", {"body":"Observasi lapangan dilaksanakan pada [tanggal] di [area atau posisi sampel]. Kondisi komponen dicatat dalam [daftar simak atau dokumentasi foto]. Pengujian yang dilakukan meliputi [jenis uji, metode, dan acuan atau keterangan tidak dilakukan], dengan batasan [batasan pengamatan atau pengujian].","previous":"[Catat waktu, lokasi, alat, dan metode pengujian yang benar-benar dilakukan.]"}],
+          ["Observasi visual dan pengujian", { body: linkedMethodNarratives["Observasi visual dan pengujian"], previous: "[Catat waktu, lokasi, alat, dan metode pengujian yang benar-benar dilakukan.]" }],
         ],
-        ["Alat dan bahan pemeriksaan", {"body":"Alat yang digunakan untuk dokumentasi, pengukuran, atau pengujian dicantumkan pada tabel pemeriksaan. Catatan alat mencakup jenis, fungsi, satuan, dan status kalibrasi apabila relevan. Bahan serta dokumen pendukung yang digunakan adalah [daftar bahan dan dokumen].","previous":"[Cantumkan alat, satuan, serta kalibrasi bila relevan.]"}],
+        ["Alat dan bahan pemeriksaan", { body: linkedMethodNarratives["Alat dan bahan pemeriksaan"], previous: "[Cantumkan alat, satuan, serta kalibrasi bila relevan.]" }],
         {"table":"Daftar alat pemeriksaan","columns":["Alat","Kegunaan","Satuan / kalibrasi"],"rows":[["[Alat ukur atau uji]","[Parameter yang diukur]","[Satuan dan status kalibrasi]"],["[Alat dokumentasi]","[Jenis bukti yang dicatat]","[Keterangan]"]]},
         [
           "Standar pemeriksaan",
@@ -351,6 +366,12 @@ function upgradeReportDraft(project) {
         if (Object.hasOwn(originalIntroduction, block.text) && block.body === originalIntroduction[block.text] &&
             !Object.hasOwn(block.links ?? {}, "pengajuan/perpanjangan")) {
           block.body = linkedIntroduction[block.text];
+        }
+        if (Object.hasOwn(originalMethodNarratives, block.text) && block.body === originalMethodNarratives[block.text]) {
+          block.body = linkedMethodNarratives[block.text];
+          if (block.links?.tanggal && !block.links["tanggal pemeriksaan"]) {
+            block.links["tanggal pemeriksaan"] = block.links.tanggal;
+          }
         }
       }
     }
