@@ -108,6 +108,16 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .linked-preview { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .purpose-field { display: grid; gap: 8px; margin-bottom: 14px; }
 .block .purpose-field { margin-bottom: 0; }
+.auto-checklist { overflow-x: auto; margin-block: 12px; }
+.auto-checklist table { width: 100%; min-width: 40rem; border-collapse: collapse; }
+.auto-checklist th, .auto-checklist td { text-align: left; vertical-align: top; padding: 8px; border: 1px solid var(--line); white-space: pre-wrap; }
+.auto-checklist th { background: #e9f2eb; }
+.site-diagram { margin: 16px 0; }
+.site-diagram img { display: block; width: 100%; max-width: 850px; }
+.site-diagram figcaption { margin-top: 5px; font-size: .875rem; color: var(--muted); }
+.intensity-toggle { display: flex; align-items: center; gap: 8px; }
+.intensity-toggle input { width: auto; }
+
 .checklist-head { flex-wrap: wrap; margin-bottom: 8px; }
 .checklist-head p { margin: 0; }
 .checklist-frame { width: 100%; height: min(74dvh, 850px); min-height: 480px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }

@@ -4,6 +4,8 @@ const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
+  "luas persil": ["project:land-area"],
+  "kdb": ["project:kdb"], "klb": ["project:klb"], "kdh": ["project:kdh"],
   "disiplin atau sistem yang diperiksa": ["project:scope"],
   "sistem utama dalam lingkup kajian": ["project:scope"],
   "pengajuan/perpanjangan": ["project:application"],
@@ -106,7 +108,8 @@ function tableCellValue(block, row, column, sources) {
 
 function tableSourceAvailable(id) {
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
-    ["project:purpose", "project:scope", "project:application", "project:chapter-order"].includes(id));
+    ["project:purpose", "project:scope", "project:application", "project:chapter-order",
+      "project:land-area", "project:kdb", "project:klb", "project:kdh"].includes(id));
 }
 
 function addNarrativeSources(add, id, text, links, label) {
@@ -143,6 +146,12 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   function add(id, group, label, value) {
     sources.set(id, { group, label, value: cleanValue(value) });
   }
+  const intensity = calculateIntensity(project, checklist);
+  if (intensity.land.value > 0) add("project:land-area", "Intensitas dan tata ruang", "Luas persil", intensityValue(intensity.land.value, " m²"));
+  for (const metric of intensity.metrics) {
+    if (metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
+      intensityValue(metric.value, metric.percent ? "%" : ""));
+  }
   const purpose = project.purpose;
   const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
   add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue);
@@ -169,7 +178,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!cleanValue(row[key]) || key === "photo" || key === "ndtPhoto") continue;
         if (key !== "location") hasResults = true;
-        const value = row[key] + (key === "measurement" && item.unit ? " " + item.unit : "");
+        const value = key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key];
         const name = [item.group.code + " " + item.title, row.label, label].filter(Boolean).join(" · ");
         add("check:" + [item.id, row.key, key].join(":"), "Hasil daftar simak", name, value);
       }

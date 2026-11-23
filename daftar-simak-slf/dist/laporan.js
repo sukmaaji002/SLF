@@ -98,7 +98,7 @@ function reportParagraphs(text) {
     .map((paragraph) => dom("p", { className: "report-text" }, paragraph));
 }
 
-async function renderChecklist(target, project, urls, checklist) {
+async function renderChecklist(target, project, urls, checklist, summaryAnchors, primary) {
   const { checks } = checklist;
   const identity = { ...checklist.identity };
   for (const [key, value] of Object.entries({
@@ -123,13 +123,18 @@ async function renderChecklist(target, project, urls, checklist) {
       currentGroup = item.group;
       body = dom("tbody");
       target.append(dom("h4", {}, item.group.code + " " + item.group.title),
-        dom("table", {}, dom("thead", {}, dom("tr", {}, dom("th", {}, "Butir pemeriksaan"), dom("th", {}, "Hasil"))), body));
+        dom("table", {}, dom("thead", {}, dom("tr", {}, dom("th", {}, "Butir pemeriksaan"), dom("th", {}, "Hasil"), dom("th", {}, "Dasar aturan atau acuan teknis"))), body));
     }
     const check = checks[item.id];
     const result = dom("td");
-    body.append(dom("tr", {}, dom("td", {}, [item.no, item.title].filter(Boolean).join(". ")), result));
+    const name = [item.no, item.title].filter(Boolean).join(". ");
+    const label = dom("td", {}, name);
+    const summary = summaryAnchors.get(item.id);
+    if (summary) label.append(dom("br"), reportJump(summary, "Ringkasan di bab"));
+    body.append(dom("tr", primary ? { id: "report-check-" + item.id } : {}, label, result,
+      dom("td", {}, checklistReference(item.id, project.intensity?.region === "tegal"))));
     if (check?.na) {
-      result.textContent = "Tidak berlaku";
+      result.textContent = ["Tidak berlaku", checklistReason(check)].filter(Boolean).join(". ");
       continue;
     }
     const filled = check?.rows.filter((row) => Object.keys(checklistLabels).some((key) => row[key]?.trim()));
@@ -142,7 +147,7 @@ async function renderChecklist(target, project, urls, checklist) {
       const values = dom("dl", { className: "result-values" });
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!row[key]?.trim()) continue;
-        const definition = dom("dd", {}, row[key] + (key === "measurement" && item.unit ? " " + item.unit : ""));
+        const definition = dom("dd", {}, key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key]);
         values.append(dom("dt", {}, label), definition);
         if (key === "photo" || key === "ndtPhoto") {
           pendingPhotos.push(checklistPhoto(project.id, item.id + ":" + row.key + ":" + key).then(async (blob) => {
@@ -158,6 +163,12 @@ async function renderChecklist(target, project, urls, checklist) {
     }
   }
   await Promise.all(pendingPhotos);
+}
+
+function reportJump(id, label) {
+  const link = dom("a", { href: "#" + id }, label);
+  link.dataset.reportJump = id;
+  return link;
 }
 
 async function buildReport(target, project, urls) {
@@ -189,6 +200,53 @@ async function buildReport(target, project, urls) {
   const tableEntries = [];
   const figureEntries = [];
   const checklistTargets = [];
+  const summaryAnchors = new Map();
+  const summaries = new Map();
+  for (const item of checklistItems) {
+    const summary = checklistSummary(item, checklist.checks[item.id]);
+    if (!summary) continue;
+    const to = checklistDestination(project, item);
+    const key = to ? to.chapter + ":" + to.block : "fallback";
+    if (!summaries.has(key)) summaries.set(key, []);
+    const id = "report-summary-" + item.id;
+    summaryAnchors.set(item.id, id);
+    summaries.get(key).push({ item, summary, id });
+  }
+  const intensity = calculateIntensity(project, checklist);
+  const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram ||
+    intensity.metrics.some((metric) => metric.area.value !== null || metric.area.error));
+  const intensityHeading = {
+    disiplin: "Intensitas bangunan", ringkas: "Tata bangunan dan lingkungan", simak: "Tinjauan kesesuaian bangunan gedung",
+  }[project.template];
+  let intensityRendered = false;
+  function appendIntensity(section) {
+    intensityRendered = true;
+    const id = "report-intensity-results";
+    const label = "Tabel " + (tableEntries.length + 1) + " · Perhitungan KDB, KLB, dan KDH";
+    tableEntries.push([id, label]);
+    section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
+      intensityTable(project, checklist)));
+    if (intensity.data.diagram) {
+      const figure = siteDiagram();
+      figure.id = "report-site-diagram";
+      const caption = "Gambar " + (figureEntries.length + 1) + " · " + figure.lastElementChild.textContent;
+      figure.lastElementChild.textContent = caption;
+      figureEntries.push([figure.id, caption]);
+      section.append(figure);
+    }
+  }
+  function appendSummary(section, key, label) {
+    const rows = summaries.get(key);
+    if (!rows) return;
+    const id = "report-checklist-summary-" + tableEntries.length;
+    const caption = "Tabel " + (tableEntries.length + 1) + " · " + label;
+    tableEntries.push([id, caption]);
+    const table = reportTable(["Butir daftar simak", "Ringkasan hasil", "Dasar aturan atau acuan teknis"],
+      rows.map(({ item, summary }) => [reportJump("report-check-" + item.id, item.group.code + " · " + item.title),
+        summary, checklistReference(item.id, intensity.data.region === "tegal")]));
+    for (const [i, row] of [...table.tBodies[0].rows].entries()) row.id = rows[i].id;
+    section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, caption), table));
+  }
   const attach = (section) => { sections.push(section); target.append(section); };
   for (const [key, label] of frontFields.slice(0, 2)) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
@@ -206,12 +264,15 @@ async function buildReport(target, project, urls) {
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
     const headings = headingEntries(chapter, index);
+    appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
     for (const [bi, block] of chapter.blocks.entries()) {
       const id = section.id + "-block-" + bi;
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }, number + " " + block.text));
         section.append(...reportParagraphs(resolve(block.body, block.links)));
+        if (showIntensity && !intensityRendered && block.text === intensityHeading) appendIntensity(section);
+        appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
       }
       if (block.type === "text") section.append(...reportParagraphs(resolve(block.text, block.links)));
       if (block.type === "table") {
@@ -229,6 +290,12 @@ async function buildReport(target, project, urls) {
       }
     }
     if (chapter.checklist) checklistTargets.push(section);
+    attach(section);
+  }
+  if (summaries.has("fallback") || (showIntensity && !intensityRendered)) {
+    const section = reportSection("Ringkasan teknis", "report-technical-summary");
+    if (showIntensity && !intensityRendered) appendIntensity(section);
+    appendSummary(section, "fallback", "Hasil daftar simak terkait");
     attach(section);
   }
   if (!checklistTargets.length) {
@@ -254,6 +321,6 @@ async function buildReport(target, project, urls) {
     return entry;
   }));
   contents.firstElementChild.after(toc);
-  await Promise.all(checklistTargets.map((section) => renderChecklist(section, project, urls, checklist)));
+  await Promise.all(checklistTargets.map((section, index) => renderChecklist(section, project, urls, checklist, summaryAnchors, index === 0)));
   await Promise.all(Array.from(target.querySelectorAll("img"), (image) => image.decode().catch(() => {})));
 }

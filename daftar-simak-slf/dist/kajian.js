@@ -260,6 +260,7 @@ function renderOutline() {
   const project = current();
   const nav = $("outline");
   nav.replaceChildren(outlineEntry("Sampul", "cover", "01"), outlineEntry("Bagian awal & daftar isi", "front", "02"));
+  nav.append(outlineEntry("Intensitas dan tata ruang", "intensity", "∑"), outlineEntry("Peta tautan dan acuan", "links", "↗"));
   for (const [index, chapter] of project.chapters.entries()) {
     nav.append(outlineEntry(chapter.title.trim() || "Bab tanpa judul", index, roman(index + 1)));
   }
@@ -277,8 +278,138 @@ function render() {
   editor.replaceChildren();
   if (active === "cover") return renderCover(project);
   if (active === "front") return renderFront(project);
+  if (active === "intensity") return renderIntensity(project);
+  if (active === "links") return renderChecklistMap(project);
   if (active === "checklist") return renderChecklistEditor(project);
   renderChapter(project);
+}
+
+function intensityTable(project, checklist, linkToInputs = false) {
+  const { data, land, metrics, note } = calculateIntensity(project, checklist);
+  const panel = dom("div", { className: "intensity-results" });
+  const site = [intensityOptions(intensityZones, data.zone), intensityOptions(intensityRoads, data.road),
+    intensityOptions(intensityFunctions, data.use)].filter(Boolean).join(" · ");
+  if (site) panel.append(dom("p", {}, site));
+  panel.append(dom("p", {}, "Luas persil: " + intensityValue(land.value, " m²")));
+  panel.append(reportTable(["Koefisien", "Luas dari daftar simak", "Hasil", "Batas Perbup", "Perbandingan"], metrics.map((metric) => {
+    const suffix = metric.percent ? "%" : "";
+    const label = metric.areaLabel + " · " + intensityValue(metric.area.value, " m²");
+    const limit = metric.limit == null ? "—" : dom("a", {
+      href: perbupTegalUrl + "#page=" + metric.page, target: "_blank", rel: "noopener",
+    }, metric.direction + " " + intensityValue(metric.limit, suffix));
+    return [metric.name, linkToInputs ? dom("a", { href: projectChecklistUrl(project, metric.id), target: "_blank", rel: "noopener" }, label) : label,
+      intensityValue(metric.value, suffix), limit, metric.status];
+  })));
+  if (note) panel.append(dom("p", {}, note));
+  if (data.region === "tegal") {
+    panel.append(dom("p", {}, intensityReviewNote),
+      dom("p", {}, dom("a", { href: perbupTegalUrl, target: "_blank", rel: "noopener" }, "Perbup Tegal No. 12 Tahun 2026, Lampiran III.A–C"),
+        " · ", dom("a", { href: rtrwTegalUrl, target: "_blank", rel: "noopener" }, "RTRW Kabupaten Tegal 2023–2043")));
+  }
+  return panel;
+}
+
+function renderIntensity(project) {
+  title("Data kajian", "Intensitas dan tata ruang");
+  const data = importIntensity(project.intensity);
+  const grid = dom("div", { className: "form-grid" });
+  const results = dom("div", { className: "auto-checklist", id: "intensity-live", ariaLive: "polite" });
+  const refresh = () => results.replaceChildren(intensityTable(project, readChecklist(project.id), true));
+  const changed = () => {
+    project.intensity = data;
+    refresh();
+    save();
+  };
+  const area = boundField(data, "land", "Luas persil yang diperhitungkan (m²)", "text", changed);
+  Object.assign(area.querySelector("input"), { inputMode: "decimal", placeholder: "Contoh: 900 atau 1.250,5" });
+  grid.append(area);
+  for (const [key, label, choices] of [
+    ["region", "Wilayah pembanding", [["tegal", "Kabupaten Tegal · Perbup 12/2026"]]],
+    ["zone", "Pola ruang / zona", intensityZones],
+    ["road", "Kelas jalan di depan persil", intensityRoads],
+    ["use", "Fungsi pada PBG/IMB atau dokumen kajian", intensityFunctions],
+  ]) {
+    const select = dom("select", {}, new Option("Pilih " + label.toLowerCase(), ""),
+      ...choices.map(([id, name]) => new Option(name, id)));
+    select.value = data[key];
+    select.addEventListener("change", () => { data[key] = select.value; changed(); });
+    grid.append(dom("label", {}, dom("span", {}, label), select));
+  }
+  const diagram = dom("input", { type: "checkbox", checked: data.diagram });
+  diagram.addEventListener("change", () => { data.diagram = diagram.checked; changed(); });
+  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Tiga luas pembilang diambil dari kolom Hasil pengukuran pada daftar simak. Gunakan luas yang diperhitungkan menurut dokumen lokasi dan ketentuan teknis."),
+    grid, results, siteDiagram(),
+    dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan"),
+    dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, gunakan Tambah Foto di Bab III. Sertakan denah terbangun atau gambar ukur yang telah diperiksa."));
+  refresh();
+}
+
+function projectChecklistUrl(project, item, embed = false) {
+  const params = new URLSearchParams({ proyek: project.id });
+  if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
+  if (embed) params.set("embed", "1");
+  return "./daftar-simak.html?" + params + (item ? "#butir-" + item : "");
+}
+
+function renderChecklistMap(project) {
+  title("Daftar simak", "Peta tautan dan acuan");
+  const search = dom("input", { type: "search", placeholder: "Cari nama butir atau acuan", ariaLabel: "Cari nama butir atau acuan" });
+  const list = dom("div", { className: "auto-checklist", id: "checklist-map-items" });
+  function update() {
+    const checklist = readChecklist(project.id);
+    const term = tokenName(search.value);
+    const rows = [];
+    for (const item of checklistItems) {
+      const reference = checklistReference(item.id, project.intensity?.region === "tegal");
+      const label = item.group.code + " · " + item.title;
+      if (!tokenName(label + " " + reference).includes(term)) continue;
+      const to = checklistDestination(project, item);
+      const value = checklistSummary(item, checklist.checks[item.id]);
+      const summary = value || "Belum diisi";
+      let jump = "Ringkasan teknis sebelum daftar simak";
+      if (to) jump = button("Bab " + roman(to.chapter + 1) + " · " + to.title, () => {
+        active = to.chapter;
+        render();
+        const section = document.getElementById("checklist-links-" + to.block);
+        if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
+      }, "quiet");
+      rows.push([dom("a", { href: projectChecklistUrl(project, item.id), target: "_blank", rel: "noopener" }, label), summary, reference, jump]);
+    }
+    list.replaceChildren(rows.length ? reportTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
+      dom("p", {}, "Tidak ada butir yang cocok."));
+  }
+  search.addEventListener("input", update);
+  editor.append(dom("p", { className: "lead" }, "Buka nama butir untuk mengisi daftar simak. Butir dengan hasil atau status Tidak berlaku akan muncul pada tabel bab terkait."),
+    search, list);
+  update();
+}
+
+function refreshChecklistViews() {
+  if (active === "links") {
+    const search = editor.querySelector('input[type="search"]');
+    search?.dispatchEvent(new Event("input"));
+  }
+  if (active === "intensity") {
+    $("intensity-live")?.replaceChildren(intensityTable(current(), readChecklist(current().id), true));
+  }
+  if (typeof active === "number") {
+    const checklist = readChecklist(current().id);
+    for (const table of editor.querySelectorAll("[data-checklist-block]")) {
+      table.replaceChildren(editorChecklistTable(current(), checklist, Number(table.dataset.checklistBlock)));
+    }
+  }
+}
+
+function editorChecklistTable(project, checklist, blockIndex) {
+  const rows = [];
+  for (const item of checklistItems) {
+    const to = checklistDestination(project, item);
+    if (to?.chapter !== active || to.block !== blockIndex) continue;
+    const summary = checklistSummary(item, checklist.checks[item.id]);
+    rows.push([dom("a", { href: projectChecklistUrl(project, item.id), target: "_blank", rel: "noopener" }, item.title),
+      summary || "Belum diisi", checklistReference(item.id, project.intensity?.region === "tegal")]);
+  }
+  return reportTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
 }
 
 function title(type, label) {
@@ -325,11 +456,11 @@ function renderFront(project) {
 
 function renderChecklistEditor(project) {
   if (active === "checklist") title("Lampiran", "Daftar simak kajian");
-  const url = "./daftar-simak.html?proyek=" + encodeURIComponent(project.id);
+  const url = projectChecklistUrl(project);
   editor.append(dom("div", { className: "checklist-head" },
     dom("p", { className: "lead" }, "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."),
     dom("a", { href: url, target: "_blank", rel: "noopener" }, "Buka layar penuh")),
-    dom("iframe", { src: url + "&embed=1", title: "Daftar simak proyek", className: "checklist-frame" }));
+    dom("iframe", { src: projectChecklistUrl(project, null, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
 
 function renderChapter(project) {
@@ -363,7 +494,22 @@ function renderChapter(project) {
   if (chapter.checklist) return renderChecklistEditor(project);
   editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
   const headings = headingEntries(chapter, index);
-  for (const [bi, block] of chapter.blocks.entries()) editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
+  const checklist = readChecklist(project.id);
+  const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
+    .filter((destination) => destination?.chapter === index).map(({ block }) => block));
+  function appendChecklist(blockIndex) {
+    if (!mapped.has(blockIndex)) return;
+    const wrapper = dom("div", { className: "auto-checklist" });
+    wrapper.dataset.checklistBlock = blockIndex;
+    wrapper.append(editorChecklistTable(project, checklist, blockIndex));
+    editor.append(dom("details", { className: "block", id: "checklist-links-" + blockIndex },
+      dom("summary", {}, "Hasil daftar simak dan acuan untuk subbab ini"), wrapper));
+  }
+  appendChecklist(-1);
+  for (const [bi, block] of chapter.blocks.entries()) {
+    editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
+    appendChecklist(bi);
+  }
   const actions = dom("div", { className: "button-row add-block" });
   for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
     actions.append(button("＋ " + label, () => {
@@ -679,6 +825,7 @@ function validateBackup(data) {
   const purpose = pickText(source.purpose, ["mode", "custom"]);
   if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = purpose;
   if (source.scope) project.scope = importScope(source.scope);
+  if (source.intensity) project.intensity = importIntensity(source.intensity);
   if (source.cover?.image) {
     valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));
     project.cover.image = source.cover.image;
@@ -693,7 +840,7 @@ function validateBackup(data) {
       return pickText(row, ["key", "label", ...Object.keys(checklistLabels)]);
     });
     valid(new Set(rows.map((row) => row.key)).size === rows.length);
-    checks[id] = { rows, nextRow: check.nextRow, na: check.na === true };
+    checks[id] = { rows, nextRow: check.nextRow, na: check.na === true, ...pickText(check, ["reason"]) };
   }
   return { project, checklist: { identity: pickText(data.checklist?.identity, Object.keys(checklistIdentityLabels)), checks } };
 }
@@ -797,7 +944,9 @@ async function start() {
     if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
   });
   window.addEventListener("storage", (event) => {
-    if (event.key === "daftar-simak-slf:v2:" + current().id) refreshLinkedFields();
+    if (event.key !== "daftar-simak-slf:v2:" + current().id) return;
+    refreshLinkedFields();
+    refreshChecklistViews();
   });
   render();
   await save();

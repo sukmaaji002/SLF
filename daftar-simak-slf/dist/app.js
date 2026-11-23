@@ -2,6 +2,7 @@
 
 const byId = (id) => document.getElementById(id);
 const projectId = new URLSearchParams(location.search).get("proyek");
+const tegalReference = new URLSearchParams(location.search).get("acuan") === "tegal";
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
 const storageKey = "daftar-simak-slf:v2" + (projectMode ? ":" + projectId : "");
 const photoKey = (key) => projectMode ? projectId + ":" + key : key;
@@ -354,6 +355,12 @@ function renderItem(item) {
   na.checked = Boolean(check.na);
   const availability = el("label", "applicable");
   availability.append(na, "Butir ini tidak berlaku");
+  const reference = el("p", "inspection-reference", "Acuan: " + checklistReference(item.id, tegalReference));
+  const naData = { reason: check.na ? checklistReason(check) : check.reason };
+  const reason = field(["reason", "Alasan tidak berlaku", "long"], naData, () => {
+    check.reason = naData.reason;
+    change();
+  }, item.title, item).label;
   const rows = el("div", "sample-list");
   const repeatable = item.fields.includes("S") || item.fields.includes("P");
   const add = repeatable ? button(item.fields.includes("P") ? "Tambah komponen" : "Tambah sampel", () => {
@@ -366,6 +373,7 @@ function renderItem(item) {
   }) : null;
   const setAvailability = () => {
     rows.hidden = na.checked;
+    reason.hidden = !na.checked;
     if (add) add.hidden = na.checked;
   };
   na.addEventListener("input", () => {
@@ -373,7 +381,7 @@ function renderItem(item) {
     setAvailability();
     change();
   });
-  item.body.append(availability, rows);
+  item.body.append(reference, availability, reason, rows);
   if (add) item.body.append(add);
   setAvailability();
 
@@ -442,6 +450,7 @@ function renderCatalog() {
         item.initialCount = startRows(item).length;
         item.search = [sourceItem.title, sourceGroup.code, sourceGroup.title, title, ...(sourceItem.components || [])].join(" ").toLocaleLowerCase("id");
         item.node = el("details", "item");
+        item.node.id = "butir-" + item.id;
         const summary = el("summary", "item-summary");
         item.badge = el("span", "item-status");
         const name = el("span", "item-title", [item.no, item.title].filter(Boolean).join(". "));
@@ -494,7 +503,7 @@ function exportCsv() {
   ];
   const uniqueFields = [...new Map(rowFields.map((definition) => [definition[0], definition])).values()];
   const lines = [
-    [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label)],
+    [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],
     ...items.flatMap((item) => {
       const check = getCheck(item);
       return check.rows.map((row) => [
@@ -502,6 +511,7 @@ function exportCsv() {
         item.category.title, item.group.code + " " + item.group.title, item.no, item.title, item.page, row.label,
         check.na ? "Ya" : "",
         ...uniqueFields.map(([key]) => check.na ? "" : row[key]),
+        check.na ? checklistReason(check) : "", checklistReference(item.id, tegalReference),
       ]);
     }),
   ];
@@ -516,6 +526,11 @@ function toggleGroups() {
 }
 
 renderCatalog();
+const requestedItem = items.find((item) => "#" + item.node.id === location.hash);
+if (requestedItem) {
+  requestedItem.node.open = true;
+  requestAnimationFrame(() => requestedItem.node.scrollIntoView({ block: "start" }));
+}
 renderIdentity();
 refresh();
 byId("search").addEventListener("input", refresh);

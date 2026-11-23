@@ -106,6 +106,7 @@ summary { cursor: pointer; font-weight: 700; }
 .item-status[data-state="issue"] { color: #883f20; background: #fff0e7; }
 .item-status[data-state="filled"] { color: #245b38; background: #edf8e9; }
 .item-body { padding: 14px 16px 16px; border-top: 1px solid var(--border); }
+.inspection-reference { margin: 0 0 10px; padding: 8px 10px; background: #eef5f0; color: #234941; }
 .applicable { display: flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; margin-bottom: 12px; }
 .applicable input { appearance: auto; min-height: 0; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--dark); }
 .sample { padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; }

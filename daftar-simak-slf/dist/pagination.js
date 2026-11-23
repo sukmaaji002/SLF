@@ -51,7 +51,9 @@ const reportPrintStyle = `
 
 function connectContents(pages) {
   const destinations = new Map();
+  const jumps = [...pages.querySelectorAll("[data-report-jump]")];
   const targets = new Set(Array.from(pages.querySelectorAll("[data-page-for]"), (element) => element.dataset.pageFor));
+  for (const jump of jumps) targets.add(jump.dataset.reportJump);
   for (const [index, page] of [...pages.querySelectorAll(".pagedjs_page")].entries()) {
     for (const element of page.querySelectorAll("[id], [data-id]")) {
       const id = element.id || element.dataset.id;
@@ -60,14 +62,21 @@ function connectContents(pages) {
       destinations.set(id, { element, page: String(index + 1) });
     }
   }
+  function connect(link, destination) {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      destination.element.scrollIntoView({ block: "start", inline: "nearest" });
+    });
+  }
+  for (const jump of jumps) {
+    const destination = destinations.get(jump.dataset.reportJump);
+    if (destination) connect(jump, destination);
+  }
   for (const number of pages.querySelectorAll("[data-page-for]")) {
     const destination = destinations.get(number.dataset.pageFor);
     if (!destination) throw new Error("Tujuan daftar isi tidak ditemukan: " + number.dataset.pageFor);
     number.textContent = destination.page;
-    number.closest("a").addEventListener("click", (event) => {
-      event.preventDefault();
-      destination.element.scrollIntoView({ block: "start", inline: "nearest" });
-    });
+    connect(number.closest("a"), destination);
   }
 }
 
