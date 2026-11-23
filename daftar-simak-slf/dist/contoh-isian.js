@@ -1,6 +1,13 @@
 "use strict";
 
 const inputExamples = {
+  "aspek": "tata bangunan atau keselamatan, sesuai butir yang dibahas",
+  "sampel / sumber bukti": "titik P-01 di koridor dan Foto 2.1",
+  "rekomendasi": "lengkapi dokumen pendukung sebelum verifikasi ulang",
+  "dokumen / rekomendasi": "gambar terbangun instalasi atau rekomendasi yang ditinjau",
+  "tanggal / nomor": "12 Mei 2026, nomor sesuai dokumen",
+  "bidang": "arsitektur, struktur, atau MEP sesuai temuan",
+  "penanggung jawab / target": "unit pemeliharaan, sebelum pemeriksaan ulang",
   "kota / kabupaten": "Kota Contoh",
   "pemilik / pemberi tugas": "PT Pengelola Gedung Contoh",
   "penyedia jasa / pengkaji": "PT Konsultan Contoh",

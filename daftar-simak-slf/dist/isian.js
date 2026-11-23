@@ -191,40 +191,40 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   for (const block of tables) {
-      const title = tokenName(block.text);
-      const columns = block.headers.map(tokenName);
-      const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
-      if (title === "susunan tim pengkaji teknis") {
-        const name = block.headers.findIndex((header) => tokenName(header) === "nama");
-        const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
-        const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
-        for (const row of rows) {
-          const roleName = tokenName(row[role] ?? "");
-          const person = cleanValue(row[name]);
-          if (!person) continue;
-          if (leadRoles.includes(roleName)) teamLeads.add(person);
-          reviewers.get(roleName)?.add(person);
-        }
+    const title = tokenName(block.text);
+    const columns = block.headers.map(tokenName);
+    const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
+    if (title === "susunan tim pengkaji teknis") {
+      const name = block.headers.findIndex((header) => tokenName(header) === "nama");
+      const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
+      const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
+      for (const row of rows) {
+        const roleName = tokenName(row[role] ?? "");
+        const person = cleanValue(row[name]);
+        if (!person) continue;
+        if (leadRoles.includes(roleName)) teamLeads.add(person);
+        reviewers.get(roleName)?.add(person);
       }
-      if (title === "daftar alat pemeriksaan") {
-        const column = columns.indexOf("alat");
-        for (const row of rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
+    }
+    if (title === "daftar alat pemeriksaan") {
+      const column = columns.indexOf("alat");
+      for (const row of rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
+    }
+    if (title === "rekap pemeriksaan dokumen") {
+      const name = columns.indexOf("dokumen");
+      const reference = columns.indexOf("nomor / tanggal");
+      const verification = columns.indexOf("status verifikasi");
+      for (const [ri, row] of rows.entries()) {
+        const document = cleanValue(row[name]);
+        const status = tokenName(row[verification] ?? "");
+        if (!document || !["terverifikasi", "telah ditelaah", "ditelaah", "sesuai", "valid"].includes(status)) continue;
+        const number = cleanValue(row[reference]);
+        const value = number ? document + " (" + number + ")" : document;
+        reviewedDocuments.add(value);
+        if (/\b(?:pbg|imb)\b/i.test(document)) permits.add(value);
+        add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
       }
-      if (title === "rekap pemeriksaan dokumen") {
-        const name = columns.indexOf("dokumen");
-        const reference = columns.indexOf("nomor / tanggal");
-        const verification = columns.indexOf("status verifikasi");
-        for (const [ri, row] of rows.entries()) {
-          const document = cleanValue(row[name]);
-          const status = tokenName(row[verification] ?? "");
-          if (!document || !["terverifikasi", "telah ditelaah", "ditelaah", "sesuai", "valid"].includes(status)) continue;
-          const number = cleanValue(row[reference]);
-          const value = number ? document + " (" + number + ")" : document;
-          reviewedDocuments.add(value);
-          if (/\b(?:pbg|imb)\b/i.test(document)) permits.add(value);
-          add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
-        }
-      }
+    }
   }
   add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", teamLeads.size === 1 ? [...teamLeads][0] : "");
   add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
