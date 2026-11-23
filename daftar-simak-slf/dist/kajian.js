@@ -60,6 +60,13 @@ function boundField(data, key, label, type, changed = save) {
   return field(label, data[key], (value) => { data[key] = value; changed(); }, type);
 }
 
+function guidedField(data, key, label, type) {
+  const control = boundField(data, key, label, type);
+  const example = inputExample(tokenName(label));
+  if (example && type !== "date") control.querySelector("input").placeholder = "Contoh: " + example;
+  return control;
+}
+
 function scopeField(project, onChange) {
   const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Bidang yang diperiksa"));
   const selected = () => new Set(project.scope?.parts ?? []);
@@ -283,7 +290,7 @@ function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
   editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
-      boundField(project.cover, key, label, type))),
+      guidedField(project.cover, key, label, type))),
     dom("hr"), pictureEditor(project.cover, "foto sampul"));
   editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
     project.name = value;
@@ -299,7 +306,7 @@ function renderFront(project) {
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
         (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
-        boundField(project.front, key, label))),
+        guidedField(project.front, key, label))),
     dom("h3", {}, "Susunan bab"),
     dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
       const titles = [...headingEntries(chapter, index)].filter(([bi]) => chapter.blocks[bi].text.trim());
@@ -432,17 +439,15 @@ function tableCellField(block, row, column, sources, options) {
   const key = tableCellKey(block, row, column);
   const value = block.rows[row][column];
   const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
+  const fieldToken = tokenName(token ?? block.headers[column]);
+  const example = inputExample(fieldToken);
   const control = field(label, token ? "" : value, (text) => {
     block.rows[row][column] = text;
     refreshLinkedFields();
     save();
   });
   const input = control.querySelector("input");
-  if (token) {
-    const example = inputExample(tokenName(token));
-    input.placeholder = example ? "Contoh: " + example : token;
-  }
-  const choices = options.length ? options : choicesForInput(tokenName(token ?? block.headers[column]));
+  const choices = options.length ? options : choicesForInput(fieldToken);
   if (choices.length) {
     const id = "pilihan-" + crypto.randomUUID();
     input.setAttribute("list", id);
@@ -458,7 +463,7 @@ function tableCellField(block, row, column, sources, options) {
     link.toggleAttribute("data-linked", Boolean(source));
     input.readOnly = Boolean(source);
     input.value = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
-    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" : token ? "Contoh: " + (inputExample(tokenName(token)) || token) : "";
+    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" : example ? "Contoh: " + example : token ?? "";
     summary.textContent = source ? "Data tertaut" : "Ambil data";
   }
   link.refreshValue = refreshValue;

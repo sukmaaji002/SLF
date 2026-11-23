@@ -388,10 +388,10 @@ function renderItem(item) {
     const context = [item.title, row.label].filter(Boolean).join(", ");
     if (row.label) sample.append(el("h4", "", row.label));
     if (repeatable && !item.fields.includes("P") && item.title !== "Jarak Antar Bangunan") {
-      group.append(field(["location", "Lokasi atau identitas sampel"], row, onRowChange, context).label);
+      group.append(field(["location", "Lokasi atau identitas sampel"], row, onRowChange, context, item).label);
     }
     if (item.title === "Jarak Antar Bangunan" && Number(row.key) > 3) {
-      group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context).label);
+      group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context, item).label);
     }
     for (const definition of definitionsFor(item)) group.append(field(definition, row, onRowChange, context, item).label);
     for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
