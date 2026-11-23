@@ -937,12 +937,35 @@ async function start() {
   const requested = new URLSearchParams(location.search).get("proyek");
   if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
   $("projects").addEventListener("change", () => setCurrent($("projects").value));
+  const chapterDialog = $("chapter-dialog");
+  const chapterForm = $("chapter-form");
+  const chapterPosition = chapterForm.elements.position;
+  const showChapterNumber = () => {
+    $("chapter-number-hint").textContent = "Bab baru akan menjadi Bab " + roman(Number(chapterPosition.value) + 1) + ".";
+  };
   $("add-chapter").addEventListener("click", () => {
     const project = current();
-    project.chapters.push({ title: "Bab baru", blocks: [heading("")], checklist: false });
-    active = project.chapters.length - 1;
+    chapterForm.reset();
+    chapterPosition.replaceChildren(new Option("Sebelum bab pertama", "0"),
+      ...project.chapters.map((_, index) => new Option("Setelah " + chapterLabel(project, index), String(index + 1))));
+    chapterPosition.value = String(typeof active === "number" ? active + 1 : project.chapters.length);
+    showChapterNumber();
+    chapterDialog.showModal();
+  });
+  chapterPosition.addEventListener("change", showChapterNumber);
+  $("chapter-cancel").addEventListener("click", () => chapterDialog.close());
+  chapterForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const { chapters } = current();
+    const position = Number(chapterPosition.value);
+    if (chapterPosition.value === "" || !Number.isInteger(position) || position < 0 || position > chapters.length) return;
+    const title = chapterForm.elements.title.value.trim() || "Bab baru";
+    chapters.splice(position, 0, { title, blocks: [heading("")], checklist: false });
+    active = position;
+    chapterDialog.close();
     save();
     render();
+    editor.querySelector("input")?.focus();
   });
   $("new-project").addEventListener("click", () => $("project-dialog").showModal());
   $("project-cancel").addEventListener("click", () => $("project-dialog").close());

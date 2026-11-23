@@ -123,10 +123,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .checklist-frame { width: 100%; height: min(74dvh, 850px); min-height: 480px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
 dialog { border: 1px solid var(--line); background: #fff; color: inherit; border-radius: 15px; padding: 23px; max-width: calc(100% - 24px); }
 dialog::backdrop { background: #132b27ab; }
-#project-dialog { width: min(460px, calc(100% - 24px)); }
-#project-form { display: grid; gap: 13px; }
+#project-dialog, #chapter-dialog { width: min(460px, calc(100% - 24px)); }
+#project-form, #chapter-form { display: grid; gap: 13px; }
 #project-form p { color: var(--muted); }
-#project-form .button-row { justify-content: end; }
+#project-form .button-row, #chapter-form .button-row { justify-content: end; }
 #preview-dialog { width: min(1000px, calc(100% - 24px)); max-height: 92dvh; padding: 0; background: #e9efed; }
 .preview-controls { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; }
 .pagination-stage { position: fixed; left: -10000px; top: 0; width: 210mm; visibility: hidden; pointer-events: none; }

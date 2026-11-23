@@ -70,6 +70,15 @@
       <div class="button-row"><button id="project-cancel" type="button">Batal</button><button class="primary" type="submit">Buat proyek</button></div>
     </form>
   </dialog>
+  <dialog id="chapter-dialog" aria-labelledby="chapter-dialog-title">
+    <form id="chapter-form">
+      <h2 id="chapter-dialog-title">Tambah bab</h2>
+      <label>Judul bab<input name="title" placeholder="Bab baru" autocomplete="off" autofocus></label>
+      <label>Posisi bab baru<select name="position" required></select></label>
+      <p id="chapter-number-hint" class="hint" aria-live="polite"></p>
+      <div class="button-row"><button id="chapter-cancel" type="button">Batal</button><button class="primary" type="submit">Sisipkan bab</button></div>
+    </form>
+  </dialog>
   <dialog id="preview-dialog">
     <div class="preview-controls"><strong>Pratinjau laporan</strong><div class="button-row"><button id="close-preview" type="button">Tutup</button><button id="print-preview" class="primary" type="button">Cetak / PDF</button></div></div>
     <article id="report" aria-label="Laporan kajian"></article>
