@@ -428,7 +428,9 @@ function tableCellField(label, value, onInput, options) {
   }
   if (options) {
     const id = "pilihan-" + crypto.randomUUID();
-    control.querySelector("input").setAttribute("list", id);
+    const input = control.querySelector("input");
+    input.setAttribute("list", id);
+    input.setAttribute("aria-label", label);
     control.append(dom("datalist", { id }, ...options.map((option) => new Option(option, option))));
   }
   return control;
