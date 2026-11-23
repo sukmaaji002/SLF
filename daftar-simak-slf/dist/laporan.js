@@ -163,6 +163,14 @@ async function buildReport(target, project, urls) {
   const tableEntries = [];
   const figureEntries = [];
   const checklistTargets = [];
+  function appendPhoto(section, photo, id) {
+    if (!imageSource.test(photo.image || "")) return;
+    const prefix = "Gambar " + (figureEntries.length + 1) + " · ";
+    const title = photo.text?.trim() ? photo.text : "Dokumentasi";
+    figureEntries.push([id, prefix + title]);
+    section.append(dom("figure", { id }, dom("img", { src: photo.image, alt: photo.text || "Dokumentasi kajian" }),
+      reportFormatted(dom("figcaption"), title, getTextFormat(photo, "text"), prefix)));
+  }
   const summaryAnchors = new Map();
   const summaries = new Map();
   for (const item of checklistItems) {
@@ -227,6 +235,7 @@ async function buildReport(target, project, urls) {
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
     if (getTextFormat(chapter, "title")) reportFormatted(section.firstElementChild, chapter.title, getTextFormat(chapter, "title"), "Bab " + roman(index + 1) + " · ");
+    for (const [i, photo] of (chapter.photos ?? []).entries()) appendPhoto(section, photo, section.id + "-photo-" + i);
     const headings = headingEntries(chapter, index);
     appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
     for (const [bi, block] of chapter.blocks.entries()) {
@@ -235,6 +244,7 @@ async function buildReport(target, project, urls) {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+        for (const [i, photo] of (block.photos ?? []).entries()) appendPhoto(section, photo, id + "-photo-" + i);
         if (showIntensity && !intensityRendered && block.text === intensityHeading) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
       }
@@ -254,13 +264,7 @@ async function buildReport(target, project, urls) {
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
       }
-      if (block.type === "photo" && imageSource.test(block.image || "")) {
-        const prefix = "Gambar " + (figureEntries.length + 1) + " · ";
-        const title = block.text || "Dokumentasi";
-        figureEntries.push([id, prefix + title]);
-        section.append(dom("figure", { id }, dom("img", { src: block.image, alt: block.text || "Dokumentasi kajian" }),
-          reportFormatted(dom("figcaption"), title, getTextFormat(block, "text"), prefix)));
-      }
+      if (block.type === "photo") appendPhoto(section, block, id);
     }
     if (chapter.checklist) checklistTargets.push(section);
     attach(section);

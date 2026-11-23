@@ -7,6 +7,7 @@ const editor = $("editor");
 const status = $("save-status");
 const dialog = $("preview-dialog");
 const reportUrls = [];
+const photoEditors = new Map();
 let disposePagination;
 let workspace;
 let active = "cover";
@@ -294,6 +295,7 @@ function render() {
   $("projects").value = project.id;
   $("template-label").textContent = reportTemplates[project.template].label;
   renderOutline();
+  photoEditors.clear();
   editor.replaceChildren();
   if (active === "cover") return renderCover(project);
   if (active === "front") return renderFront(project);
@@ -509,7 +511,7 @@ function renderChapter(project) {
     title("Bab " + roman(index + 1), chapter.title || "Bab tanpa judul");
     renderOutline();
     save();
-  }), chapterActions);
+  }), chapterActions, sectionPhotoEditor(chapter, "Unggah foto bab", () => project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
   editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
   const headings = headingEntries(chapter, index);
@@ -726,6 +728,56 @@ function pictureEditor(block, label, isAttached = () => true) {
   return dom("div", {}, dom("label", {}, "Pilih " + label, upload), feedback, image, remove);
 }
 
+function sectionPhotoEditor(owner, label, isAttached) {
+  const upload = dom("input", { type: "file", accept: "image/*", multiple: true, hidden: true, ariaLabel: label });
+  const add = button(label, () => upload.click());
+  const feedback = dom("p", { className: "hint", role: "status", hidden: true });
+  const list = dom("div", { className: "section-photo-list" });
+  const gallery = dom("div", { className: "section-photos" }, dom("div", { className: "button-row" }, add),
+    upload, feedback, list);
+  function renderPhotos() {
+    list.replaceChildren(...(owner.photos ?? []).map((photo, index) => {
+      const caption = boundField(photo, "text", "Keterangan foto " + (index + 1));
+      const remove = button("Hapus foto " + (index + 1), () => {
+        owner.photos = owner.photos.filter((entry) => entry !== photo);
+        if (!owner.photos.length) delete owner.photos;
+        renderPhotos();
+        save();
+        add.focus();
+      }, "quiet");
+      return dom("div", { className: "section-photo-card" },
+        dom("img", { className: "photo-thumb", alt: photo.text || "Foto dokumentasi", src: photo.image }), caption, remove);
+    }));
+  }
+  upload.addEventListener("change", async () => {
+    const files = [...upload.files];
+    if (!files.length) return;
+    add.disabled = true;
+    feedback.hidden = false;
+    feedback.textContent = "Menyiapkan foto…";
+    const photos = [];
+    for (const file of files) {
+      try {
+        photos.push({ image: await imageData(file), text: "" });
+      } catch { /* A photo that cannot be decoded does not prevent adding the others. */ }
+    }
+    if (isAttached() && photos.length) {
+      (owner.photos ??= []).push(...photos);
+      photoEditors.get(owner)?.();
+      save();
+    }
+    const failed = files.length - photos.length;
+    feedback.textContent = [photos.length ? photos.length + " foto ditambahkan." : "",
+      failed ? failed + " foto gagal dibuka." : ""].filter(Boolean).join(" ");
+    upload.value = "";
+    add.disabled = false;
+  });
+  photoEditors.set(owner, renderPhotos);
+  renderPhotos();
+  return gallery;
+}
+
+
 function blockEditor(chapter, block, index, headingInfo) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
@@ -753,7 +805,9 @@ function blockEditor(chapter, block, index, headingInfo) {
   if (block.type === "heading") {
     wrapper.append(boundField(block, "text", "Judul subbab"));
     if (block.text === "Tujuan" && reportTokens(block.body).has("tujuan kajian")) wrapper.append(purposeField(current()));
-    wrapper.append(linked("body", "Isi subbab"));
+    const project = current();
+    wrapper.append(linked("body", "Isi subbab"), sectionPhotoEditor(block, "Unggah foto subbab",
+      () => project.chapters.includes(chapter) && chapter.blocks.includes(block)));
   }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
   if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
@@ -808,6 +862,16 @@ function validateBackup(data) {
   const valid = (condition) => { if (!condition) throw new Error("Struktur cadangan tidak valid"); };
   valid(data?.version === 1 && typeof source?.name === "string" && Object.hasOwn(reportTemplates, source.template) &&
     Array.isArray(source.chapters));
+  function restorePhotos(target, owner) {
+    if (owner.photos === undefined) return target;
+    valid(Array.isArray(owner.photos));
+    const photos = owner.photos.map((photo) => {
+      valid(typeof photo?.image === "string" && imageSource.test(photo.image));
+      return { image: photo.image, text: "", ...pickText(photo, ["text"]) };
+    });
+    if (photos.length) target.photos = photos;
+    return target;
+  }
   const chapters = source.chapters.map((chapter) => {
     valid(typeof chapter?.title === "string" && Array.isArray(chapter.blocks));
     const blocks = chapter.blocks.map((block) => {
@@ -839,9 +903,9 @@ function validateBackup(data) {
       }
       importTextFormats(clean, block, ["text", "body", ...tableFormatKeys]);
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
-      return clean;
+      return block.type === "heading" ? restorePhotos(clean, block) : clean;
     });
-    return importTextFormats({ title: chapter.title, blocks, checklist: chapter.checklist === true }, chapter, ["title"]);
+    return restorePhotos(importTextFormats({ title: chapter.title, blocks, checklist: chapter.checklist === true }, chapter, ["title"]), chapter);
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
