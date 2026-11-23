@@ -40,9 +40,9 @@ const reportTemplates = {
           {"body":"Acuan penilaian untuk objek kajian ini meliputi [peraturan, standar teknis, dan dokumen rencana yang relevan]. Setiap acuan dicatat bersama nomor, tahun atau edisi, dan parameter yang digunakan untuk membandingkan hasil pemeriksaan.","previous":"[Masukkan standar dan ketentuan yang digunakan pengkaji untuk proyek ini.]"},
           ["Tata bangunan", {"body":"Penilaian tata bangunan mengacu pada [ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan]. Aspek pembanding meliputi fungsi bangunan, intensitas, sempadan, tata ruang dalam, dan hubungan dengan lingkungan tapak.","previous":"[Catat acuan pemeriksaan fungsi, intensitas, sempadan, dan tata ruang.]"}],
           ["Keselamatan", {"body":"Acuan pemeriksaan keselamatan meliputi [standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan]. Parameter yang dijadikan pembanding untuk masing-masing sistem adalah [parameter dan rujukan].","previous":"[Catat acuan struktur, kebakaran, listrik, dan penangkal petir yang berlaku pada objek.]"}],
-          ["Kesehatan", {"body":"Pemeriksaan aspek kesehatan mencakup [parameter yang diperiksa] pada [ruang atau sistem]. Hasil observasi atau pengukuran dirujuk pada [tabel, gambar, atau lampiran] dan dibandingkan dengan [acuan yang digunakan]. Ringkasan temuan untuk bidang ini adalah [temuan kesehatan].","previous":"[Catat acuan penghawaan, pencahayaan, air, dan sanitasi.]"}],
-          ["Kenyamanan", {"body":"Kondisi udara ruang serta getaran atau kebisingan ditinjau pada [lokasi sampel]. Parameter yang diperoleh adalah [hasil dan satuan] berdasarkan [metode atau sumber data]. Penilaian terhadap hasil tersebut adalah [hasil telaah dan keterbatasan].","previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
-          ["Kemudahan", {"body":"Pemeriksaan kemudahan mencakup [jalur akses, fasilitas, atau peralatan yang diperiksa] untuk pengguna [kelompok pengguna]. Kondisi yang tercatat adalah [temuan], didukung oleh [hasil ukur, foto, atau daftar simak] dan dibandingkan dengan [acuan].","previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
+          ["Kesehatan", {"body":"Aspek kesehatan dinilai menggunakan [standar atau dokumen pembanding] terkait penghawaan, pencahayaan, air bersih, dan sanitasi. Parameter pembanding yang digunakan pada [ruang atau sistem] adalah [parameter, satuan, dan rujukan].","previous":"[Catat acuan penghawaan, pencahayaan, air, dan sanitasi.]"}],
+          ["Kenyamanan", {"body":"Acuan aspek kenyamanan mencakup [ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan]. Parameter yang diterapkan untuk [fungsi ruang] adalah [parameter dan rujukan].","previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
+          ["Kemudahan", {"body":"Akses, sirkulasi, dan kelengkapan fasilitas dinilai dengan [acuan aksesibilitas atau dokumen teknis]. Ketentuan yang dibandingkan dengan kondisi lapangan meliputi [parameter jalur, fasilitas, atau peralatan yang berlaku].","previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
         ],
       ],
       [
@@ -236,15 +236,45 @@ const roman = (number) => {
   return text;
 };
 
-function templateBlocks(sections, depth = 1) {
+function templateBlocks(sections, depth = 1, previous = false) {
   return sections.flatMap((section) => {
     if (section === "@checklist") return [];
     if (!Array.isArray(section)) {
-      return [{ type: "table", text: section.table, headers: [...section.columns], rows: [section.columns.map(() => "")] }];
+      const rows = !previous && section.rows ? section.rows.map((row) => [...row]) : [section.columns.map(() => "")];
+      return [{ type: "table", text: section.table, headers: [...section.columns], rows }];
     }
-    const [text, body, ...children] = section;
-    return [{ type: "heading", text, body, depth }, ...templateBlocks(children, depth + 1)];
+    const [text, narrative, ...children] = section;
+    const body = typeof narrative === "string" ? narrative : previous ? narrative.previous : narrative.body;
+    return [{ type: "heading", text, body, depth }, ...templateBlocks(children, depth + 1, previous)];
   });
+}
+
+const disciplineNarrativeRevision = 1;
+
+function upgradeDisciplineDraft(project) {
+  if (project.template !== "disiplin" || project.narrativeRevision >= disciplineNarrativeRevision) return;
+  for (const [title, ...sections] of reportTemplates.disiplin.chapters) {
+    const chapter = project.chapters.find((entry) => entry.title === title);
+    if (!chapter) continue;
+    const starters = templateBlocks(sections);
+    const previous = templateBlocks(sections, 1, true);
+    for (const [index, old] of previous.entries()) {
+      const next = starters[index];
+      if (old.type === "heading" && old.body !== next.body) {
+        for (const block of chapter.blocks) {
+          if (block.type === old.type && block.text === old.text && block.body === old.body) block.body = next.body;
+        }
+      }
+      if (old.type === "table") {
+        for (const block of chapter.blocks) {
+          if (block.type === old.type && block.text === old.text &&
+              JSON.stringify(block.headers) === JSON.stringify(old.headers) &&
+              JSON.stringify(block.rows) === JSON.stringify(old.rows)) block.rows = next.rows.map((row) => [...row]);
+        }
+      }
+    }
+  }
+  project.narrativeRevision = disciplineNarrativeRevision;
 }
 
 function headingEntries(chapter, chapterIndex) {

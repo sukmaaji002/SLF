@@ -18,6 +18,7 @@ function heading(text) {
 function draft(name, template) {
   return {
     id: crypto.randomUUID(), name, template,
+    ...(template === "disiplin" ? { narrativeRevision: disciplineNarrativeRevision } : {}),
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
     front: { ...frontDefaults },
     chapters: reportTemplates[template].chapters.map(([title, ...sections]) => ({
@@ -375,6 +376,7 @@ function validateBackup(data) {
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
+    ...(source.narrativeRevision === disciplineNarrativeRevision ? { narrativeRevision: disciplineNarrativeRevision } : {}),
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
     front: pickText(source.front, frontFields.map(([key]) => key)), chapters,
   };
@@ -401,6 +403,7 @@ async function importBackup(file) {
   try {
     const raw = JSON.parse(await file.text());
     const { project, checklist } = validateBackup(raw);
+    upgradeDisciplineDraft(project);
     for (const key of checklistPhotos(checklist)) {
       const photo = raw.photos?.[key];
       if (typeof photo !== "string" || !/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(photo)) continue;
@@ -445,6 +448,7 @@ async function start() {
     const project = draft("Kajian baru", preset);
     workspace = { projects: [project], current: project.id };
   }
+  for (const project of workspace.projects) upgradeDisciplineDraft(project);
   const requested = new URLSearchParams(location.search).get("proyek");
   if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
   $("projects").addEventListener("change", () => setCurrent($("projects").value));
