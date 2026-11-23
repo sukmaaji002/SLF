@@ -273,7 +273,42 @@ const inputChoices = {
   "fungsi ruang": ["ruang tunggu", "ruang pelayanan", "ruang kantor", "ruang servis"],
   "acuan aksesibilitas atau dokumen teknis": ["ketentuan aksesibilitas yang digunakan", "gambar jalur akses", "gambar rencana sarana bangunan"],
   "parameter jalur, fasilitas, atau peralatan yang berlaku": ["lebar bebas koridor", "dimensi akses masuk", "dimensi dan kelengkapan tangga", "dimensi toilet aksesibel"],
+  "fungsi aktual": ["pelayanan kesehatan", "perkantoran", "perdagangan atau jasa", "pendidikan", "hunian"],
+  "unit atau area bangunan": ["gedung utama", "bangunan servis", "area luar yang diperiksa"],
+  "lantai atau area": ["lantai dasar", "lantai 1", "ruang panel", "koridor pelayanan"],
+  "prasarana tapak yang diperiksa": ["area parkir", "jalur pedestrian", "saluran drainase"],
+  "jalan atau arah masuk": ["akses utama dari jalan lingkungan", "akses dari sisi utara tapak", "akses dari sisi timur tapak"],
+  "area atau unit": ["ruang utama", "area servis", "area luar bangunan"],
+  "ruang terbuka, sirkulasi, atau parkir": ["ruang terbuka tapak", "sirkulasi kendaraan", "jalur pedestrian", "area parkir"],
+  "sisi atau area": ["fasad depan", "sisi belakang bangunan", "teras masuk", "area servis"],
+  "bentuk, fasad, atap, atau elemen arsitektural yang diperiksa": ["fasad bangunan", "penutup atap", "elemen pintu dan jendela", "dinding dan teras"],
+  "lantai atau zona": ["lantai dasar", "lantai 1", "zona pelayanan", "zona servis"],
+  "kelompok pengguna": ["pengunjung", "staf atau penghuni", "pengguna kursi roda"],
+  "jalur akses, fasilitas, atau peralatan yang diperiksa": ["jalur masuk", "koridor", "tangga atau ramp", "toilet aksesibel"],
+  "sistem utama dan material": ["rangka beton bertulang", "rangka baja", "struktur pasangan dinding sesuai dokumen"],
+  "daftar elemen yang dapat diakses": ["kolom", "balok", "pelat lantai", "rangka atap"],
+  "metode atau status pengujian": ["observasi visual", "telaah laporan hasil uji", "pengujian lapangan sesuai lembar pengujian", "pengujian belum dilakukan"],
+  "parameter pembanding": ["dimensi pada gambar rencana", "nilai pada dokumen spesifikasi", "kriteria yang dicatat pada acuan pemeriksaan"],
+  "sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait": ["proteksi kebakaran", "proteksi petir", "instalasi listrik"],
+  "sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia": ["pintu tahan api", "APAR", "alarm kebakaran", "jalur evakuasi"],
+  "sumber, panel, jaringan distribusi, dan perangkat proteksi": ["sumber listrik utama", "panel utama", "panel distribusi", "perangkat proteksi"],
+  "penghawaan, pencahayaan, air bersih, sanitasi, atau sistem terkait": ["penghawaan", "pencahayaan", "suplai air bersih", "sanitasi"],
+  "sistem atau bukaan": ["bukaan alami", "ventilasi mekanis", "gabungan bukaan alami dan ventilasi mekanis"],
+  "sistem drainase atau penampungan": ["talang", "saluran drainase", "bak penampungan"],
+  "fasilitas atau peralatan": ["lif", "ramp", "toilet aksesibel", "alat bantu akses"],
+  "pihak terkait": ["pemilik bangunan", "pengelola gedung", "unit pemeliharaan", "penyedia jasa yang ditunjuk"],
+  "target waktu atau tahapan": ["sebelum verifikasi ulang", "setelah dokumen diperbarui", "pada jadwal pemeliharaan yang ditetapkan"],
+  "prioritas": ["segera", "jangka pendek", "pemeliharaan terjadwal"],
+  "bukti penyelesaian, dokumentasi, atau hasil pengujian ulang": ["foto setelah tindakan", "berita acara perbaikan", "hasil pemeriksaan ulang", "dokumen yang telah diperbarui"],
+  "waktu atau tahapan": ["setelah perbaikan selesai", "setelah bukti penyelesaian diterima", "pada pemeriksaan lanjutan yang dijadwalkan"],
+  "pihak yang memverifikasi": ["pengkaji bidang terkait", "tim pengelola yang ditunjuk", "penanggung jawab verifikasi"],
 };
+
+function choicesForInput(token) {
+  if (Object.hasOwn(inputChoices, token)) return inputChoices[token];
+  const example = inputExample(token);
+  return example ? [example] : [];
+}
 
 function inputExample(token) {
   return Object.hasOwn(inputExamples, token) ? inputExamples[token] : "";
