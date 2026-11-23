@@ -56,17 +56,21 @@ const intensityLimits = {
 };
 const standardKdh = [20, 25, 20, 25, 15, 10];
 const areaMetrics = [
-  { id: "K.1-1-0", key: "kdb", name: "KDB", areaLabel: "Luas lantai dasar", percent: true, direction: "Maks.", page: 54 },
-  { id: "K.1-1-2", key: "klb", name: "KLB", areaLabel: "Luas total lantai", percent: false, direction: "Maks.", page: 56 },
-  { id: "K.1-1-6", key: "kdh", name: "KDH", areaLabel: "Luas daerah hijau", percent: true, direction: "Min.", page: 60 },
+  { id: "K.1-1-0", key: "kdb", name: "KDB", areaLabel: "Luas lantai dasar", percent: true, page: 54 },
+  { id: "K.1-1-2", key: "klb", name: "KLB", areaLabel: "Luas total lantai", percent: false, page: 56 },
+  { id: "K.1-1-6", key: "kdh", name: "KDH", areaLabel: "Luas daerah hijau", percent: true, page: 60 },
 ];
 const formatIntensity = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 4 });
 const intensityOptions = (choices, id) => choices.find(([key]) => key === id)?.[1] || "";
 
+const localIntensityKeys = ["municipality", "province", "zone", "road", "use", "source", "reference", "sourceUrl",
+  ...areaMetrics.flatMap(({ key }) => [key + "Min", key + "Max"])];
+
 function importIntensity(source = {}) {
   return {
     land: typeof source?.land === "string" ? source.land : "",
-    region: source?.region === "tegal" ? "tegal" : "",
+    region: ["tegal", "manual"].includes(source?.region) ? source.region : "",
+    local: Object.fromEntries(localIntensityKeys.map((key) => [key, typeof source?.local?.[key] === "string" ? source.local[key] : ""])),
     zone: intensityOptions(intensityZones, source?.zone) ? source.zone : "",
     road: intensityOptions(intensityRoads, source?.road) ? source.road : "",
     use: intensityOptions(intensityFunctions, source?.use) ? source.use : "",
@@ -75,10 +79,13 @@ function importIntensity(source = {}) {
 }
 
 function parseArea(raw) {
-  const input = raw?.trim().replace(/\s*m[²2]$/i, "").trim() || "";
+  return parseIntensityNumber(raw?.trim().replace(/\s*m[²2]$/i, "").trim() || "", true);
+}
+
+function parseIntensityNumber(input, groupThousands = false) {
   if (!input) return { value: null };
   let normalized = input;
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(input) && !input.startsWith("0.")) {
+  if (groupThousands && /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(input) && !input.startsWith("0.")) {
     normalized = input.replaceAll(".", "").replace(",", ".");
   } else if (/^\d+(?:[.,]\d+)?$/.test(input)) {
     normalized = input.replace(",", ".");
@@ -90,7 +97,8 @@ function parseArea(raw) {
 }
 
 function getIntensityLimits(data) {
-  if (data.region !== "tegal") return { note: "Pilih Kabupaten Tegal untuk menampilkan pembanding umum Perbup 12/2026." };
+  if (data.region === "manual") return localIntensityLimits(data);
+  if (data.region !== "tegal") return { note: "Pilih metode pembanding jika ingin menilai hasil terhadap acuan daerah." };
   if (data.zone === "bersyarat") return {
     values: { kdb: 15, klb: 0.15, kdh: 80 },
     conditional: true,
@@ -112,6 +120,50 @@ function getIntensityLimits(data) {
   };
 }
 
+
+function localIntensityLimits(data) {
+  const local = data.local;
+  const sourced = Boolean(local.municipality.trim() && local.source.trim());
+  return {
+    bounds: Object.fromEntries(areaMetrics.map(({ key, percent }) => {
+      const parse = (direction) => parseIntensityNumber((percent ? local[key + direction].trim().replace(/%$/, "") : local[key + direction]).trim());
+      const minimum = parse("Min");
+      const maximum = parse("Max");
+      const min = minimum.value;
+      const max = maximum.value;
+      return [key, {
+        min, max, invalid: minimum.error || maximum.error || (min !== null && max !== null && min > max),
+        unsourced: !sourced,
+      }];
+    })),
+    note: "Gunakan batas untuk persil dan fungsi yang diperiksa sesuai dokumen yang berlaku. Perbandingan angka tidak menetapkan kelaikan fungsi.",
+  };
+}
+
+function compareIntensity(area, land, value, range, limits) {
+  if (area.error) return "Periksa format luas";
+  if (land.error || land.value === 0) return "Periksa luas persil";
+  if (range?.invalid) return "Periksa batas acuan";
+  if (value === null) return "Data luas belum lengkap";
+  if (!range || (range.min == null && range.max == null)) return "Acuan belum ditentukan";
+  if (range.unsourced) return "Isi daerah dan sumber acuan";
+  const tolerance = Number.EPSILON * Math.max(1, Math.abs(value)) * 8;
+  const within = (range.min == null || value >= range.min - tolerance) && (range.max == null || value <= range.max + tolerance);
+  if (limits.conditional) return within ? "Dalam batas angka bersyarat" : "Di luar batas angka bersyarat";
+  if (limits.bounds) return within ? "Dalam batas acuan" : "Di luar batas acuan";
+  return within ? "Dalam batas umum" : "Di luar batas umum";
+}
+
+function intensitySourceUrl(text) {
+  try {
+    const url = new URL(text.trim());
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+
 function calculateIntensity(project, checklist) {
   const data = importIntensity(project.intensity);
   const land = parseArea(data.land);
@@ -123,12 +175,9 @@ function calculateIntensity(project, checklist) {
     const calculated = land.value > 0 && area.value !== null ? area.value / land.value * (metric.percent ? 100 : 1) : null;
     const value = Number.isFinite(calculated) ? calculated : null;
     const limit = limits.values?.[metric.key];
-    const tolerance = Number.EPSILON * Math.max(1, Math.abs(limit ?? 0)) * 8;
-    const within = metric.percent && metric.key === "kdh" ? value >= limit - tolerance : value <= limit + tolerance;
-    return { ...metric, area, value, limit, status: check?.na ? "Tidak berlaku" : area.error ? "Periksa format luas" :
-      land.error || land.value === 0 ? "Periksa luas persil" : value === null ? "Data luas belum lengkap" :
-      limit === undefined ? "Acuan belum ditentukan" : limits.conditional ? (within ? "Dalam batas angka bersyarat" : "Di luar batas angka bersyarat") :
-      within ? "Dalam batas umum" : "Di luar batas umum" };
+    const range = limits.bounds?.[metric.key] ?? (limit === undefined ? undefined : metric.key === "kdh" ? { min: limit } : { max: limit });
+    const status = check?.na ? "Tidak berlaku" : compareIntensity(area, land, value, range, limits);
+    return { ...metric, area, value, range, status };
   });
   return { data, land, metrics, note: limits.note };
 }

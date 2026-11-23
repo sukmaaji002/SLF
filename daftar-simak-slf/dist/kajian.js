@@ -316,20 +316,34 @@ function render() {
 function intensityTable(project, checklist, linkToInputs = false) {
   const { data, land, metrics, note } = calculateIntensity(project, checklist);
   const panel = dom("div", { className: "intensity-results" });
-  const site = [intensityOptions(intensityZones, data.zone), intensityOptions(intensityRoads, data.road),
-    intensityOptions(intensityFunctions, data.use)].filter(Boolean).join(" · ");
-  if (site) panel.append(dom("p", {}, site));
+  const local = data.local;
+  const site = data.region === "manual" ? [
+    [local.municipality, local.province].map((v) => v.trim()).filter(Boolean).join(", "),
+    local.zone, local.road, local.use,
+  ] : data.region === "tegal" ? [
+    "Kabupaten Tegal", intensityOptions(intensityZones, data.zone), intensityOptions(intensityRoads, data.road),
+    intensityOptions(intensityFunctions, data.use),
+  ] : [];
+  const context = site.map((value) => value.trim()).filter(Boolean).join(" · ");
+  if (context) panel.append(dom("p", {}, context));
   panel.append(dom("p", {}, "Luas persil: " + intensityValue(land.value, " m²")));
-  panel.append(reportTable(["Koefisien", "Luas dari daftar simak", "Hasil", "Batas Perbup", "Perbandingan"], metrics.map((metric) => {
+  panel.append(reportTable(["Koefisien", "Luas dari daftar simak", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
     const suffix = metric.percent ? "%" : "";
     const label = metric.areaLabel + " · " + intensityValue(metric.area.value, " m²");
-    const limit = metric.limit == null ? "—" : dom("a", {
+    const bounds = [metric.range?.min == null ? "" : "Min. " + intensityValue(metric.range.min, suffix),
+      metric.range?.max == null ? "" : "Maks. " + intensityValue(metric.range.max, suffix)].filter(Boolean).join(" · ");
+    const limit = bounds && data.region === "tegal" ? dom("a", {
       href: perbupTegalUrl + "#page=" + metric.page, target: "_blank", rel: "noopener",
-    }, metric.direction + " " + intensityValue(metric.limit, suffix));
+    }, bounds) : bounds || "—";
     return [metric.name, linkToInputs ? dom("a", { href: projectChecklistUrl(project, metric.id), target: "_blank", rel: "noopener" }, label) : label,
       intensityValue(metric.value, suffix), limit, metric.status];
   })));
   if (note) panel.append(dom("p", {}, note));
+  if (data.region === "manual" && local.source.trim()) {
+    const citation = [local.source, local.reference].map((value) => value.trim()).filter(Boolean).join(" · ");
+    const url = intensitySourceUrl(local.sourceUrl);
+    panel.append(dom("p", {}, "Sumber acuan: ", url ? dom("a", { href: url, target: "_blank", rel: "noopener" }, citation) : citation));
+  }
   if (data.region === "tegal") {
     panel.append(dom("p", {}, intensityReviewNote),
       dom("p", {}, dom("a", { href: perbupTegalUrl, target: "_blank", rel: "noopener" }, "Perbup Tegal No. 12 Tahun 2026, Lampiran III.A–C"),
@@ -342,36 +356,59 @@ function renderIntensity(project) {
   title("Data kajian", "Intensitas dan tata ruang");
   const data = importIntensity(project.intensity);
   const grid = dom("div", { className: "form-grid" });
+  const criteria = dom("div", { className: "intensity-criteria" });
   const results = dom("div", { className: "auto-checklist", id: "intensity-live", ariaLive: "polite" });
   const refresh = () => results.replaceChildren(intensityTable(project, readChecklist(project.id), true));
-  const changed = () => {
-    project.intensity = data;
-    refresh();
-    save();
-  };
+  const changed = () => { project.intensity = data; refresh(); save(); };
   const area = boundField(data, "land", "Luas persil yang diperhitungkan (m²)", "text", changed, false);
   Object.assign(area.querySelector("input"), { inputMode: "decimal", placeholder: "Contoh: 900 atau 1.250,5" });
-  grid.append(area);
-  for (const [key, label, choices] of [
-    ["region", "Wilayah pembanding", [["tegal", "Kabupaten Tegal · Perbup 12/2026"]]],
-    ["zone", "Pola ruang / zona", intensityZones],
-    ["road", "Kelas jalan di depan persil", intensityRoads],
-    ["use", "Fungsi pada PBG/IMB atau dokumen kajian", intensityFunctions],
-  ]) {
-    const select = dom("select", {}, new Option("Pilih " + label.toLowerCase(), ""),
-      ...choices.map(([id, name]) => new Option(name, id)));
-    select.value = data[key];
-    select.addEventListener("change", () => { data[key] = select.value; changed(); });
-    grid.append(dom("label", {}, dom("span", {}, label), select));
+  const select = (key, label, choices, blank, onChange = changed) => {
+    const input = dom("select", { ariaLabel: label }, new Option(blank, ""), ...choices.map(([id, name]) => new Option(name, id)));
+    input.value = data[key];
+    input.addEventListener("change", () => { data[key] = input.value; onChange(); });
+    return dom("label", {}, dom("span", {}, label), input);
+  };
+  function localField(key, label, hint = "", type = "text") {
+    const control = boundField(data.local, key, label, type, changed, false);
+    control.querySelector("input").placeholder = hint;
+    return control;
   }
+  function showCriteria() {
+    criteria.replaceChildren();
+    if (data.region === "tegal") {
+      criteria.append(dom("div", { className: "form-grid" },
+        select("zone", "Pola ruang / zona", intensityZones, "Pilih pola ruang / zona"),
+        select("road", "Kelas jalan di depan persil", intensityRoads, "Pilih kelas jalan"),
+        select("use", "Fungsi bangunan", intensityFunctions, "Pilih fungsi bangunan")));
+    }
+    if (data.region === "manual") {
+      criteria.append(
+        dom("div", { className: "form-grid" },
+          localField("municipality", "Kabupaten / kota"), localField("province", "Provinsi"),
+          localField("zone", "Zona / subzona"), localField("road", "Kelas jalan"),
+          localField("use", "Fungsi bangunan"), localField("source", "Judul dan nomor dokumen acuan", "Contoh: RDTR, KRK, atau dokumen izin"),
+          localField("reference", "Pasal / tabel / halaman"), localField("sourceUrl", "Tautan resmi (opsional)", "https://", "url")),
+        dom("p", { className: "hint" }, "Isi minimum, maksimum, atau keduanya sesuai dokumen. Biarkan kosong jika batasnya belum tersedia."),
+        dom("div", { className: "form-grid" }, ...areaMetrics.flatMap(({ key, name, percent }) =>
+          [["Min","minimum"],["Max","maksimum"]].map(([side,direction]) => {
+            const field = localField(key + side, name + " " + direction + (percent ? " (%)" : " (rasio)"));
+            field.querySelector("input").inputMode = "decimal";
+            return field;
+          }))));
+    }
+  }
+  grid.append(area, select("region", "Metode pembanding", [["manual", "Acuan daerah setempat"], ["tegal", "Kabupaten Tegal · Perbup 12/2026"]],
+    "Hitung tanpa pembanding", () => { showCriteria(); changed(); }));
+  showCriteria();
   const diagram = dom("input", { type: "checkbox", checked: data.diagram });
   diagram.addEventListener("change", () => { data.diagram = diagram.checked; changed(); });
-  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Tiga luas pembilang diambil dari kolom Hasil pengukuran pada daftar simak. Gunakan luas yang diperhitungkan menurut dokumen lokasi dan ketentuan teknis."),
-    grid, results, siteDiagram(),
+  editor.append(dom("p", { className: "lead" }, "Isi luas persil. Luas lantai dasar, luas total lantai, dan luas daerah hijau diambil dari daftar simak."),
+    grid, criteria, results, siteDiagram(),
     dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan"),
-    dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, gunakan Tambah Foto di Bab III. Sertakan denah terbangun atau gambar ukur yang telah diperiksa."));
+    dom("p", { className: "lead" }, "Untuk gambar objek sebenarnya, unggah denah terbangun atau gambar ukur yang telah diperiksa di Bab III."));
   refresh();
 }
+
 
 function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });

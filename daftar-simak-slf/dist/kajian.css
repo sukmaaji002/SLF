@@ -120,6 +120,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .site-diagram { margin: 16px 0; }
 .site-diagram img { display: block; width: 100%; max-width: 850px; }
 .site-diagram figcaption { margin-top: 5px; font-size: .875rem; color: var(--muted); }
+.intensity-criteria:not(:empty) { display: grid; gap: 10px; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--line); }
 .intensity-toggle { display: flex; align-items: center; gap: 8px; }
 .intensity-toggle input { width: auto; }
 
