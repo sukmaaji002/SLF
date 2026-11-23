@@ -7,7 +7,7 @@ const reportTemplates = {
     chapters: [
       [
         "Pendahuluan",
-        ["Latar belakang","[Uraikan alasan pengkajian, penggunaan gedung saat ini, dan konteks permohonan SLF.]"],
+        ["Latar belakang","Kajian teknis ini disusun sebagai bagian dari [pengajuan atau perpanjangan] Sertifikat Laik Fungsi untuk [nama bangunan] di [alamat]. Bangunan berfungsi sebagai [fungsi aktual]. Pengkajian dilakukan atas dasar [alasan dan kondisi yang melatarbelakangi pekerjaan]."],
         [
           "Maksud, tujuan, dan sasaran",
           "[Jelaskan apa yang dinilai, tujuan pemeriksaan, dan keluaran yang diharapkan.]",
@@ -21,7 +21,7 @@ const reportTemplates = {
           ["Lingkup wilayah kegiatan","[Tuliskan alamat, batas tapak, dan cakupan bangunan.]"],
           ["Lingkup materi pelaporan","[Jelaskan dokumen, disiplin, dan batasan akses atau pengujian.]"],
         ],
-        ["Sistematika penyusunan","[Jelaskan urutan bab dan lampiran yang digunakan dalam laporan ini.]"],
+        ["Sistematika penyusunan","Laporan ini dimulai dengan pendahuluan, metode dan landasan hukum, gambaran umum, serta tinjauan dokumen administrasi. Bagian berikutnya memuat pengkajian bidang arsitektur, struktur, dan MEP. Rekomendasi dan daftar simak melengkapi hasil pengkajian."],
         ["Tim pengkaji teknis","[Cantumkan personel, bidang, kompetensi, dan penanggung jawab kajian.]"],
         {"table":"Susunan tim pengkaji teknis","columns":["Nama","Peran / bidang","Kompetensi / dokumen pendukung"]},
       ],
@@ -220,8 +220,8 @@ const coverFields = [
   ["city", "Kota / kabupaten"], ["date", "Tanggal laporan", "date"], ["number", "Nomor / revisi laporan"],
 ];
 const frontDefaults = {
-  preface: "[Tuliskan tujuan penyusunan laporan, pihak yang terlibat, dan ucapan terima kasih yang relevan.]",
-  approval: "[Isi pernyataan pengesahan laporan, nama bangunan, nomor laporan, dan pihak yang mengesahkan.]",
+  preface: "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.\n\n[Tambahkan ucapan terima kasih dan keterangan yang diperlukan.]",
+  approval: "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]\n\n[Isi pernyataan pengesahan setelah pemeriksaan dan penelaahan laporan selesai.]",
 };
 const frontFields = [
   ["preface", "Kata pengantar"], ["approval", "Lembar pengesahan"],
