@@ -86,6 +86,13 @@ function reportSection(title, id) {
   return dom("section", { className: "report-section", id }, dom("h2", {}, title));
 }
 
+function contentsLink(id, title, className = "") {
+  const page = dom("span", { className: "toc-page" });
+  page.dataset.pageFor = id;
+  return dom("a", { href: "#" + id, className: "toc-row " + className },
+    dom("span", { className: "toc-title" }, title), dom("span", { className: "toc-leader", ariaHidden: "true" }), page);
+}
+
 function reportParagraphs(text) {
   return text.split(/\n\s*\n/).filter((paragraph) => paragraph.trim())
     .map((paragraph) => dom("p", { className: "report-text" }, paragraph));
@@ -186,13 +193,16 @@ async function buildReport(target, project, urls) {
   for (const [key, label] of frontFields.slice(0, 2)) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
     const section = reportSection(label, "report-" + key);
+    section.classList.add("front-doc");
     section.append(...reportParagraphs(resolve(project.front[key] || "", project.frontLinks?.[key])));
-    if (key === "approval") for (const [id] of frontFields.slice(2)) {
-      if (project.front[id]) section.append(dom("p", {}, project.front[id]));
+    if (key === "approval") {
+      const signoff = frontFields.slice(2).filter(([id]) => project.front[id]?.trim());
+      if (signoff.length) section.append(dom("div", { className: "report-signoff" },
+        ...signoff.map(([id]) => dom("p", {}, project.front[id]))));
     }
     attach(section);
   }
-  target.append(contents);
+  attach(contents);
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
     const headings = headingEntries(chapter, index);
@@ -228,17 +238,18 @@ async function buildReport(target, project, urls) {
   for (const [entries, label, id] of [[tableEntries, "Daftar tabel", "report-tables"], [figureEntries, "Daftar gambar", "report-figures"]]) {
     if (!entries.length) continue;
     const list = reportSection(label, id);
-    list.append(dom("ol", {}, ...entries.map(([anchor, text]) => dom("li", {}, dom("a", { href: "#" + anchor }, text)))));
+    list.append(dom("ul", { className: "contents-index" }, ...entries.map(([anchor, text]) =>
+      dom("li", {}, contentsLink(anchor, text)))));
     contents.append(list);
     const firstChapter = sections.findIndex((section) => section.id.startsWith("report-chapter-"));
     sections.splice(firstChapter < 0 ? 0 : firstChapter, 0, list);
   }
   const toc = dom("ul", { className: "toc" }, ...sections.map((section) => {
-    const entry = dom("li", {}, dom("a", { href: "#" + section.id }, section.firstElementChild.textContent));
+    const entry = dom("li", {}, contentsLink(section.id, section.firstElementChild.textContent));
     const headings = [...section.querySelectorAll(".chapter-heading")];
     if (headings.length) entry.append(dom("ul", { className: "sub-outline" }, ...headings.map((heading) =>
       dom("li", { className: heading.tagName === "H4" ? "nested-outline" : "" },
-        dom("a", { href: "#" + heading.id }, heading.textContent)))));
+        contentsLink(heading.id, heading.textContent)))));
     return entry;
   }));
   contents.firstElementChild.after(toc);
