@@ -49,15 +49,17 @@ function button(text, action, className = "") {
   return control;
 }
 
-function field(label, value, onInput, type = "text") {
+function field(label, value, onInput, type = "text", formatOwner, key, onFormat) {
   const props = { value: value ?? "" };
   const input = type === "area" ? dom("textarea", { ...props, rows: 4 }) : dom("input", { ...props, type });
   input.addEventListener("input", () => onInput(input.value));
-  return dom("label", { className: type === "area" ? "wide" : "" }, dom("span", {}, label), input);
+  const wrapper = dom("label", { className: type === "area" ? "wide" : "" }, dom("span", {}, label), input);
+  return formatOwner && (type === "text" || type === "area") ?
+    textFormatControl(wrapper, input, formatOwner, key, onFormat || save) : wrapper;
 }
 
-function boundField(data, key, label, type, changed = save) {
-  return field(label, data[key], (value) => { data[key] = value; changed(); }, type);
+function boundField(data, key, label, type, changed = save, format = true) {
+  return field(label, data[key], (value) => { data[key] = value; changed(); }, type, format ? data : undefined, key, changed);
 }
 
 function guidedField(data, key, label, type) {
@@ -84,7 +86,8 @@ function scopeField(project, onChange) {
     });
     form.append(dom("label", { className: "scope-choice" }, control, label));
   }
-  const other = field("Bidang atau sistem lain", project.scope?.other, (value) => change({ other: value }));
+  const layout = project.scope ?? {};
+  const other = field("Bidang atau sistem lain", layout.other, (value) => change({ other: value, _format: layout._format }), "text", layout, "other", () => change({ _format: layout._format }));
   other.querySelector("input").placeholder = "Contoh: sistem gas medis";
   form.append(other);
   return form;
@@ -95,9 +98,12 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
   const content = dom("div", { className: "linked-content" });
   const details = dom("details", { className: "linked-fields" }, summary, content);
   const wrapper = dom("div", { className: "wide" }, boundField(data, key, label, "area", () => {
-    update();
+    if (data[key] !== lastText) { lastText = data[key]; update(); }
+    else linkedPreview?.();
     save();
   }), details);
+  let lastText = data[key];
+  let linkedPreview;
 
   function update() {
     const text = data[key] || "";
@@ -113,7 +119,13 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
     }
     const grid = dom("div", { className: "form-grid" });
     const preview = dom("p", { className: "linked-preview" });
-    const updatePreview = () => { preview.textContent = resolveReportText(text, sources, getLinks()); };
+    const updatePreview = () => {
+      const format = getTextFormat(data, key);
+      preview.removeAttribute("style");
+      styleTextBlock(preview, format);
+      preview.replaceChildren(formattedText(text, format, (token, name) => resolveReportLink(token, name, sources, getLinks())));
+    };
+    linkedPreview = updatePreview;
     for (const [token, name] of fields) {
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
@@ -134,13 +146,19 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const value = dom("p", { className: "hint" });
       const example = inputExample(token);
       const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
-      const manual = field("Isi " + name, saved?.value, (input) => {
-        setLinks({ ...getLinks(), [token]: { value: input } });
-        if (sources.has(ownSource)) sources.get(ownSource).value = cleanValue(input);
+      const manualData = { value: saved?.value ?? "", _format: saved?._format };
+      const saveManual = () => {
+        setLinks({ ...getLinks(), [token]: manualData });
+        if (sources.has(ownSource)) {
+          sources.get(ownSource).value = cleanValue(manualData.value);
+          sources.get(ownSource).format = getTextFormat(manualData, "value");
+        }
         updatePreview();
         refreshLinkedFields(details);
         save();
-      }, token === "tanggal pemeriksaan" ? "date" : "text");
+      };
+      const manual = field("Isi " + name, manualData.value, (input) => { manualData.value = input; saveManual(); },
+        token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
       const choices = token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
       const isExample = !Object.hasOwn(inputChoices, token);
@@ -176,7 +194,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       };
       select.addEventListener("change", () => {
         const links = { ...getLinks() };
-        if (select.value === "manual") links[token] = { value: manualInput.value };
+        if (select.value === "manual") links[token] = manualData;
         else if (select.value) links[token] = { source: select.value };
         else delete links[token];
         setLinks(links);
@@ -220,7 +238,8 @@ function purposeField(project) {
     ...purposeOptions.map(([id, label]) => new Option(label, id)),
     new Option("Isi manual", "manual"));
   select.value = project.purpose?.mode ?? "";
-  const manual = field("Tujuan kajian manual", project.purpose?.custom, (value) => update({ custom: value }));
+  const layout = project.purpose ?? {};
+  const manual = field("Tujuan kajian manual", layout.custom, (value) => update({ custom: value, _format: layout._format }), "text", layout, "custom", () => update({ _format: layout._format }));
   manual.querySelector("input").placeholder = "Contoh: menilai kelaikan fungsi pada area renovasi";
   const reflect = () => { manual.hidden = select.value !== "manual"; };
 
@@ -320,7 +339,7 @@ function renderIntensity(project) {
     refresh();
     save();
   };
-  const area = boundField(data, "land", "Luas persil yang diperhitungkan (m²)", "text", changed);
+  const area = boundField(data, "land", "Luas persil yang diperhitungkan (m²)", "text", changed, false);
   Object.assign(area.querySelector("input"), { inputMode: "decimal", placeholder: "Contoh: 900 atau 1.250,5" });
   grid.append(area);
   for (const [key, label, choices] of [
@@ -427,7 +446,7 @@ function renderCover(project) {
     project.name = value;
     $("projects").selectedOptions[0].textContent = value;
     save();
-  }));
+  }, "text", project, "name"));
 }
 
 function renderFront(project) {
@@ -533,7 +552,7 @@ function tableEditor(block) {
       block.headers[index] = text;
       refreshLinkedFields();
       save();
-    })));
+    }, "text", block, "header:" + block.columnIds[index])));
   }
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
@@ -550,7 +569,11 @@ function tableEditor(block) {
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
       const populated = row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
       if (populated && !confirm("Hapus baris tabel ini?")) return;
-      if (block.cellLinks) for (const column of row.keys()) delete block.cellLinks[tableCellKey(block, index, column)];
+      for (const column of row.keys()) {
+        const key = tableCellKey(block, index, column);
+        if (block.cellLinks) delete block.cellLinks[key];
+        setTextFormat(block, "cell:" + key, undefined);
+      }
       block.rows.splice(index, 1);
       block.rowIds.splice(index, 1);
       save();
@@ -575,7 +598,12 @@ function tableEditor(block) {
     const populated = block.rows.some((row, index) => row[column].trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
     if (populated && !confirm("Hapus kolom terakhir beserta isinya?")) return;
     change(() => {
-      if (block.cellLinks) for (const row of block.rows.keys()) delete block.cellLinks[tableCellKey(block, row, column)];
+      for (const row of block.rows.keys()) {
+        const key = tableCellKey(block, row, column);
+        if (block.cellLinks) delete block.cellLinks[key];
+        setTextFormat(block, "cell:" + key, undefined);
+      }
+      setTextFormat(block, "header:" + block.columnIds[column], undefined);
       block.headers.pop();
       block.columnIds.pop();
       block.rows.forEach((row) => row.pop());
@@ -600,7 +628,7 @@ function tableCellField(block, row, column, sources, options) {
     block.rows[row][column] = text;
     refreshLinkedFields();
     save();
-  });
+  }, "text", block, "cell:" + key, () => { refreshLinkedFields(); save(); });
   const input = control.querySelector("input");
   const choices = options.length ? options : choicesForInput(fieldToken);
   if (choices.length) {
@@ -620,6 +648,7 @@ function tableCellField(block, row, column, sources, options) {
     input.value = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
     input.placeholder = source && !entry?.value ? "Sumber belum tersedia" : example ? "Contoh: " + example : token ?? "";
     summary.textContent = source ? "Data tertaut" : "Ambil data";
+    control.syncTextFormat();
   }
   link.refreshValue = refreshValue;
   function refreshOptions() {
@@ -776,7 +805,7 @@ async function backup() {
 }
 
 function pickText(record, keys) {
-  return Object.fromEntries(keys.filter((key) => typeof record?.[key] === "string").map((key) => [key, record[key]]));
+  return importTextFormats(Object.fromEntries(keys.filter((key) => typeof record?.[key] === "string").map((key) => [key, record[key]])), record, keys);
 }
 
 function validateBackup(data) {
@@ -809,10 +838,15 @@ function validateBackup(data) {
             keys.has(key) && validReportSource(id) && tableSourceAvailable(id)));
         }
       }
+      const tableFormatKeys = clean.columnIds?.map((id) => "header:" + id) ?? [];
+      if (clean.rowIds && clean.columnIds) {
+        for (const row of clean.rowIds) for (const col of clean.columnIds) tableFormatKeys.push("cell:" + row + ":" + col);
+      }
+      importTextFormats(clean, block, ["text", "body", ...tableFormatKeys]);
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
       return clean;
     });
-    return { title: chapter.title, blocks, checklist: chapter.checklist === true };
+    return importTextFormats({ title: chapter.title, blocks, checklist: chapter.checklist === true }, chapter, ["title"]);
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
@@ -822,9 +856,10 @@ function validateBackup(data) {
     frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },
     chapters,
   };
+  importTextFormats(project, source, ["name"]);
   const purpose = pickText(source.purpose, ["mode", "custom"]);
-  if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = purpose;
-  if (source.scope) project.scope = importScope(source.scope);
+  if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = importTextFormats(purpose, source.purpose, ["custom"]);
+  if (source.scope) project.scope = importTextFormats(importScope(source.scope), source.scope, ["other"]);
   if (source.intensity) project.intensity = importIntensity(source.intensity);
   if (source.cover?.image) {
     valid(typeof source.cover.image === "string" && imageSource.test(source.cover.image));

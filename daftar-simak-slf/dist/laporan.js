@@ -93,9 +93,23 @@ function contentsLink(id, title, className = "") {
     dom("span", { className: "toc-title" }, title), dom("span", { className: "toc-leader", ariaHidden: "true" }), page);
 }
 
-function reportParagraphs(text) {
-  return text.split(/\n\s*\n/).filter((paragraph) => paragraph.trim())
-    .map((paragraph) => dom("p", { className: "report-text" }, paragraph));
+function reportParagraphs(text, format, resolveToken) {
+  const paragraphs = [];
+  let offset = 0;
+  for (const [index, part] of text.split(/(\n\s*\n)/).entries()) {
+    if (index % 2 === 0 && part.trim()) {
+      const paragraph = styleTextBlock(dom("p", { className: "report-text" }), format);
+      paragraph.append(formattedText(part, format, resolveToken, offset));
+      paragraphs.push(paragraph);
+    }
+    offset += part.length;
+  }
+  return paragraphs;
+}
+
+function reportFormatted(element, text, format, prefix = "") {
+  element.replaceChildren(prefix, formattedText(text, format));
+  return styleTextBlock(element, format);
 }
 
 async function renderChecklist(target, project, urls, checklist, summaryAnchors, primary) {
@@ -108,7 +122,7 @@ async function renderChecklist(target, project, urls, checklist, summaryAnchors,
     if (!cleanValue(identity[key]) && cleanValue(value)) identity[key] = value;
   }
   const rows = Object.entries(checklistIdentityLabels).filter(([key]) => identity[key]?.trim())
-    .map(([key, label]) => [label, identity[key]]);
+    .map(([key, label]) => [label, formattedValue(identity[key], getTextFormat(checklist.identity, key) || getTextFormat(project.cover, { ownerName: "owner", location: "address" }[key] ?? key))]);
   if (rows.length) target.append(reportTable(["Data pemeriksaan", "Isian"], rows));
   let currentCategory;
   let currentGroup;
@@ -134,7 +148,9 @@ async function renderChecklist(target, project, urls, checklist, summaryAnchors,
     body.append(dom("tr", primary ? { id: "report-check-" + item.id } : {}, label, result,
       dom("td", {}, checklistReference(item.id, project.intensity?.region === "tegal"))));
     if (check?.na) {
-      result.textContent = ["Tidak berlaku", checklistReason(check)].filter(Boolean).join(". ");
+      result.append("Tidak berlaku");
+      const reason = checklistReason(check);
+      if (reason) result.append(". ", formattedValue(reason, getTextFormat(check, "reason") || getTextFormat(check.rows[0], "note")));
       continue;
     }
     const filled = check?.rows.filter((row) => Object.keys(checklistLabels).some((key) => row[key]?.trim()));
@@ -147,7 +163,8 @@ async function renderChecklist(target, project, urls, checklist, summaryAnchors,
       const values = dom("dl", { className: "result-values" });
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!row[key]?.trim()) continue;
-        const definition = dom("dd", {}, key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key]);
+        const value = key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key];
+        const definition = reportFormatted(dom("dd"), value, getTextFormat(row, key));
         values.append(dom("dt", {}, label), definition);
         if (key === "photo" || key === "ndtPhoto") {
           pendingPhotos.push(checklistPhoto(project.id, item.id + ":" + row.key + ":" + key).then(async (blob) => {
@@ -175,7 +192,8 @@ async function buildReport(target, project, urls) {
   target.replaceChildren();
   const checklist = readChecklist(project.id);
   const sources = reportSources(project, checklist);
-  const resolve = (text, links) => resolveReportText(text, sources, links);
+  const resolveToken = (links) => (original, name) => resolveReportLink(original, name, sources, links);
+  const coverFormat = (key, token) => getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
   const data = {
     ...project.cover,
     building: automaticValue("nama bangunan", sources) || project.cover.building,
@@ -186,14 +204,14 @@ async function buildReport(target, project, urls) {
   const title = data.title || "Laporan Kajian Teknis Sertifikat Laik Fungsi";
   const cover = dom("section", { className: "report-cover" },
     dom("p", { className: "paper-kicker" }, "Sertifikat Laik Fungsi"),
-    dom("h1", {}, title),
-    dom("p", { className: "cover-building" }, data.building || project.name),
-    dom("p", {}, data.address || data.city || ""));
+    reportFormatted(dom("h1"), title, coverFormat("title")),
+    reportFormatted(dom("p", { className: "cover-building" }), data.building || project.name, data.building ? coverFormat("building", "nama bangunan") : getTextFormat(project, "name")),
+    reportFormatted(dom("p"), data.address || data.city || "", data.address ? coverFormat("address", "alamat bangunan") : coverFormat("city")));
   if (imageSource.test(data.image || "")) {
     cover.append(dom("img", { className: "cover-photo", src: data.image, alt: data.building || project.name }));
   }
   const coverDetails = coverFields.filter(([key]) => !["title", "building", "address"].includes(key) && data[key]?.trim());
-  if (coverDetails.length) cover.append(reportTable(["Identitas laporan", "Keterangan"], coverDetails.map(([key, label]) => [label, data[key]])));
+  if (coverDetails.length) cover.append(reportTable(["Identitas laporan", "Keterangan"], coverDetails.map(([key, label]) => [label, formattedValue(data[key], coverFormat(key, { use: "fungsi bangunan", owner: "nama pemilik" }[key]))])));
   target.append(cover);
   const contents = reportSection("Daftar isi", "report-contents");
   const sections = [];
@@ -243,7 +261,7 @@ async function buildReport(target, project, urls) {
     tableEntries.push([id, caption]);
     const table = reportTable(["Butir daftar simak", "Ringkasan hasil", "Dasar aturan atau acuan teknis"],
       rows.map(({ item, summary }) => [reportJump("report-check-" + item.id, item.group.code + " · " + item.title),
-        summary, checklistReference(item.id, intensity.data.region === "tegal")]));
+        checklistSummary(item, checklist.checks[item.id], true), checklistReference(item.id, intensity.data.region === "tegal")]));
     for (const [i, row] of [...table.tBodies[0].rows].entries()) row.id = rows[i].id;
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, caption), table));
   }
@@ -252,41 +270,51 @@ async function buildReport(target, project, urls) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
     const section = reportSection(label, "report-" + key);
     section.classList.add("front-doc");
-    section.append(...reportParagraphs(resolve(project.front[key] || "", project.frontLinks?.[key])));
+    section.append(...reportParagraphs(project.front[key] || "", getTextFormat(project.front, key), resolveToken(project.frontLinks?.[key])));
     if (key === "approval") section.append(dom("div", { className: "report-signoff" },
-      dom("p", {}, project.front.location?.trim() || "[Tempat dan tanggal pengesahan]"),
-      dom("p", {}, project.front.role?.trim() || "Direktur"),
+      reportFormatted(dom("p"), project.front.location?.trim() || "[Tempat dan tanggal pengesahan]", getTextFormat(project.front, "location")),
+      reportFormatted(dom("p"), project.front.role?.trim() || "Direktur", getTextFormat(project.front, "role")),
       dom("div", { className: "signature-space", ariaHidden: "true" }),
-      dom("p", { className: "signatory-name" }, project.front.signatory?.trim() || "[Nama Direktur]")));
+      reportFormatted(dom("p", { className: "signatory-name" }), project.front.signatory?.trim() || "[Nama Direktur]", getTextFormat(project.front, "signatory"))));
     attach(section);
   }
   attach(contents);
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
+    if (getTextFormat(chapter, "title")) reportFormatted(section.firstElementChild, chapter.title, getTextFormat(chapter, "title"), "Bab " + roman(index + 1) + " · ");
     const headings = headingEntries(chapter, index);
     appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
     for (const [bi, block] of chapter.blocks.entries()) {
       const id = section.id + "-block-" + bi;
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
-        if (block.text.trim()) section.append(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }, number + " " + block.text));
-        section.append(...reportParagraphs(resolve(block.body, block.links)));
+        if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
+        section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         if (showIntensity && !intensityRendered && block.text === intensityHeading) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
       }
-      if (block.type === "text") section.append(...reportParagraphs(resolve(block.text, block.links)));
+      if (block.type === "text") section.append(...reportParagraphs(block.text, getTextFormat(block, "text"), resolveToken(block.links)));
       if (block.type === "table") {
-        const label = "Tabel " + (tableEntries.length + 1) + " · " + (block.text || "Tabel kajian");
-        tableEntries.push([id, label]);
-        section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, label),
-          reportTable(block.headers.map((text) => resolve(text)), block.rows.map((row, ri) =>
-            row.map((_, ci) => resolve(tableCellValue(block, ri, ci, sources)))))));
+        const prefix = "Tabel " + (tableEntries.length + 1) + " · ";
+        const title = block.text || "Tabel kajian";
+        tableEntries.push([id, prefix + title]);
+        const columns = block.headers.map((text, ci) => formattedValue(text, getTextFormat(block, "header:" + block.columnIds?.[ci]), resolveToken()));
+        const rows = block.rows.map((row, ri) => row.map((_, ci) => {
+          const key = tableCellKey(block, ri, ci);
+          const source = sources.get(block.cellLinks?.[key]);
+          const own = getTextFormat(block, "cell:" + key);
+          const format = source?.format && own ? { base: { ...source.format.base, ...own.base }, block: own.block, runs: own.runs.length ? own.runs : source.format.runs } : own || source?.format;
+          return formattedValue(tableCellValue(block, ri, ci, sources), format, resolveToken());
+        }));
+        section.append(dom("div", { id, className: "report-block" },
+          reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
       }
       if (block.type === "photo" && imageSource.test(block.image || "")) {
-        const label = "Gambar " + (figureEntries.length + 1) + " · " + (block.text || "Dokumentasi");
-        figureEntries.push([id, label]);
+        const prefix = "Gambar " + (figureEntries.length + 1) + " · ";
+        const title = block.text || "Dokumentasi";
+        figureEntries.push([id, prefix + title]);
         section.append(dom("figure", { id }, dom("img", { src: block.image, alt: block.text || "Dokumentasi kajian" }),
-          dom("figcaption", {}, label)));
+          reportFormatted(dom("figcaption"), title, getTextFormat(block, "text"), prefix)));
       }
     }
     if (chapter.checklist) checklistTargets.push(section);

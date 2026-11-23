@@ -141,14 +141,23 @@ function field([key, title, type], data, onChange, context, item) {
     control.placeholder = "Contoh: " + example;
   }
   control.value = data[key] || "";
+  const refreshOutput = () => {
+    const format = getTextFormat(data, key);
+    output.removeAttribute("style");
+    styleTextBlock(output, format);
+    output.replaceChildren(formattedText(control.value || "–", format));
+  };
+  const changed = () => { refreshOutput(); onChange(); };
   control.addEventListener("input", () => {
     data[key] = control.value;
     label.classList.toggle("has-value", Boolean(control.value.trim()));
-    output.textContent = control.value || "–";
-    onChange();
+    changed();
   });
   label.append(control, output);
-  return { label, control };
+  refreshOutput();
+  const editableText = (control.tagName === "TEXTAREA" || control.type === "text") &&
+    key !== "measurement";
+  return { label: editableText ? textFormatControl(label, control, data, key, changed) : label, control };
 }
 
 function renderIdentity() {
@@ -179,7 +188,7 @@ function applyCheck(item, check) {
 }
 
 function hasData(row) {
-  return Object.entries(row).some(([key, value]) => !["key", "label"].includes(key) && Boolean(value?.trim()));
+  return Object.entries(row).some(([key, value]) => !["key", "label"].includes(key) && typeof value === "string" && Boolean(value.trim()));
 }
 
 function flags(check) {
@@ -356,9 +365,10 @@ function renderItem(item) {
   const availability = el("label", "applicable");
   availability.append(na, "Butir ini tidak berlaku");
   const reference = el("p", "inspection-reference", "Acuan: " + checklistReference(item.id, tegalReference));
-  const naData = { reason: check.na ? checklistReason(check) : check.reason };
+  const naData = importTextFormats({ reason: check.na ? checklistReason(check) : check.reason }, check, ["reason"]);
   const reason = field(["reason", "Alasan tidak berlaku", "long"], naData, () => {
     check.reason = naData.reason;
+    setTextFormat(check, "reason", getTextFormat(naData, "reason"));
     change();
   }, item.title, item).label;
   const rows = el("div", "sample-list");

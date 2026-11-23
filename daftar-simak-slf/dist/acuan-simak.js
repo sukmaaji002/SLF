@@ -119,15 +119,33 @@ function formatChecklistMeasurement(value, unit) {
   return unit && /^[-+−]?\d[\d.,\s]*$/.test(value.trim()) ? value.trim() + " " + unit : value;
 }
 
-function checklistSummary(item, check) {
+function checklistSummary(item, check, rich = false) {
   if (!check) return "";
-  if (check.na) return ["Tidak berlaku", checklistReason(check)].filter(Boolean).join(". ");
+  if (check.na) {
+    const reason = checklistReason(check);
+    const format = getTextFormat(check, "reason") || getTextFormat(check.rows[0], "note");
+    return rich && reason && format ? [document.createTextNode("Tidak berlaku. "), formattedValue(reason, format)].reduce((fragment, node) => {
+      fragment.append(node);
+      return fragment;
+    }, document.createDocumentFragment()) : ["Tidak berlaku", reason].filter(Boolean).join(". ");
+  }
   const available = check.rows.filter((row) => checklistSummaryOrder.some((key) => row[key]?.trim()));
   const first = available[0];
   if (!first) return "";
-  const parts = checklistSummaryOrder.filter((key) => first[key]?.trim()).slice(0, 3).map((key) =>
-    checklistLabels[key] + ": " + (key === "measurement" ? formatChecklistMeasurement(first[key], item.unit) : first[key].trim()));
+  const keys = checklistSummaryOrder.filter((key) => first[key]?.trim()).slice(0, 3);
+  const value = (key) => key === "measurement" ? formatChecklistMeasurement(first[key], item.unit) : first[key].trim();
+  const parts = keys.map((key) => checklistLabels[key] + ": " + value(key));
   const summary = parts.join("\n");
   const more = available.length > 1 ? "\n+" + (available.length - 1) + " baris di lampiran" : "";
+  if (rich && summary.length <= 380 && keys.some((key) => getTextFormat(first, key))) {
+    const fragment = document.createDocumentFragment();
+    for (const key of keys) {
+      const line = styleTextBlock(document.createElement("div"), getTextFormat(first, key));
+      line.append(checklistLabels[key] + ": ", formattedText(value(key), getTextFormat(first, key)));
+      fragment.append(line);
+    }
+    fragment.append(more);
+    return fragment;
+  }
   return (summary.length > 380 ? summary.slice(0, 377) + "…" : summary) + more;
 }

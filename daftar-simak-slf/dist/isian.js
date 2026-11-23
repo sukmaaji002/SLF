@@ -115,7 +115,7 @@ function tableSourceAvailable(id) {
 function addNarrativeSources(add, id, text, links, label) {
   for (const [token, name] of reportTokens(text)) {
     const value = links?.[token]?.value;
-    if (cleanValue(value)) add(narrativeReference(id, token), "Isian bagian lain", label + " · " + name, value);
+    if (cleanValue(value)) add(narrativeReference(id, token), "Isian bagian lain", label + " · " + name, value, getTextFormat(links[token], "value"));
   }
 }
 
@@ -143,8 +143,8 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const tables = [];
   let hasResults = false;
   let hasPhotos = false;
-  function add(id, group, label, value) {
-    sources.set(id, { group, label, value: cleanValue(value) });
+  function add(id, group, label, value, format) {
+    sources.set(id, { group, label, value: cleanValue(value), format });
   }
   const intensity = calculateIntensity(project, checklist);
   if (intensity.land.value > 0) add("project:land-area", "Intensitas dan tata ruang", "Luas persil", intensityValue(intensity.land.value, " m²"));
@@ -154,20 +154,20 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   }
   const purpose = project.purpose;
   const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
-  add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue);
+  add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue, getTextFormat(purpose, "custom"));
   add("project:scope", "Data kajian", "Pilihan bidang pemeriksaan", scopeValue(project.scope));
   const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
   add("project:application", "Data kajian", "Jenis permohonan SLF", application);
   const outline = project.chapters.map((chapter, index) => chapterLabel(project, index));
   if (!project.chapters.some((chapter) => chapter.checklist)) outline.push("Lampiran · Daftar simak kajian");
   add("project:chapter-order", "Data kajian", "Urutan bab dan lampiran", outline.join("\n"));
-  for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key]);
+  for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key], getTextFormat(project.cover, key));
   for (const [key, label] of frontFields.slice(0, 2)) {
     addNarrativeSources(add, key, project.front[key] ?? "", project.frontLinks?.[key], label);
   }
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
     const value = checklist.identity[key];
-    add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value);
+    add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value, getTextFormat(checklist.identity, key));
   }
   for (const item of checklistItems) {
     const check = checklist.checks[item.id];
@@ -180,7 +180,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         if (key !== "location") hasResults = true;
         const value = key === "measurement" ? formatChecklistMeasurement(row[key], item.unit) : row[key];
         const name = [item.group.code + " " + item.title, row.label, label].filter(Boolean).join(" · ");
-        add("check:" + [item.id, row.key, key].join(":"), "Hasil daftar simak", name, value);
+        add("check:" + [item.id, row.key, key].join(":"), "Hasil daftar simak", name, value, getTextFormat(row, key));
       }
     }
   }
@@ -198,7 +198,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
           if (!cleanValue(value) || block.cellLinks?.[key]) continue;
           const rowName = cleanValue(row[0]) || "Baris " + (ri + 1);
           const name = [chapterLabel(project, index), block.text || "Tabel", rowName, block.headers[ci]].join(" · ");
-          add("cell:" + block.sourceId + ":" + key, "Tabel kajian", name, value);
+          add("cell:" + block.sourceId + ":" + key, "Tabel kajian", name, value, getTextFormat(block, "cell:" + key));
         }
       }
     }
@@ -271,13 +271,17 @@ function automaticValue(token, sources) {
   return sources.get(automaticSource(token, sources))?.value || "";
 }
 
+function resolveReportLink(original, label, sources, links) {
+  const key = tokenName(label);
+  const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
+  const source = sources.get(link?.source ?? automaticSource(key, sources));
+  const value = link ? (link.source ? source?.value : link.value) : automaticValue(key, sources);
+  const format = link && !link.source ? getTextFormat(link, "value") : source?.format;
+  return { value: (key === "tanggal pemeriksaan" ? inspectionDate(value) : value?.trim()) || original, format };
+}
+
 function resolveReportText(text, sources, links) {
-  return text.replace(tokenPattern, (original, label) => {
-    const key = tokenName(label);
-    const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
-    const value = link ? (link.source ? sources.get(link.source)?.value : link.value) : automaticValue(key, sources);
-    return (key === "tanggal pemeriksaan" ? inspectionDate(value) : value?.trim()) || original;
-  });
+  return text.replace(tokenPattern, (original, label) => resolveReportLink(original, label, sources, links).value);
 }
 
 const sourceUuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
@@ -288,7 +292,7 @@ function importLinks(links) {
   const pairs = [];
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
-    if (typeof link.value === "string") pairs.push([tokenName(token), { value: link.value }]);
+    if (typeof link.value === "string") pairs.push([tokenName(token), importTextFormats({ value: link.value }, link, ["value"])]);
     else if (validReportSource(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
