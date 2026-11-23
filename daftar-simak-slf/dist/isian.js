@@ -3,6 +3,7 @@
 const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
 const tokenAliases = {
+  "tujuan kajian": ["project:purpose"],
   "nama bangunan": ["cover:building", "identity:building"],
   "alamat": ["cover:address", "identity:location"],
   "alamat lengkap": ["cover:address", "identity:location"],
@@ -54,6 +55,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   function add(id, group, label, value) {
     sources.set(id, { group, label, value: cleanValue(value) });
   }
+  const purpose = project.purpose;
+  const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
+  add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue);
   for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key]);
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
     add("identity:" + key, "Identitas daftar simak", label, checklist.identity[key]);
@@ -117,7 +121,7 @@ function importLinks(links) {
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
     if (typeof link.value === "string") pairs.push([tokenName(token), { value: link.value }]);
-    else if (typeof link.source === "string" && /^(?:cover|identity|check|cell):[a-z\d.:/-]+$/i.test(link.source)) {
+    else if (typeof link.source === "string" && /^(?:project|cover|identity|check|cell):[a-z\d.:/-]+$/i.test(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
   }

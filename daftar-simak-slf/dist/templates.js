@@ -1,5 +1,14 @@
 "use strict";
 
+const originalPurposeText = "Kajian ini bertujuan membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, dan merumuskan tindak lanjut atas temuan yang didukung bukti pemeriksaan.";
+const purposeText = "Pekerjaan ini disusun untuk [tujuan kajian]. " + originalPurposeText;
+const purposeOptions = [
+  ["pengajuan", "Pengajuan SLF pertama", "mendukung pengajuan Sertifikat Laik Fungsi (SLF) pertama"],
+  ["perpanjangan", "Perpanjangan SLF", "mendukung perpanjangan Sertifikat Laik Fungsi (SLF)"],
+  ["perubahan", "Kajian setelah perubahan bangunan atau fungsi", "menilai kembali kelaikan fungsi setelah perubahan bangunan atau pemanfaatannya"],
+  ["tindak-lanjut", "Verifikasi tindak lanjut rekomendasi", "memverifikasi tindak lanjut atas rekomendasi kajian teknis sebelumnya"],
+];
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -12,7 +21,7 @@ const reportTemplates = {
           "Maksud, tujuan, dan sasaran",
           {"body":"Penelaahan dokumen dan pemeriksaan kondisi bangunan merupakan dasar untuk menyusun penilaian teknis atas [nama bangunan]. Hasilnya digunakan untuk mendokumentasikan kondisi yang dapat diverifikasi, mencatat kesenjangan terhadap acuan pemeriksaan, dan menyusun rekomendasi yang dapat ditindaklanjuti oleh [pemilik/pengelola bangunan].","previous":"[Jelaskan apa yang dinilai, tujuan pemeriksaan, dan keluaran yang diharapkan.]"},
           ["Maksud", {"body":"Pekerjaan ini dimaksudkan untuk menelaah kelengkapan dan kesesuaian dokumen administratif serta mengkaji kondisi teknis [nama bangunan] sesuai dengan fungsi [fungsi aktual]. Kajian disusun sebagai bahan pertimbangan dalam proses [pengajuan/perpanjangan] SLF.","previous":"[Jelaskan kebutuhan pengkajian teknis untuk bangunan ini.]"}],
-          ["Tujuan", {"body":"Kajian ini bertujuan membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, dan merumuskan tindak lanjut atas temuan yang didukung bukti pemeriksaan.","previous":"[Tuliskan tujuan pemeriksaan administratif dan teknis.]"}],
+          ["Tujuan", { body: purposeText, previous: "[Tuliskan tujuan pemeriksaan administratif dan teknis.]" }],
           ["Sasaran", {"body":"Sasaran pekerjaan ini adalah tersusunnya data kondisi eksisting, daftar simak, dan rekomendasi yang dapat ditelusuri kembali ke dokumen, observasi, atau hasil uji. Objek yang ditinjau meliputi [unit atau area bangunan], sedangkan sistem yang diperiksa meliputi [sistem utama dalam lingkup kajian].","previous":"[Sebutkan objek dan aspek yang dinilai.]"}],
         ],
         [
@@ -220,13 +229,18 @@ const coverFields = [
   ["city", "Kota / kabupaten"], ["date", "Tanggal laporan", "date"], ["number", "Nomor / revisi laporan"],
 ];
 const approvalPlaceholder = "[Isi pernyataan pengesahan setelah pemeriksaan dan penelaahan laporan selesai.]";
+const acknowledgementsPlaceholder = "[Tambahkan ucapan terima kasih dan keterangan yang diperlukan.]";
+const acknowledgementsText = [
+  "Kami menyampaikan terima kasih kepada [pemilik/pengelola bangunan] atas dukungan dalam penyediaan dokumen dan akses pemeriksaan, serta kepada tim pengkaji, petugas lapangan, dan seluruh pihak yang membantu pengumpulan data, pemeriksaan, dan penelaahan laporan ini.",
+  "Laporan ini disusun berdasarkan data yang tersedia dan lingkup pemeriksaan yang ditetapkan. Kami menghargai masukan yang disertai informasi pendukung untuk penyempurnaan laporan. Semoga laporan ini bermanfaat sebagai rujukan dalam menindaklanjuti temuan dan menjaga keandalan fungsi bangunan.",
+].join("\n\n");
 const approvalStatement = [
   "Pemeriksaan bangunan dan penelaahan laporan ini telah selesai dilaksanakan sesuai dengan ruang lingkup kajian. Penelaahan mencakup dokumen administrasi dan teknis, hasil pemeriksaan lapangan, serta bukti yang mendasari kesimpulan dan rekomendasi dalam laporan.",
   "Dengan ini, kami mengesahkan laporan ini sebagai dokumen hasil kajian teknis kelaikan fungsi [nama bangunan]. Rekomendasi dan tindak lanjut yang tercantum dalam laporan menjadi acuan bagi pihak terkait sesuai dengan tanggung jawab masing-masing.",
 ].join("\n\n");
 
 const frontDefaults = {
-  preface: "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.\n\n[Tambahkan ucapan terima kasih dan keterangan yang diperlukan.]",
+  preface: "Laporan kajian teknis ini disusun untuk [tujuan kajian] pada [nama bangunan] di [lokasi]. Laporan memuat ruang lingkup, metode, hasil pemeriksaan, dan rekomendasi berdasarkan dokumen serta temuan yang dicatat tim pengkaji.\n\n" + acknowledgementsText,
   approval: "Judul laporan: [judul laporan]\nObjek kajian: [nama dan alamat bangunan]\nNomor / revisi: [nomor laporan]\n\n" + approvalStatement,
 };
 const frontFields = [
@@ -285,8 +299,18 @@ function upgradeDisciplineDraft(project) {
 
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
+  if (typeof project.front.preface === "string") {
+    project.front.preface = project.front.preface.replace(acknowledgementsPlaceholder, acknowledgementsText);
+  }
   if (typeof project.front.approval === "string") {
     project.front.approval = project.front.approval.replace(approvalPlaceholder, approvalStatement);
+  }
+  if (project.template === "disiplin") {
+    for (const chapter of project.chapters) {
+      for (const block of chapter.blocks) {
+        if (block.type === "heading" && block.text === "Tujuan" && block.body === originalPurposeText) block.body = purposeText;
+      }
+    }
   }
 }
 
