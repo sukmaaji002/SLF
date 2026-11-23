@@ -47,11 +47,17 @@ function slfProjectOptions() {
 }
 
 function slfUpdateAccountControls() {
-  $("cloud-login").hidden = Boolean(slfAuthUser);
-  $("cloud-logout").hidden = !slfAuthUser;
-  $("cloud-sync").hidden = !slfAuthUser;
+  const signedIn = Boolean(slfAuthUser);
+  const account = $("cloud-account");
+  const email = slfAuthUser?.email ?? "";
+  $("cloud-login").hidden = signedIn;
+  $("cloud-status").hidden = !signedIn;
+  $("cloud-sync").hidden = !signedIn;
   $("cloud-copy").hidden = !slfAccount || !workspace?.cloud?.[workspace.current]?.conflict;
-  $("cloud-email").textContent = slfAuthUser?.email ?? "";
+  account.hidden = !signedIn;
+  if (!signedIn) account.open = false;
+  $("cloud-avatar").textContent = email.charAt(0).toLocaleUpperCase("id") || "A";
+  $("cloud-email").textContent = email;
 }
 
 function slfRememberEdit(projectId) {
@@ -264,25 +270,45 @@ async function slfCopyConflict() {
   await slfSyncCloud();
 }
 
+function slfShowPassword(show) {
+  $("cloud-password").type = show ? "text" : "password";
+  $("cloud-password-toggle").textContent = show ? "Sembunyikan" : "Lihat sandi";
+}
+
 function slfShowAuth(mode) {
   slfAuthMode = mode;
   const auth = $("cloud-dialog");
   const form = $("cloud-auth");
   const update = mode === "update";
   const recover = mode === "recover";
+  const email = auth.open && !update ? form.email.value : "";
   form.reset();
-  const labels = { login: "Masuk", signup: "Daftar akun", recover: "Kirim tautan pemulihan", update: "Simpan kata sandi baru" };
-  $("cloud-dialog-title").textContent = labels[mode];
-  $("cloud-submit").textContent = labels[mode];
-  $("cloud-auth-message").textContent = "";
+  form.email.value = email;
+  slfShowPassword(false);
+  const [title, description, submit] = {
+    login: ["Masuk", "Buka kembali proyek yang tersimpan di akun Anda.", "Masuk"],
+    signup: ["Buat akun", "Kami akan mengirim tautan konfirmasi ke email Anda.", "Daftar"],
+    recover: ["Atur ulang kata sandi", "Masukkan email yang terdaftar untuk menerima tautan pemulihan.", "Kirim tautan"],
+    update: ["Kata sandi baru", "Gunakan minimal 8 karakter untuk kata sandi baru.", "Simpan kata sandi"],
+  }[mode];
+  $("cloud-dialog-title").textContent = title;
+  $("cloud-dialog-description").textContent = description;
+  $("cloud-submit").textContent = submit;
+  const feedback = $("cloud-auth-message");
+  feedback.textContent = "";
+  feedback.removeAttribute("data-error");
   $("cloud-mode-actions").hidden = update;
+  for (const control of $("cloud-mode-actions").querySelectorAll("button")) {
+    control.hidden = control.dataset.authMode === mode || (mode !== "login" && control.dataset.authMode !== "login");
+  }
   form.email.closest("label").hidden = update;
   form.email.required = !update;
-  form.password.closest("label").hidden = recover;
+  $("cloud-password-field").hidden = recover;
   form.password.required = !recover;
   form.password.autocomplete = mode === "login" ? "current-password" : "new-password";
   form.password.minLength = mode === "login" ? 0 : 8;
   if (!auth.open) auth.showModal();
+  (update ? form.password : form.email).focus({ preventScroll: true });
 }
 
 function initSlfCloud() {
@@ -294,7 +320,20 @@ function initSlfCloud() {
   const redirect = new URL("./", location.href).href;
   $("cloud-login").addEventListener("click", () => slfShowAuth("login"));
   $("cloud-cancel").addEventListener("click", () => auth.close());
-  for (const control of $("cloud-mode-actions").querySelectorAll("button")) {
+  $("cloud-password-toggle").addEventListener("click", () => slfShowPassword(form.password.type === "password"));
+  auth.addEventListener("close", () => { form.password.value = ""; slfShowPassword(false); });
+  const account = $("cloud-account");
+  document.addEventListener("click", (event) => {
+    if (account.open && !account.contains(event.target)) account.open = false;
+  });
+  account.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && account.open) {
+      account.open = false;
+      account.querySelector("summary").focus();
+    }
+  });
+  const authLinks = $("cloud-mode-actions").querySelectorAll("button");
+  for (const control of authLinks) {
     control.addEventListener("click", () => slfShowAuth(control.dataset.authMode));
   }
   form.addEventListener("submit", async (event) => {
@@ -305,6 +344,8 @@ function initSlfCloud() {
     const email = form.email.value.trim();
     const password = form.password.value;
     control.disabled = true;
+    for (const link of authLinks) link.disabled = true;
+    message.removeAttribute("data-error");
     message.textContent = "Memproses…";
     try {
       if (mode === "recover") {
@@ -324,12 +365,16 @@ function initSlfCloud() {
       }
     } catch (error) {
       message.textContent = slfCloudError(error);
+      message.setAttribute("data-error", "");
     } finally {
       form.password.value = "";
+      slfShowPassword(false);
       control.disabled = false;
+      for (const link of authLinks) link.disabled = false;
     }
   });
   $("cloud-logout").addEventListener("click", () => {
+    account.open = false;
     slfQueueCloud(async () => {
       if (slfAccount) await slfSyncCloud({ pull: false });
       slfCheckCloudResult(await slfCloud.auth.signOut({ scope: "local" }));

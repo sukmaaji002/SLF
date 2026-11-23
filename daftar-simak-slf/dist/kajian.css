@@ -126,9 +126,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .intensity-additional fieldset { min-width: 0; }
 .intensity-toggle { display: flex; align-items: center; gap: 8px; }
 .intensity-toggle input { width: auto; }
-.cloud-controls:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.cloud-controls .button-row { margin: 0; }
-.cloud-controls [hidden] { display: none; }
 
 .checklist-head { flex-wrap: wrap; margin-bottom: 8px; }
 .checklist-head p { margin: 0; }
