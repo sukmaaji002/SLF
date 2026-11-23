@@ -175,7 +175,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         pick.value = "";
         updateValue();
         manualInput.dispatchEvent(new Event("input"));
-        manualInput.focus();
+        focusTextField(manualInput);
       });
       const scope = auto === "project:scope" ? scopeField(project, () => {
         sources.get("project:scope").value = scopeValue(project.scope);
@@ -252,7 +252,7 @@ function purposeField(project) {
   select.addEventListener("change", () => {
     reflect();
     update({ mode: select.value });
-    if (select.value === "manual") manual.querySelector("input").focus();
+    if (select.value === "manual") focusTextField(manual.querySelector("input"));
   });
   reflect();
   return dom("div", { className: "purpose-field" }, dom("label", {}, "Tujuan kajian", select), manual);
@@ -463,7 +463,7 @@ function renderFront(project) {
       const jump = (bi) => {
         active = index;
         render();
-        editor.querySelector(bi === undefined ? "input" : "#edit-block-" + bi + " input")?.focus();
+        focusTextField(editor.querySelector(bi === undefined ? "input" : "#edit-block-" + bi + " input"));
       };
       const entry = dom("li", {}, button(chapterLabel(project, index), () => jump(), "quiet"));
       if (titles.length) entry.append(dom("ul", { className: "sub-outline" }, ...titles.map(([bi, info]) =>
@@ -537,7 +537,7 @@ function renderChapter(project) {
       chapter.blocks.push(data);
       save();
       render();
-      editor.querySelector(".block:last-of-type input, .block:last-of-type textarea")?.focus();
+      focusTextField(editor.querySelector(".block:last-of-type input, .block:last-of-type textarea"));
     }));
   }
   editor.append(actions);
@@ -631,12 +631,7 @@ function tableCellField(block, row, column, sources, options) {
   }, "text", block, "cell:" + key, () => { refreshLinkedFields(); save(); });
   const input = control.querySelector("input");
   const choices = options.length ? options : choicesForInput(fieldToken);
-  if (choices.length) {
-    const id = "pilihan-" + crypto.randomUUID();
-    input.setAttribute("list", id);
-    input.setAttribute("aria-label", label);
-    control.append(dom("datalist", { id }, ...choices.map((option) => new Option(option, option))));
-  }
+  if (choices.length) control.setTextChoices(choices);
   const summary = dom("summary");
   const pick = dom("select", { ariaLabel: "Sumber data " + label.toLocaleLowerCase("id") });
   const link = dom("details", { className: "table-link" }, summary, pick);
@@ -965,7 +960,7 @@ async function start() {
     chapterDialog.close();
     save();
     render();
-    editor.querySelector("input")?.focus();
+    focusTextField(editor.querySelector("input"));
   });
   $("new-project").addEventListener("click", () => $("project-dialog").showModal());
   $("project-cancel").addEventListener("click", () => $("project-dialog").close());

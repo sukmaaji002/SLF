@@ -379,7 +379,7 @@ function renderItem(item) {
     check.rows.push({ key, label: item.fields.includes("P") ? key : (item.sampleTitle || "Sampel") + " " + key });
     change();
     renderItem(item);
-    item.body.querySelector(".sample:last-child input, .sample:last-child select")?.focus();
+    focusTextField(item.body.querySelector(".sample:last-child input, .sample:last-child select"));
   }) : null;
   const setAvailability = () => {
     rows.hidden = na.checked;

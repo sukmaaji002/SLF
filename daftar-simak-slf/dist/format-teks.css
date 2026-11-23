@@ -1,23 +1,28 @@
 .text-format-field { min-width: 0; overflow-wrap: anywhere; }
 .text-format-field > label { width: 100%; }
-.text-format-panel { margin-top: 4px; border: 1px solid #cbdad3; border-radius: 8px; background: #f4f8f5; }
-.text-format-panel > summary { padding: 5px 8px; color: #31574b; font-size: .875rem; font-weight: 650; cursor: pointer; }
-.text-format-toolbar, .text-format-ruler { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding: 7px 9px; }
-.text-format-toolbar > label, .text-format-ruler > label { min-width: 0; font-size: .875rem; }
-.text-format-toolbar select { min-height: 32px; padding: 4px 6px; }
+.text-format-frame { overflow: hidden; border: 1px solid #b8cdc3; border-radius: 8px; background: #fff; }
+.text-format-frame:focus-within { border-color: #458471; box-shadow: 0 0 0 2px #dcece5; }
+.text-format-toolbar, .text-format-ruler { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; }
+.text-format-toolbar { background: #f1f6f3; border-bottom: 1px solid #cbdad3; }
+.text-format-toolbar select { width: auto; max-width: 100%; min-height: 33px; padding: 4px 23px 4px 6px; font-size: .875rem; }
 .text-format-toggles { display: flex; gap: 3px; }
-.text-format-toolbar button { min-height: 32px; min-width: 34px; padding: 3px 7px; }
+.text-format-toolbar button { min-height: 33px; min-width: 34px; padding: 3px 7px; font-size: .875rem; }
 .text-format-toolbar .format-bold { font-weight: 800; }
 .text-format-toolbar .format-italic { font-style: italic; }
 .text-format-toolbar .format-underline { text-decoration: underline; }
 .text-format-toolbar button[aria-pressed="true"] { background: #d5edac; border-color: #8fae88; }
-.text-format-ruler { border-block: 1px solid #dce8e0; background: #edf4ee; }
-.text-format-ruler > label { flex: 1 1 8rem; }
+.text-format-ruler { border-bottom: 1px solid #dce8e0; background: #edf4ee; }
+.text-format-ruler[hidden] { display: none; }
+.text-format-ruler > label { flex: 1 1 8rem; min-width: 0; font-size: .875rem; }
 .text-format-ruler output { font-weight: 450; margin-left: 4px; }
 .text-format-ruler input { width: 100%; min-height: 22px; margin: 0; padding: 0; accent-color: #31574b; }
-.text-format-hint { padding: 5px 9px; font-size: .8125rem; color: #426357; }
-.text-format-preview { margin: 4px 8px 8px; padding: 7px; border-left: 2px solid #87ad9a; background: #fff; white-space: pre-wrap; }
+.text-format-surface { min-height: 7rem; padding: 9px 11px; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; outline: none; }
+.text-format-surface:empty::before { content: attr(data-placeholder); color: #526c64; pointer-events: none; }
+.text-format-surface[aria-readonly="true"] { background: #f7faf8; }
+.text-format-compact .text-format-surface { min-height: 42px; }
+.text-format-compact:not(:focus-within) .text-format-toolbar,
+.text-format-compact:not(:focus-within) .text-format-ruler { display: none; }
 .formatted-value { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media print {
-  .text-format-panel { display: none !important; }
+  .text-format-frame { display: none !important; }
 }
