@@ -69,7 +69,7 @@ function connectContents(pages) {
 
 async function paginateReport(source, target) {
   const staging = dom("div", { className: "pagination-stage", ariaHidden: "true" });
-  const previewer = new Paged.Previewer();
+  const previewer = new PagedModule.Previewer();
   const dispose = () => previewer.polisher.destroy();
   document.body.append(staging);
   const fragment = document.createDocumentFragment();
