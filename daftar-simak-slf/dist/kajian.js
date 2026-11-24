@@ -155,10 +155,12 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
         "Otomatis · Nama dan alamat bangunan";
       if (auto || combined) select.append(new Option(autoLabel, ""));
+      const directorId = "project:consultant-director";
+      if (token === "nama penanggung jawab") select.append(new Option("Direktur Badan Usaha Pengkaji", directorId));
       select.append(new Option("Isi manual", "manual"));
       const ownSource = narrativeReference(data.sourceId ?? key, token);
       for (const [group, entries] of groups) {
-        const available = entries.filter(([id]) => id !== ownSource);
+        const available = entries.filter(([id]) => id !== ownSource && (token !== "nama penanggung jawab" || id !== directorId));
         if (available.length) select.append(dom("optgroup", { label: group }, ...available.map(([id, label]) => new Option(label, id))));
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
@@ -246,9 +248,11 @@ function refreshLinkedFields(except) {
     if (details !== except) details.refreshSources();
   }
   const tableFields = [...editor.querySelectorAll(".table-link[data-linked]")];
-  if (tableFields.length) {
+  const leadFields = [...editor.querySelectorAll(".team-lead")];
+  if (tableFields.length || leadFields.length) {
     const sources = reportSources(current());
     for (const details of tableFields) details.refreshValue(sources);
+    for (const control of leadFields) control.refreshMembers(sources);
   }
 }
 
@@ -636,7 +640,8 @@ function renderFront(project) {
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
         (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
-        guidedField(project.front, key, label))),
+        key === "consultantDirector" ? boundField(project.front, key, label, "text", save) :
+          guidedField(project.front, key, label))),
     dom("h3", {}, "Susunan bab"),
     dom("p", { className: "hint" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
     dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
@@ -746,7 +751,8 @@ function renderChapter(project) {
 }
 
 function tableEditor(block) {
-  const matrix = dom("div", { className: "matrix" });
+  const team = isTeamTable(block);
+  const matrix = dom("div", { className: team ? "matrix team-matrix" : "matrix" });
   const table = dom("table");
   const header = dom("tr");
   for (const [index, value] of block.headers.entries()) {
@@ -765,7 +771,7 @@ function tableEditor(block) {
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
-    rows.append(dom("tr", {}, ...row.map((_, column) =>
+    rows.append(dom("tr", { ariaLabel: team ? "Pengkaji " + (index + 1) : undefined }, ...row.map((_, column) =>
       dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
@@ -777,6 +783,7 @@ function tableEditor(block) {
         setTextFormat(block, "cell:" + key, undefined);
       }
       block.rows.splice(index, 1);
+      if (block.teamLead === block.rowIds[index]) delete block.teamLead;
       block.rowIds.splice(index, 1);
       save();
       render();
@@ -812,15 +819,39 @@ function tableEditor(block) {
     });
   }));
   const editor = dom("div", {}, matrix, actions);
-  if (tokenName(block.text) === "susunan tim pengkaji teknis") {
-    editor.prepend(dom("p", { className: "hint" },
-      "Isi peran Penanggung jawab kajian pada baris yang sesuai agar nama dari tabel muncul otomatis dalam narasi Bab I."));
+  if (team) {
+    const select = dom("select");
+    const hint = dom("p", { className: "hint" });
+    const leadField = dom("div", { className: "team-lead" },
+      dom("label", {}, "Ketua tim / penanggung jawab kajian", select), hint);
+    leadField.refreshMembers = (registry) => {
+      const members = teamMembers(block, registry);
+      const options = members.map(([id, name], index) =>
+        new Option("Pengkaji " + (index + 1) + " · " + (name || "Nama belum diisi"), id));
+      select.replaceChildren(new Option("Pilih penanggung jawab", ""), ...options,
+        new Option("Direktur Badan Usaha Pengkaji", "director"));
+      select.value = block.teamLead || "";
+      const name = registry.get("project:team-lead").value;
+      hint.textContent = name ? "Terhubung ke narasi subbab Tim pengkaji teknis · " + name :
+        select.value === "director" ? "Isi nama Direktur Badan Usaha Pengkaji di Bagian Awal." :
+          select.value ? "Isi nama pengkaji pada baris yang dipilih." :
+            "Pilih pengkaji dari tabel ini atau Direktur dari Bagian Awal.";
+    };
+    select.addEventListener("change", () => {
+      if (select.value) block.teamLead = select.value;
+      else delete block.teamLead;
+      refreshLinkedFields();
+      save();
+    });
+    leadField.refreshMembers(sources);
+    editor.prepend(leadField);
   }
   return editor;
 }
 
 function tableCellField(block, row, column, sources, options) {
-  const label = "Baris " + (row + 1) + ", kolom " + (column + 1);
+  const label = isTeamTable(block) && block.headers[column].trim() ? block.headers[column] :
+    "Baris " + (row + 1) + ", kolom " + (column + 1);
   const key = tableCellKey(block, row, column);
   const value = block.rows[row][column];
   const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
@@ -1097,6 +1128,7 @@ function validateBackup(data) {
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
         clean.rowIds = importIds(block.rowIds, block.rows.length);
         clean.columnIds = importIds(block.columnIds, block.headers.length);
+        if (block.teamLead === "director" || clean.rowIds?.includes(block.teamLead)) clean.teamLead = block.teamLead;
         if (clean.rowIds && clean.columnIds && block.cellLinks && typeof block.cellLinks === "object") {
           const keys = new Set(clean.rowIds.flatMap((row) => clean.columnIds.map((column) => row + ":" + column)));
           clean.cellLinks = Object.fromEntries(Object.entries(block.cellLinks).filter(([key, id]) =>

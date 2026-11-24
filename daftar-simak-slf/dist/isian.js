@@ -139,9 +139,20 @@ function projectPurposeValue(purpose) {
     purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
 }
 
+function isTeamTable(block) {
+  return tokenName(block.text) === "susunan tim pengkaji teknis";
+}
+
+function teamMembers(block, sources) {
+  const name = block.headers.findIndex((header) => tokenName(header) === "nama");
+  return block.rowIds.map((id, index) => [id, name < 0 ? "" : cleanValue(tableCellValue(block, index, name, sources))]);
+}
+
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
   const teamLeads = new Set();
+  const designatedLeads = new Set();
+  let hasDesignation = false;
   const locations = new Set();
   const reviewedDocuments = new Set();
   const permits = new Set();
@@ -166,6 +177,10 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const purpose = project.purpose;
   add("project:purpose", "Bagian awal", "Tujuan kajian", projectPurposeValue(purpose), getTextFormat(purpose, "custom"));
   add("project:scope", "Data kajian", "Pilihan bidang pemeriksaan", scopeValue(project.scope));
+  const director = cleanValue(project.front.consultantDirector) ||
+    (/^(?:direktur(?: utama)?)?$/i.test(project.front.role?.trim() ?? "") ? cleanValue(project.front.signatory) : "");
+  add("project:consultant-director", "Bagian awal", "Direktur Badan Usaha Pengkaji", director,
+    getTextFormat(project.front, cleanValue(project.front.consultantDirector) ? "consultantDirector" : "signatory"));
   const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
   add("project:application", "Data kajian", "Jenis permohonan SLF", application);
   const outline = project.chapters.map((chapter, index) => chapterLabel(project, index));
@@ -217,13 +232,18 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     const title = tokenName(block.text);
     const columns = block.headers.map(tokenName);
     const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
-    if (title === "susunan tim pengkaji teknis") {
-      const name = block.headers.findIndex((header) => tokenName(header) === "nama");
-      const role = block.headers.findIndex((header) => tokenName(header) === "peran / bidang");
+    if (isTeamTable(block)) {
+      const role = columns.indexOf("peran / bidang");
       const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
-      for (const row of rows) {
-        const roleName = tokenName(row[role] ?? "");
-        const person = cleanValue(row[name]);
+      const members = teamMembers(block, sources);
+      if (block.teamLead) {
+        hasDesignation = true;
+        const designated = block.teamLead === "director" ? director :
+          members.find(([id]) => id === block.teamLead)?.[1];
+        if (designated) designatedLeads.add(designated);
+      }
+      for (const [index, [, person]] of members.entries()) {
+        const roleName = tokenName(rows[index][role] ?? "");
         if (!person) continue;
         if (leadRoles.includes(roleName)) teamLeads.add(person);
         reviewers.get(roleName)?.add(person);
@@ -249,7 +269,8 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       }
     }
   }
-  add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", teamLeads.size === 1 ? [...teamLeads][0] : "");
+  const leads = hasDesignation ? designatedLeads : teamLeads;
+  add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", leads.size === 1 ? [...leads][0] : "");
   add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));

@@ -307,6 +307,7 @@ const frontDefaults = {
 const frontFields = [
   ["preface", "Kata pengantar"], ["approval", "Lembar pengesahan"],
   ["location", "Tempat dan tanggal pengesahan"], ["signatory", "Nama penandatangan"], ["role", "Jabatan / peran"],
+  ["consultantDirector", "Nama Direktur Badan Usaha Pengkaji"],
 ];
 
 const roman = (number) => {

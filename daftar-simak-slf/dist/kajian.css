@@ -88,6 +88,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .matrix th, .matrix td { min-width: 135px; padding: 4px; text-align: left; }
 .matrix th:last-child, .matrix td:last-child { min-width: auto; }
 .matrix label { font-size: .8125rem; }
+.team-matrix td, .team-matrix th { vertical-align: top; }
+.team-lead { margin-block: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.team-lead select { max-width: min(100%, 420px); }
+.team-lead .hint { margin-bottom: 0; }
 .matrix .table-link { margin-top: 3px; font-size: .8125rem; }
 .table-link summary { cursor: pointer; color: var(--muted); }
 .table-link select { margin-top: 4px; font-size: .85rem; }

@@ -89,6 +89,15 @@
   :is(.editor, .identity, .checklist) textarea,
   .text-format-surface { font-size: 1rem; }
 
+  .team-matrix table, .team-matrix thead, .team-matrix tbody { display: block; }
+  .team-matrix tr { display: grid; gap: 6px; padding: 10px; }
+  .team-matrix thead { margin-block-end: 8px; background: var(--panel); border-radius: 6px; }
+  .team-matrix tbody tr { margin-block-end: 8px; border: 1px solid var(--line); border-radius: 6px; }
+  .team-matrix tbody tr::before { content: attr(aria-label); font-size: .875rem; font-weight: 700; }
+  .team-matrix :is(th, td) { padding: 0; min-width: 0; }
+  .team-matrix thead th:last-child { display: none; }
+  .team-matrix td:last-child { justify-self: start; }
+
   .text-format-toolbar { gap: 4px; padding: 5px 6px; }
   .text-format-toolbar select { max-width: 100%; font-size: .875rem; }
   .text-format-toolbar button, .text-format-toolbar select { min-height: 36px; }
