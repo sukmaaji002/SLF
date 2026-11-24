@@ -278,7 +278,8 @@ function outlineEntry(label, id, marker) {
     render();
     if (narrowLayout.matches) {
       $("section-navigation").open = false;
-      $("section-title").focus();
+      $("section-title").focus({ preventScroll: true });
+      document.querySelector(".workspace").scrollIntoView({ block: "start" });
     }
   }, "outline-entry");
   control.append(dom("span", { className: "nav-marker", ariaHidden: "true" }, marker), dom("span", {}, label));
@@ -305,6 +306,7 @@ function render() {
   $("projects").value = project.id;
   $("template-label").textContent = reportTemplates[project.template].label;
   renderOutline();
+  $("mobile-section-name").textContent = $("outline").querySelector("[aria-current=page]")?.lastElementChild.textContent ?? "Daftar simak";
   photoEditors.clear();
   editor.replaceChildren();
   if (active === "cover") return renderCover(project);
@@ -315,7 +317,25 @@ function render() {
   renderChapter(project);
 }
 
-function intensityTable({ data, land, metrics, note }) {
+function editorTable(columns, rows) {
+  const table = reportTable(columns, rows);
+  table.classList.add("editor-table");
+  table.setAttribute("role", "table");
+  for (const [rowIndex, row] of [...table.rows].entries()) {
+    row.setAttribute("role", "row");
+    for (const [columnIndex, cell] of [...row.cells].entries()) {
+      cell.setAttribute("role", rowIndex === 0 ? "columnheader" : "cell");
+      if (rowIndex === 0) continue;
+      const value = dom("div", { className: "editor-cell-value" }, ...cell.childNodes);
+      const label = dom("span", { className: "mobile-cell-label", ariaHidden: "true" }, columns[columnIndex]);
+      cell.replaceChildren(label, value);
+    }
+  }
+  return table;
+}
+
+function intensityTable({ data, land, metrics, note }, forEditor = false) {
+  const makeTable = forEditor ? editorTable : reportTable;
   const panel = dom("div", { className: "intensity-results" });
   const local = data.local;
   const site = data.region === "manual" ? [
@@ -328,7 +348,7 @@ function intensityTable({ data, land, metrics, note }) {
   const context = site.map((value) => value.trim()).filter(Boolean).join(" · ");
   if (context) panel.append(dom("p", {}, context));
   panel.append(dom("p", {}, "Luas persil: " + intensityValue(land.value, " m²")));
-  panel.append(reportTable(["Parameter", "Data ukur", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
+  panel.append(makeTable(["Parameter", "Data ukur", "Hasil", "Batas acuan", "Perbandingan"], metrics.map((metric) => {
     const suffix = intensityUnit(metric);
     const label = metric.areaLabel + " · " + intensityValue(metric.measurement.value, metric.direct || metric.unit === "lantai" ? suffix : " m²");
     const bounds = metric.limit == null ? "" : (metric.side === "Min" ? "Min. " : "Maks. ") + intensityValue(metric.limit, suffix);
@@ -517,7 +537,7 @@ function renderChecklistMap(project) {
       }, "quiet");
       rows.push([checklistEditorLink(project, item.id, label), summary, reference, jump]);
     }
-    list.replaceChildren(rows.length ? reportTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
+    list.replaceChildren(rows.length ? editorTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
       dom("p", {}, "Tidak ada butir yang cocok."));
   }
   search.addEventListener("input", update);
@@ -543,7 +563,7 @@ function refreshChecklistViews() {
   }
   if (typeof active === "number") {
     const checklist = readChecklist(current().id);
-    $("intensity-analysis-table")?.replaceChildren(intensityTable(calculateIntensity(current(), checklist)));
+    $("intensity-analysis-table")?.replaceChildren(intensityTable(calculateIntensity(current(), checklist), true));
     for (const table of editor.querySelectorAll("[data-checklist-block]")) {
       table.replaceChildren(editorChecklistTable(current(), checklist, Number(table.dataset.checklistBlock)));
     }
@@ -559,7 +579,7 @@ function editorChecklistTable(project, checklist, blockIndex) {
     rows.push([checklistEditorLink(project, item.id, item.title),
       summary || "Belum diisi", checklistReference(item.id, project.intensity?.region === "tegal")]);
   }
-  return reportTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
+  return editorTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
 }
 
 function title(type, label) {
@@ -617,7 +637,7 @@ function renderChecklistEditor(project) {
 
 function renderIntensityAnalysis(project, checklist) {
   const data = importIntensity(project.intensity);
-  const table = dom("div", { className: "auto-checklist", id: "intensity-analysis-table" }, intensityTable(calculateIntensity(project, checklist)));
+  const table = dom("div", { className: "auto-checklist", id: "intensity-analysis-table" }, intensityTable(calculateIntensity(project, checklist), true));
   const edit = button("Ubah data awal intensitas", () => { active = "intensity"; render(); $("section-title").focus(); }, "quiet");
   const diagram = dom("input", { type: "checkbox", checked: data.diagram });
   diagram.addEventListener("change", () => {
@@ -1117,6 +1137,18 @@ async function importBackup(file) {
   }
 }
 
+let previewActualSize = false;
+
+function fitReportPreview() {
+  const target = $("report");
+  const page = target.querySelector(".pagedjs_page");
+  if (!dialog.open || !page?.offsetWidth) return;
+  const style = getComputedStyle(target);
+  const gutter = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const scale = Math.min(1, (target.clientWidth - gutter) / page.offsetWidth);
+  target.style.setProperty("--preview-page-zoom", String(previewActualSize ? 1 : scale));
+}
+
 async function presentReport(print) {
   const buttons = [$("preview"), $("print")];
   if (buttons.some((control) => control.disabled)) return;
@@ -1126,7 +1158,10 @@ async function presentReport(print) {
     const source = dom("article", { className: "report-print" });
     await buildReport(source, structuredClone(current()), reportUrls);
     disposePagination = await paginateReport(source, $("report"));
+    previewActualSize = false;
+    $("preview-zoom").textContent = "Perbesar";
     dialog.showModal();
+    fitReportPreview();
     status.textContent = "Laporan siap";
     if (print) window.print();
   } catch {
@@ -1213,6 +1248,12 @@ async function start() {
     explain();
     setCurrent(project.id, true);
   });
+  $("preview-zoom").addEventListener("click", () => {
+    previewActualSize = !previewActualSize;
+    $("preview-zoom").textContent = previewActualSize ? "Pas lebar" : "Perbesar";
+    fitReportPreview();
+  });
+  new ResizeObserver(fitReportPreview).observe($("report"));
   $("preview").addEventListener("click", () => presentReport(false));
   $("print").addEventListener("click", () => presentReport(true));
   $("print-preview").addEventListener("click", () => window.print());

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="akun.css?v=2">
+  <link rel="stylesheet" href="ponsel.css">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js" defer></script>
@@ -26,7 +27,7 @@
   <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
   <script src="cloud-workspace.js?v=3" defer></script>
-  <script src="kajian.js?v=2" defer></script>
+  <script src="kajian.js?v=3" defer></script>
 </head>
 <body data-screen="kajian">
   <header class="mast">
@@ -59,7 +60,7 @@
     <div class="workspace">
       <aside class="sidebar">
         <details id="section-navigation" open>
-          <summary class="section-nav-toggle">Isi laporan</summary>
+          <summary class="section-nav-toggle"><span>Isi laporan</span><span id="mobile-section-name" class="mobile-section-name" aria-hidden="true"></span></summary>
           <div class="side-head"><p id="template-label"></p></div>
           <nav id="outline" aria-label="Isi laporan"></nav>
           <div class="side-actions">
@@ -72,6 +73,7 @@
                 <input id="backup-file" type="file" accept=".json,application/json" hidden>
               </div>
             </details>
+            <a class="mobile-standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
           </div>
         </details>
       </aside>
@@ -133,7 +135,7 @@
     </form>
   </dialog>
   <dialog id="preview-dialog">
-    <div class="preview-controls"><strong>Pratinjau laporan</strong><div class="button-row"><button id="close-preview" type="button">Tutup</button><button id="print-preview" class="primary" type="button">Cetak / PDF</button></div></div>
+    <div class="preview-controls"><strong>Pratinjau laporan</strong><div class="button-row"><button id="close-preview" type="button">Tutup</button><button id="preview-zoom" type="button">Perbesar</button><button id="print-preview" class="primary" type="button">Cetak / PDF</button></div></div>
     <article id="report" aria-label="Laporan kajian"></article>
   </dialog>
 </body>
