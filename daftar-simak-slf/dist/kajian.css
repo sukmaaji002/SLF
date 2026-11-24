@@ -111,8 +111,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .scope-choice input[type="checkbox"] { width: 16px; min-height: 16px; height: 16px; margin: 3px 0 0; flex: none; accent-color: var(--dark); }
 .scope-options > label:last-child { margin-top: 6px; }
 .linked-preview { margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.purpose-field { display: grid; gap: 8px; margin-bottom: 14px; }
-.block .purpose-field { margin-bottom: 0; }
+.purpose-field { min-width: 0; display: grid; gap: 8px; margin: 0 0 18px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.purpose-field legend { padding-inline: 5px; font-weight: 700; color: var(--dark); }
+#purpose-mode { scroll-margin-top: 64px; }
+.linked-content > button:first-child { margin-bottom: 6px; }
 .auto-checklist { overflow-x: auto; margin-block: 12px; }
 .auto-checklist table { width: 100%; min-width: 40rem; border-collapse: collapse; }
 .auto-checklist th, .auto-checklist td { text-align: left; vertical-align: top; padding: 8px; border: 1px solid var(--line); white-space: pre-wrap; }

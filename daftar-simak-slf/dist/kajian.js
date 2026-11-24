@@ -105,15 +105,32 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
     else linkedPreview?.();
     save();
   }), details);
+  const control = wrapper.querySelector("textarea");
+  const insertPurpose = button("Tambahkan tautan Tujuan Kajian", () => {
+    if (reportTokens(control.value).has("tujuan kajian")) return;
+    const separator = control.value.trim() ? "\n\n" : "";
+    control.value += separator + "[tujuan kajian]";
+    control.dispatchEvent(new Event("input"));
+    summary.focus();
+  }, "quiet");
+  const editPurpose = button("Ubah tujuan di Bagian Awal", () => {
+    active = "front";
+    render();
+    $("purpose-mode").focus();
+  }, "quiet");
   let lastText = data[key];
   let linkedPreview;
 
   function update() {
     const text = data[key] || "";
     const fields = reportTokens(text);
-    details.hidden = fields.size === 0;
-    summary.textContent = "Isian tertaut (" + fields.size + ")";
-    if (!details.open || !fields.size) return;
+    summary.textContent = fields.size ? "Isian tertaut (" + fields.size + ")" : "Tautkan isian";
+    if (!details.open) return;
+    if (!fields.size) {
+      linkedPreview = undefined;
+      content.replaceChildren(insertPurpose);
+      return;
+    }
     const sources = reportSources(project);
     const groups = new Map();
     for (const [id, source] of sources) {
@@ -215,7 +232,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       grid.append(entry);
     }
     updatePreview();
-    content.replaceChildren(grid, dom("h4", {}, "Hasil di laporan"), preview);
+    content.replaceChildren(fields.has("tujuan kajian") ? editPurpose : insertPurpose, grid, dom("h4", {}, "Hasil di laporan"), preview);
   }
 
   details.addEventListener("toggle", update);
@@ -236,15 +253,25 @@ function refreshLinkedFields(except) {
 }
 
 function purposeField(project) {
-  const select = dom("select", { ariaLabel: "Tujuan kajian" });
+  const select = dom("select", { id: "purpose-mode", ariaLabel: "Tujuan kajian" });
   select.append(new Option("Pilih tujuan kajian", ""),
     ...purposeOptions.map(([id, label]) => new Option(label, id)),
     new Option("Isi manual", "manual"));
   select.value = project.purpose?.mode ?? "";
-  const layout = project.purpose ?? {};
-  const manual = field("Tujuan kajian manual", layout.custom, (value) => update({ custom: value, _format: layout._format }), "text", layout, "custom", () => update({ _format: layout._format }));
-  manual.querySelector("input").placeholder = "Contoh: menilai kelaikan fungsi pada area renovasi";
-  const reflect = () => { manual.hidden = select.value !== "manual"; };
+  const data = project.purpose ?? {};
+  const manual = field("Uraian tujuan kajian", data.custom,
+    (value) => update({ custom: value, _format: data._format }), "area", data, "custom",
+    () => update({ _format: data._format }));
+  const input = manual.querySelector("textarea");
+  input.placeholder = "Contoh: menilai kelaikan fungsi bangunan setelah renovasi ruang pelayanan.";
+  const chosen = dom("p", { className: "linked-preview field-example" });
+
+  function reflect() {
+    manual.hidden = select.value !== "manual";
+    const presetPurpose = select.value === "manual" ? "" : projectPurposeValue({ mode: select.value }) || "";
+    chosen.hidden = !presetPurpose;
+    chosen.textContent = presetPurpose;
+  }
 
   function update(changes) {
     project.purpose = { ...project.purpose, ...changes };
@@ -253,12 +280,15 @@ function purposeField(project) {
   }
 
   select.addEventListener("change", () => {
-    reflect();
     update({ mode: select.value });
-    if (select.value === "manual") focusTextField(manual.querySelector("input"));
+    reflect();
+    if (select.value === "manual") focusTextField(input);
   });
   reflect();
-  return dom("div", { className: "purpose-field" }, dom("label", {}, "Tujuan kajian", select), manual);
+  return dom("fieldset", { className: "purpose-field" },
+    dom("legend", {}, "Tujuan Kajian"),
+    dom("p", { className: "hint" }, "Isi sekali di sini. Gunakan Isian tertaut pada bab atau subbab untuk mengambil tujuan ini."),
+    dom("label", {}, "Tujuan kajian", select), chosen, manual);
 }
 
 function setCurrent(id, dirty = false) {
@@ -602,13 +632,13 @@ function renderCover(project) {
 
 function renderFront(project) {
   title("Bagian awal", "Bagian awal & daftar isi");
-  editor.append(dom("p", { className: "lead" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
-    purposeField(project),
+  editor.append(purposeField(project),
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
         (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
         guidedField(project.front, key, label))),
     dom("h3", {}, "Susunan bab"),
+    dom("p", { className: "hint" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
     dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
       const titles = [...headingEntries(chapter, index)].filter(([bi]) => chapter.blocks[bi].text.trim());
       const jump = (bi) => {
@@ -977,7 +1007,6 @@ function blockEditor(chapter, block, index, headingInfo) {
   const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; });
   if (block.type === "heading") {
     wrapper.append(boundField(block, "text", "Judul subbab"));
-    if (block.text === "Tujuan" && reportTokens(block.body).has("tujuan kajian")) wrapper.append(purposeField(current()));
     const project = current();
     wrapper.append(linked("body", "Isi subbab"), sectionPhotoEditor(block, "Unggah foto subbab",
       () => project.chapters.includes(chapter) && chapter.blocks.includes(block)));

@@ -134,6 +134,11 @@ function inspectionDate(value) {
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "UTC" }).format(date);
 }
 
+function projectPurposeValue(purpose) {
+  return purpose?.mode === "manual" ? purpose.custom :
+    purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
+}
+
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
   const teamLeads = new Set();
@@ -159,8 +164,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       intensityValue(metric.value, intensityUnit(metric)));
   }
   const purpose = project.purpose;
-  const purposeValue = purpose?.mode === "manual" ? purpose.custom : purposeOptions.find(([id]) => id === purpose?.mode)?.[2];
-  add("project:purpose", "Data kajian", "Tujuan kajian", purposeValue, getTextFormat(purpose, "custom"));
+  add("project:purpose", "Bagian awal", "Tujuan kajian", projectPurposeValue(purpose), getTextFormat(purpose, "custom"));
   add("project:scope", "Data kajian", "Pilihan bidang pemeriksaan", scopeValue(project.scope));
   const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
   add("project:application", "Data kajian", "Jenis permohonan SLF", application);
