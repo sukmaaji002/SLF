@@ -121,6 +121,34 @@ function scopeField(project, onChange) {
   return form;
 }
 
+function methodChoiceField(choices, input, applyValue) {
+  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Pilih satu atau beberapa metode"));
+  const known = (part) => choices.includes(tokenName(part));
+  const parts = () => input.value.trim().split(/\s*,\s*/).filter(Boolean).flatMap((part) => {
+    const tail = part.replace(/^dan\s+/i, "");
+    if (known(tail)) return [tail];
+    const joined = part.split(/\s+dan\s+/i);
+    return joined.every(known) ? joined : [part];
+  });
+  const controls = choices.map((choice) => {
+    const control = dom("input", { type: "checkbox" });
+    control.addEventListener("change", () => {
+      const values = parts().filter((part) => tokenName(part) !== choice);
+      if (control.checked) values.push(choice);
+      applyValue(values.every(known) ? scopeList.format(values) : values.join(", "));
+    });
+    fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
+    return [choice, control];
+  });
+  const sync = () => {
+    const selected = new Set(parts().map(tokenName));
+    for (const [choice, control] of controls) control.checked = selected.has(choice);
+  };
+  input.addEventListener("input", sync);
+  sync();
+  return fieldset;
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks) {
   const summary = dom("summary", {}, "Isian tertaut");
   const content = dom("div", { className: "linked-content" });
@@ -208,22 +236,31 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
       const choices = token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
-      const isExample = !Object.hasOwn(inputChoices, token);
-      const pick = choices.length ? dom("select", { ariaLabel: "Pilihan isian " + name },
-        new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option))) : null;
-      const choiceField = pick ? dom("label", {}, "Pilihan isian", pick) : null;
-      if (pick) pick.addEventListener("change", () => {
-        if (!pick.value) return;
-        const previousValue = manualInput.value.trim();
-        const replace = token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
-        if (replace || isExample || !previousValue) manualInput.value = pick.value;
-        else if (!previousValue.split(", ").includes(pick.value)) manualInput.value = previousValue + ", " + pick.value;
+      const applyChoiceValue = (text) => {
         select.value = "manual";
-        pick.value = "";
+        manualInput.value = text;
         updateValue();
         manualInput.dispatchEvent(new Event("input"));
-        focusTextField(manualInput);
-      });
+      };
+      const isExample = !Object.hasOwn(inputChoices, token);
+      let choiceField;
+      if (token === "metode pemeriksaan yang digunakan") {
+        choiceField = methodChoiceField(choices, manualInput, applyChoiceValue);
+      } else if (choices.length) {
+        const pick = dom("select", { ariaLabel: "Pilihan isian " + name },
+          new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option)));
+        choiceField = dom("label", {}, "Pilihan isian", pick);
+        pick.addEventListener("change", () => {
+          if (!pick.value) return;
+          const previousValue = manualInput.value.trim();
+          const replace = token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
+          const next = replace || isExample || !previousValue ? pick.value :
+            previousValue.split(", ").includes(pick.value) ? previousValue : previousValue + ", " + pick.value;
+          pick.value = "";
+          applyChoiceValue(next);
+          focusTextField(manualInput);
+        });
+      }
       const scope = auto === "project:scope" ? scopeField(project, () => {
         sources.get("project:scope").value = scopeValue(project.scope);
         updateValue();
