@@ -48,6 +48,12 @@ function contextualNarrative(title) {
   return previous.replace("[" + marker + "]", "[" + replacement + "]");
 }
 
+const previousSafetyNarrative = "Acuan pemeriksaan keselamatan meliputi [standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan]. Parameter yang dijadikan pembanding untuk masing-masing sistem adalah [parameter dan rujukan].";
+const safetyNarrative = previousSafetyNarrative.replace(
+  "Parameter yang dijadikan pembanding untuk masing-masing sistem adalah",
+  "Parameter pembanding untuk tiap sistem ditetapkan",
+);
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -87,7 +93,7 @@ const reportTemplates = {
           "Standar pemeriksaan",
           {"body":"Acuan penilaian untuk objek kajian ini meliputi [peraturan, standar teknis, dan dokumen rencana yang relevan]. Setiap acuan dicatat bersama nomor, tahun atau edisi, dan parameter yang digunakan untuk membandingkan hasil pemeriksaan.","previous":"[Masukkan standar dan ketentuan yang digunakan pengkaji untuk proyek ini.]"},
           ["Tata bangunan", {"body":"Penilaian tata bangunan mengacu pada [ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan]. Aspek pembanding meliputi fungsi bangunan, intensitas, sempadan, tata ruang dalam, dan hubungan dengan lingkungan tapak.","previous":"[Catat acuan pemeriksaan fungsi, intensitas, sempadan, dan tata ruang.]"}],
-          ["Keselamatan", {"body":"Acuan pemeriksaan keselamatan meliputi [standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan]. Parameter yang dijadikan pembanding untuk masing-masing sistem adalah [parameter dan rujukan].","previous":"[Catat acuan struktur, kebakaran, listrik, dan penangkal petir yang berlaku pada objek.]"}],
+          ["Keselamatan", {"body":safetyNarrative,"previous":"[Catat acuan struktur, kebakaran, listrik, dan penangkal petir yang berlaku pada objek.]"}],
           ["Kesehatan", {"body":"Aspek kesehatan dinilai menggunakan [standar atau dokumen pembanding] terkait penghawaan, pencahayaan, air bersih, dan sanitasi. Parameter pembanding yang digunakan pada [ruang atau sistem] adalah [parameter, satuan, dan rujukan].","previous":"[Catat acuan penghawaan, pencahayaan, air, dan sanitasi.]"}],
           ["Kenyamanan", {"body":"Acuan aspek kenyamanan mencakup [ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan]. Parameter yang diterapkan untuk [fungsi ruang] adalah [parameter dan rujukan].","previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
           ["Kemudahan", {"body":"Akses, sirkulasi, dan kelengkapan fasilitas dinilai dengan [acuan aksesibilitas atau dokumen teknis]. Ketentuan yang dibandingkan dengan kondisi lapangan meliputi [parameter jalur, fasilitas, atau peralatan yang berlaku].","previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
@@ -362,6 +368,10 @@ function upgradeDisciplineDraft(project) {
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
+    if (block.type === "heading" && block.body === previousSafetyNarrative) {
+      updateTextFormat(block, "body", block.body, safetyNarrative);
+      block.body = safetyNarrative;
+    }
     if (block.type !== "photo" || !block.image) continue;
     const first = importTextFormats({ image: block.image, text: block.text }, block, ["text"]);
     block.photos = [first, ...(block.photos ?? [])];

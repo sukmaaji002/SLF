@@ -14,8 +14,7 @@ const repeatedNarrativeFields = new Map([
   [safetyReferenceToken,
     { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
   [parameterReferenceToken,
-    { key: "parameters", choiceKey: "parameterChoices", groupKey: "parameterGroups", legend: "Parameter keselamatan",
-      item: "Parameter tambahan", groupName: "kelompok parameter", addGroupLabel: "Tambah kelompok parameter", compactGroups: true }],
+    { key: "parameters", choiceKey: "parameterStandardChoices", item: "Isian tambahan", minimumRows: 0 }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
@@ -351,13 +350,16 @@ function resolveReportText(text, sources, links) {
 const sourceUuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const validReportSource = (source) => typeof source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(source);
 
-function narrativeEntryValue(choices, entries, groups = []) {
-  const groupEntries = groups.flatMap(({ name, entries, fixed }) => {
+function narrativeGroupEntries(groups) {
+  return groups.flatMap(({ name, entries, fixed }) => {
     const references = entries.map((entry) => entry.trim()).filter(Boolean);
     return !fixed && name.trim() && references.length ?
       [name.trim() + " (" + scopeList.format(references) + ")"] : references;
   });
-  return scopeList.format([...choices, ...entries, ...groupEntries].map((entry) => entry.trim()).filter(Boolean));
+}
+
+function narrativeEntryValue(choices, entries, groups = []) {
+  return scopeList.format([...choices, ...entries, ...narrativeGroupEntries(groups)].map((entry) => entry.trim()).filter(Boolean));
 }
 
 function importLinks(links) {
@@ -370,15 +372,19 @@ function importLinks(links) {
       const data = importTextFormats({ value: link.value }, link, ["value"]);
       const field = repeatedNarrativeFields.get(key);
       const entries = field && link[field.key];
-      const choices = field?.choiceKey ? link[field.choiceKey] : [];
-      const groups = field?.groupKey ? link[field.groupKey] ?? [] : [];
+      const legacyParameters = key === parameterReferenceToken && Array.isArray(link.parameterChoices) &&
+        !Array.isArray(link.parameterStandardChoices);
+      const choiceKey = legacyParameters ? "parameterChoices" : field?.choiceKey;
+      const groupKey = legacyParameters ? "parameterGroups" : field?.groupKey;
+      const choices = choiceKey ? link[choiceKey] : [];
+      const groups = groupKey ? link[groupKey] ?? [] : [];
       if (Array.isArray(entries) && Array.isArray(choices) && [...choices, ...entries].every((entry) => typeof entry === "string") &&
         Array.isArray(groups) && groups.every((group) => group && typeof group.name === "string" &&
           typeof group.fixed === "boolean" && Array.isArray(group.entries) && group.entries.every((entry) => typeof entry === "string")) &&
         narrativeEntryValue(choices, entries, groups) === link.value) {
         data[field.key] = [...entries];
-        if (field.choiceKey) data[field.choiceKey] = [...choices];
-        if (field.groupKey) data[field.groupKey] = groups.map(({ name, fixed, entries }) => ({ name, fixed, entries: [...entries] }));
+        if (choiceKey) data[choiceKey] = [...choices];
+        if (groupKey) data[groupKey] = groups.map(({ name, fixed, entries }) => ({ name, fixed, entries: [...entries] }));
       }
       pairs.push([key, data]);
     }

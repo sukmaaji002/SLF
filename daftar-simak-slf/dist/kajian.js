@@ -143,17 +143,12 @@ function narrativeChoiceParts(value, choiceKeys) {
   });
 }
 
-const narrativeChoiceValue = (option) => option.value ?? option;
-
-function narrativeChoiceCheckboxes(legend, choices, changed, compact = false) {
-  const fieldset = compact ?
-    dom("fieldset", { className: "compact-narrative-choices", ariaLabel: legend }) :
-    dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
-  const controls = choices.map((option) => {
-    const choice = narrativeChoiceValue(option);
+function narrativeChoiceCheckboxes(legend, choices, changed) {
+  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
+  const controls = choices.map((choice) => {
     const control = dom("input", { type: "checkbox" });
     control.addEventListener("change", () => changed(choice, control.checked));
-    fieldset.append(dom("label", { className: "scope-choice" }, control, option.label ?? choice));
+    fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
     return [tokenName(choice), control];
   });
   const sync = (values) => {
@@ -238,58 +233,43 @@ function narrativeEntryList(values, item, changed, minimumRows = 1) {
 }
 
 function repeatedNarrativeField(spec, data, changed, groups = []) {
-  const choices = groups.flatMap(([, options]) => options.map(narrativeChoiceValue));
+  const choices = groups.flatMap(([, options]) => options);
   const choiceKeys = new Set(choices.map(tokenName));
   const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
   let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
   const extra = selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
   const values = [...(data[spec.key] ?? [])];
-  if (!values.length && (!spec.groupKey || (!data[spec.groupKey] && extra.trim()))) values.push(extra);
+  const minimumRows = spec.minimumRows ?? 1;
+  const hasLegacyValue = !data[spec.groupKey] && extra.trim();
+  if (!values.length && ((!spec.groupKey && minimumRows) || hasLegacyValue)) values.push(extra);
   const fixedNames = new Set(groups.map(([name]) => name));
   const referenceGroups = (data[spec.groupKey] ?? []).map(({ name, fixed, entries }) =>
     ({ name, fixed: fixed && fixedNames.has(name), entries: [...entries] }));
-  const form = spec.compactGroups ? dom("div") :
-    dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
+  const form = spec.legend ? dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend)) : dom("div");
   for (const [legend, options] of groups) {
-    const summary = spec.compactGroups ? dom("summary", {}, legend) : null;
-    let group;
+    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
+      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
+      if (checked) selected.push(choice);
+      commit();
+    });
+    sync(selected);
     if (spec.groupKey) {
-      group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
+      let group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
       if (!group) {
         group = { name: legend, fixed: true, entries: [] };
         referenceGroups.push(group);
       }
+      fieldset.append(...narrativeEntryList(group.entries, spec.item, commit, 0));
     }
-    function updateSummary() {
-      if (!summary) return;
-      const chosen = new Set(selected.map(tokenName));
-      const count = options.filter((option) => chosen.has(tokenName(narrativeChoiceValue(option)))).length +
-        (group?.entries ?? []).filter((entry) => entry.trim()).length;
-      summary.textContent = count ? legend + " · " + count + " terisi" : legend;
-    }
-    function updateGroup() {
-      updateSummary();
-      commit();
-    }
-    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
-      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
-      if (checked) selected.push(choice);
-      updateGroup();
-    }, spec.compactGroups);
-    sync(selected);
-    if (group) fieldset.append(...narrativeEntryList(group.entries, spec.item, updateGroup, 0));
-    updateSummary();
-    form.append(summary ?
-      dom("details", { className: "scope-options compact-narrative-group" }, summary, fieldset) : fieldset);
+    form.append(fieldset);
   }
   if (spec.groupKey) {
     if (values.some((entry) => entry.trim())) {
       form.append(dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.item + " sebelumnya"),
         ...narrativeEntryList(values, spec.item, commit, 0)));
     }
-    const groupName = spec.groupName ?? "jenis acuan";
     const customGroups = dom("div");
-    const addGroup = button(spec.addGroupLabel ?? "Tambah acuan keselamatan", () => {
+    const addGroup = button("Tambah acuan keselamatan", () => {
       const group = { name: "", fixed: false, entries: [""] };
       referenceGroups.push(group);
       appendGroup(group).focus();
@@ -299,14 +279,14 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
     form.append(customGroups, addGroup);
 
     function appendGroup(group) {
-      const name = field("Nama " + groupName, group.name, (text) => {
+      const name = field("Nama jenis acuan", group.name, (text) => {
         group.name = text;
         commit();
       });
       const fieldset = dom("fieldset", { className: "scope-options" },
-        dom("legend", {}, spec.groupName ? "Kelompok parameter tambahan" : "Jenis acuan tambahan"), name,
+        dom("legend", {}, "Jenis acuan tambahan"), name,
         ...narrativeEntryList(group.entries, spec.item, commit));
-      fieldset.append(button("Hapus " + groupName, () => {
+      fieldset.append(button("Hapus jenis acuan", () => {
         referenceGroups.splice(referenceGroups.indexOf(group), 1);
         fieldset.remove();
         addGroup.focus();
@@ -316,7 +296,7 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
       return name.querySelector("input");
     }
   } else {
-    form.append(...narrativeEntryList(values, spec.item, commit));
+    form.append(...narrativeEntryList(values, spec.item, commit, minimumRows));
   }
   function commit() {
     const value = narrativeEntryValue(selected, values, referenceGroups);
@@ -441,14 +421,18 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         select.dispatchEvent(new Event("change"));
         focusManual();
       }, "quiet");
-      const example = safetyParameters ? "lebar bersih jalur evakuasi berdasarkan SNI 03-1746-2000 dan denah evakuasi" : inputExample(token);
-      const hint = safetyParameters ? "Buka kelompok untuk memilih atau menambah parameter." :
-        (Object.hasOwn(inputHints, token) ? inputHints[token] : "");
+      const example = safetyParameters ? "" : inputExample(token);
+      const hint = safetyParameters || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
       if (repeated?.choiceKey && Array.isArray(saved?.[repeated.choiceKey])) manualData[repeated.choiceKey] = saved[repeated.choiceKey];
       if (repeated?.groupKey && Array.isArray(saved?.[repeated.groupKey])) manualData[repeated.groupKey] = saved[repeated.groupKey];
+      if (safetyParameters && !manualData.parameterStandardChoices && Array.isArray(saved?.parameterChoices)) {
+        manualData.parameters = [...saved.parameterChoices, ...(saved.parameters ?? []), ...narrativeGroupEntries(saved.parameterGroups ?? [])]
+          .filter((entry) => entry.trim());
+        manualData.parameterStandardChoices = [];
+      }
       const saveManual = () => {
         setLinks({ ...getLinks(), [token]: manualData });
         if (sources.has(ownSource)) {
@@ -469,7 +453,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
-      const focusManual = () => focusTextField(manual.querySelector(".compact-narrative-group > summary, input"));
+      const focusManual = () => focusTextField(manual.querySelector("input"));
       const choices = repeated || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
       const applyChoiceValue = (text) => {
         select.value = "manual";

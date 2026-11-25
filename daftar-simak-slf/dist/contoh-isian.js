@@ -363,32 +363,11 @@ const inputChoiceGroups = new Map([
     ]],
   ]],
   [parameterReferenceToken, [
-    ["Struktur", [
-      { label: "Beban mati dan hidup", value: "beban mati dan beban hidup sesuai SNI 1727:2020" },
-      { label: "Ketahanan gempa", value: "parameter ketahanan gempa sesuai SNI 1726:2019" },
-      { label: "Kinerja seismik gedung eksisting", value: "kinerja seismik gedung eksisting sesuai SNI 9273:2025" },
-      { label: "Mutu beton dan tulangan", value: "mutu beton dan detail penulangan sesuai SNI 2847:2019" },
-      { label: "Profil dan sambungan baja", value: "profil dan sambungan baja sesuai SNI 1729:2020" },
-    ]],
-    ["Proteksi kebakaran", [
-      { label: "Jalur evakuasi", value: "lebar bersih dan jarak tempuh jalur evakuasi sesuai SNI 03-1746-2000" },
-      { label: "Ketahanan api dan kompartemen", value: "ketahanan api dan kompartemen sesuai SNI 03-1736-2000" },
-      { label: "Debit dan tekanan pipa tegak", value: "debit dan tekanan pada sistem pipa tegak sesuai SNI 03-1745-2000" },
-      { label: "Detektor dan alarm", value: "penempatan dan fungsi detektor serta alarm sesuai SNI 03-3985-2000" },
-      { label: "Jenis dan lokasi APAR", value: "jenis dan penempatan APAR sesuai SNI 03-3987-1995" },
-    ]],
-    ["Instalasi listrik", [
-      { label: "Beban dan kapasitas listrik", value: "beban dan kapasitas instalasi sesuai SNI 0225-2:2020" },
-      { label: "Proteksi kejut listrik", value: "proteksi terhadap kejut listrik sesuai SNI 0225-4-41:2025" },
-      { label: "Ukuran dan pemasangan penghantar", value: "ukuran penghantar dan metode pemasangan sesuai SNI 0225-5-52:2020" },
-      { label: "Gawai proteksi dan sakelar", value: "pemilihan gawai proteksi dan penyakelaran sesuai SNI 0225-5-53:2020" },
-      { label: "Kontinuitas dan isolasi", value: "kontinuitas penghantar proteksi dan resistans isolasi sesuai SNI 0225-6:2020" },
-    ]],
-    ["Proteksi petir", [
-      { label: "Risiko dan tingkat proteksi", value: "tingkat proteksi petir berdasarkan hasil penilaian risiko sesuai SNI IEC 62305-2:2009" },
-      { label: "Cakupan proteksi petir", value: "cakupan proteksi terhadap sambaran langsung mengacu pada prinsip SNI IEC 62305-1:2013" },
-      { label: "Penerima dan penghantar turun", value: "kondisi penerima dan penghantar turun di tempat kerja sesuai Pasal 52 Permenaker PER.02/MEN/1989" },
-      { label: "Tahanan pembumian", value: "hasil ukur tahanan pembumian penyalur petir di tempat kerja sesuai Pasal 52 Permenaker PER.02/MEN/1989" },
+    ["Pilih rujukan", [
+      "sesuai dengan standar teknis struktur",
+      "sesuai dengan standar teknis proteksi kebakaran",
+      "sesuai dengan standar teknis elektrikal",
+      "sesuai dengan standar teknis proteksi petir",
     ]],
   ]],
 ]);
