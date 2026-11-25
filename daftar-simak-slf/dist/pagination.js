@@ -12,7 +12,7 @@ const reportPrintStyle = `
   .report-print .report-cover h1 { font-size: 27pt; margin: 14px 0; text-transform: uppercase; }
   .report-print .paper-kicker { font-size: 11pt; font-weight: 700; }
   .report-print .cover-building { font-size: 17pt; font-weight: 700; }
-  .report-print .cover-photo { width: min(100%, 500px); max-height: 80mm; margin: 12px auto; }
+  .report-print .cover-photo { width: auto; height: auto; max-width: min(100%, 126mm); max-height: 76mm; margin: 12px auto; }
   .report-print > .report-section { break-before: page; }
   .report-print h2 { font-size: 18pt; margin: 0 0 15px; break-after: avoid; }
   .report-print h3 { margin: 11px 0 6px; break-after: avoid; }
@@ -43,6 +43,12 @@ const reportPrintStyle = `
   .report-print figure { margin: 12px 0; }
   .report-print img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; margin: 4px 0; }
   .report-print .caption, .report-print figcaption { font-size: 10pt; font-weight: 650; break-after: avoid; }
+  .report-print .report-photo-row { display: flex; justify-content: center; align-items: flex-start; gap: 6mm; margin: 3mm 0; break-inside: avoid; }
+  .report-print .report-photo-row > .report-photo { flex: 0 1 calc((100% - 6mm) / 2); min-width: 0; margin: 0; }
+  .report-print .report-photo-row > .report-photo:only-child { flex-basis: 126mm; max-width: 100%; }
+  .report-print .report-photo img { width: auto; height: auto; max-height: 62mm; margin: 0 auto 2mm; }
+  .report-print .report-photo:only-child img { max-height: 76mm; }
+  .report-print [data-report-figure] > figcaption { text-align: center !important; break-after: auto; }
   .report-print .result-values { margin: 3px 0 6px; }
   .report-print .result-values dt { font-weight: 650; }
   .report-print .result-values dd { margin-left: 0; margin-bottom: 3px; }

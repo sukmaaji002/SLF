@@ -141,7 +141,7 @@ async function renderChecklist(target, project, urls, checklist, summaryAnchors,
   }
   await renderSimakForm(target, { identity, checks: checklist.checks }, {
     tegal: project.intensity?.region === "tegal",
-    anchors: primary, summaryAnchors, photoUrls: urls, items,
+    anchors: primary, summaryAnchors, photoUrls: urls, items, figurePrefix: target.id,
     loadPhoto: items === trialChecklistItems ? undefined : (key) => checklistPhoto(project.id, key),
   });
 }
@@ -184,15 +184,20 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   const contents = reportSection("Daftar isi", "report-contents");
   const sections = [];
   const tableEntries = [];
-  const figureEntries = [];
   const checklistTargets = [];
-  function appendPhoto(section, photo, id) {
-    if (!imageSource.test(photo.image || "")) return;
-    const prefix = "Gambar " + (figureEntries.length + 1) + " · ";
-    const title = photo.text?.trim() ? photo.text : "Dokumentasi";
-    figureEntries.push([id, prefix + title]);
-    section.append(dom("figure", { id }, dom("img", { src: photo.image, alt: photo.text || "Dokumentasi kajian" }),
-      reportFormatted(dom("figcaption"), title, getTextFormat(photo, "text"), prefix)));
+  function appendPhotos(section, entries) {
+    const photos = entries.filter(([photo]) => imageSource.test(photo.image || ""));
+    for (let index = 0; index < photos.length; index += 2) {
+      const row = photos.slice(index, index + 2);
+      section.append(dom("div", { className: "report-photo-row" }, ...row.map(([photo, id]) => {
+        const title = photo.text?.trim() || "Dokumentasi";
+        const figure = dom("figure", { id, className: "report-photo" },
+          dom("img", { src: photo.image, alt: title }),
+          reportFormatted(dom("figcaption"), title, getTextFormat(photo, "text")));
+        figure.dataset.reportFigure = "";
+        return figure;
+      })));
+    }
   }
   const summaryAnchors = new Map();
   const summaries = new Map();
@@ -221,9 +226,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     if (intensity.data.diagram) {
       const figure = siteDiagram();
       figure.id = "report-site-diagram";
-      const caption = "Gambar " + (figureEntries.length + 1) + " · " + figure.lastElementChild.textContent;
-      figure.lastElementChild.textContent = caption;
-      figureEntries.push([figure.id, caption]);
+      figure.dataset.reportFigure = "";
       section.append(figure);
     }
   }
@@ -256,16 +259,24 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   for (const [index, chapter] of project.chapters.entries()) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
     if (getTextFormat(chapter, "title")) reportFormatted(section.firstElementChild, chapter.title, getTextFormat(chapter, "title"), "Bab " + roman(index + 1) + " · ");
-    for (const [i, photo] of (chapter.photos ?? []).entries()) appendPhoto(section, photo, section.id + "-photo-" + i);
+    section.dataset.chapterNumber = String(index + 1);
+    appendPhotos(section, (chapter.photos ?? []).map((photo, i) => [photo, section.id + "-photo-" + i]));
     const headings = headingEntries(chapter, index);
     appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
+    const pendingPhotos = [];
     for (const [bi, block] of chapter.blocks.entries()) {
       const id = section.id + "-block-" + bi;
+      if (block.type === "photo") {
+        if (block.image) pendingPhotos.push([block, id]);
+        pendingPhotos.push(...(block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
+        continue;
+      }
+      if (pendingPhotos.length) appendPhotos(section, pendingPhotos.splice(0));
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
-        for (const [i, photo] of (block.photos ?? []).entries()) appendPhoto(section, photo, id + "-photo-" + i);
+        appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
       }
@@ -285,11 +296,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
       }
-      if (block.type === "photo") {
-        if (block.image) appendPhoto(section, block, id);
-        for (const [i, photo] of (block.photos ?? []).entries()) appendPhoto(section, photo, id + "-photo-" + i);
-      }
     }
+    if (pendingPhotos.length) appendPhotos(section, pendingPhotos);
     if (chapter.checklist) checklistTargets.push(section);
     attach(section);
   }
@@ -304,6 +312,16 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     checklistTargets.push(section);
     attach(section);
   }
+  await Promise.all(checklistTargets.map((section, index) => renderChecklist(section, project, urls, checklist, summaryAnchors, index === 0, items)));
+  const figureEntries = sections.flatMap((section) => {
+    const prefix = section.dataset.chapterNumber ? section.dataset.chapterNumber + "." :
+      section.id === "report-checklist" ? "Lampiran " : "Ringkasan ";
+    return [...section.querySelectorAll("[data-report-figure]")].map((figure, index) => {
+      const caption = figure.lastElementChild;
+      caption.prepend("Gambar " + prefix + (index + 1) + " ");
+      return [figure.id, caption.textContent];
+    });
+  });
   for (const [entries, label, id] of [[tableEntries, "Daftar tabel", "report-tables"], [figureEntries, "Daftar gambar", "report-figures"]]) {
     if (!entries.length) continue;
     const list = reportSection(label, id);
@@ -322,6 +340,5 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     return entry;
   }));
   contents.firstElementChild.after(toc);
-  await Promise.all(checklistTargets.map((section, index) => renderChecklist(section, project, urls, checklist, summaryAnchors, index === 0, items)));
   await Promise.all(Array.from(target.querySelectorAll("img"), (image) => image.decode().catch(() => {})));
 }

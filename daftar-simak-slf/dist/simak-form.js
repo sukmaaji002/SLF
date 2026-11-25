@@ -22,8 +22,9 @@ const simakFormStyle = `
   .simak-form .simak-box.checked { background: #111; box-shadow: inset 0 0 0 1pt #fff; }
   .simak-form .simak-state { font-style: italic; margin-bottom: 2pt; }
   .simak-form .simak-extra { margin-top: 2pt; }
-  .simak-form .simak-photo { font-size: 7.5pt; margin: 2pt 0; }
-  .simak-form .simak-photo img { display: block; max-width: 100%; max-height: 85pt; margin: 2pt 0; object-fit: contain; }
+  .simak-form .simak-photo { margin: 3pt auto; text-align: center; break-inside: avoid; }
+  .simak-form .simak-photo figcaption { font-size: 7.5pt; line-height: 1.25; break-after: auto; }
+  .simak-form .simak-photo img { display: block; width: auto; height: auto; max-width: 100%; max-height: 85pt; margin: 0 auto 2pt; object-fit: contain; }
   .simak-form .simak-jump { margin-left: 5pt; color: #1d4a40; font-size: 8pt; }
   .simak-form .simak-band, .simak-form .simak-group, .simak-form .simak-item-title { scroll-margin-top: 65px; }
 `;
@@ -163,7 +164,7 @@ async function renderSimakForm(target, checklist, settings = {}) {
   let group;
   const photos = [];
   function photo(row, key, item) {
-    const figure = dom("div", { className: "simak-photo" }, row[key]);
+    const figure = dom("figure", { className: "simak-photo" }, dom("figcaption", {}, row[key]));
     if (!settings.loadPhoto) return figure;
     photos.push(settings.loadPhoto(item.id + ":" + row.key + ":" + key).then(async (file) => {
       if (!file) return;
@@ -171,7 +172,11 @@ async function renderSimakForm(target, checklist, settings = {}) {
       settings.photoUrls?.push(url);
       const image = dom("img", { src: url, alt: checklistLabels[key] + " · " + item.title });
       await image.decode();
-      figure.append(image);
+      figure.prepend(image);
+      if (settings.figurePrefix) {
+        figure.id = [settings.figurePrefix, "photo", item.id, row.key, key].join("-");
+        figure.dataset.reportFigure = "";
+      }
     }).catch(() => {}));
     return figure;
   }
