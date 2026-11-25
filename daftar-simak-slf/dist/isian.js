@@ -15,7 +15,7 @@ const repeatedNarrativeFields = new Map([
     { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
   [parameterReferenceToken,
     { key: "parameters", choiceKey: "parameterChoices", groupKey: "parameterGroups", legend: "Parameter keselamatan",
-      item: "Parameter tambahan", groupName: "kelompok parameter", addGroupLabel: "Tambah kelompok parameter" }],
+      item: "Parameter tambahan", groupName: "kelompok parameter", addGroupLabel: "Tambah kelompok parameter", compactGroups: true }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],

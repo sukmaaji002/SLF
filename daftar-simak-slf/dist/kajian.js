@@ -143,12 +143,17 @@ function narrativeChoiceParts(value, choiceKeys) {
   });
 }
 
-function narrativeChoiceCheckboxes(legend, choices, changed) {
-  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
-  const controls = choices.map((choice) => {
+const narrativeChoiceValue = (option) => option.value ?? option;
+
+function narrativeChoiceCheckboxes(legend, choices, changed, compact = false) {
+  const fieldset = compact ?
+    dom("fieldset", { className: "compact-narrative-choices", ariaLabel: legend }) :
+    dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
+  const controls = choices.map((option) => {
+    const choice = narrativeChoiceValue(option);
     const control = dom("input", { type: "checkbox" });
     control.addEventListener("change", () => changed(choice, control.checked));
-    fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
+    fieldset.append(dom("label", { className: "scope-choice" }, control, option.label ?? choice));
     return [tokenName(choice), control];
   });
   const sync = (values) => {
@@ -233,7 +238,7 @@ function narrativeEntryList(values, item, changed, minimumRows = 1) {
 }
 
 function repeatedNarrativeField(spec, data, changed, groups = []) {
-  const choices = groups.flatMap(([, options]) => options);
+  const choices = groups.flatMap(([, options]) => options.map(narrativeChoiceValue));
   const choiceKeys = new Set(choices.map(tokenName));
   const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
   let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
@@ -243,23 +248,39 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
   const fixedNames = new Set(groups.map(([name]) => name));
   const referenceGroups = (data[spec.groupKey] ?? []).map(({ name, fixed, entries }) =>
     ({ name, fixed: fixed && fixedNames.has(name), entries: [...entries] }));
-  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
+  const form = spec.compactGroups ? dom("div") :
+    dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
   for (const [legend, options] of groups) {
-    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
-      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
-      if (checked) selected.push(choice);
-      commit();
-    });
-    sync(selected);
+    const summary = spec.compactGroups ? dom("summary", {}, legend) : null;
+    let group;
     if (spec.groupKey) {
-      let group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
+      group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
       if (!group) {
         group = { name: legend, fixed: true, entries: [] };
         referenceGroups.push(group);
       }
-      fieldset.append(...narrativeEntryList(group.entries, spec.item, commit, 0));
     }
-    form.append(fieldset);
+    function updateSummary() {
+      if (!summary) return;
+      const chosen = new Set(selected.map(tokenName));
+      const count = options.filter((option) => chosen.has(tokenName(narrativeChoiceValue(option)))).length +
+        (group?.entries ?? []).filter((entry) => entry.trim()).length;
+      summary.textContent = count ? legend + " · " + count + " terisi" : legend;
+    }
+    function updateGroup() {
+      updateSummary();
+      commit();
+    }
+    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
+      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
+      if (checked) selected.push(choice);
+      updateGroup();
+    }, spec.compactGroups);
+    sync(selected);
+    if (group) fieldset.append(...narrativeEntryList(group.entries, spec.item, updateGroup, 0));
+    updateSummary();
+    form.append(summary ?
+      dom("details", { className: "scope-options compact-narrative-group" }, summary, fieldset) : fieldset);
   }
   if (spec.groupKey) {
     if (values.some((entry) => entry.trim())) {
@@ -418,10 +439,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const useManual = button("Isi sendiri", () => {
         select.value = "manual";
         select.dispatchEvent(new Event("change"));
-        focusTextField(manual.querySelector("input"));
+        focusManual();
       }, "quiet");
       const example = safetyParameters ? "lebar bersih jalur evakuasi berdasarkan SNI 03-1746-2000 dan denah evakuasi" : inputExample(token);
-      const hint = safetyParameters ? "Pilih parameter sesuai acuan yang digunakan. Untuk isian sendiri, catat parameter, nilai atau satuan jika diperlukan, dan rujukannya." :
+      const hint = safetyParameters ? "Buka kelompok untuk memilih atau menambah parameter." :
         (Object.hasOwn(inputHints, token) ? inputHints[token] : "");
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
@@ -448,6 +469,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
+      const focusManual = () => focusTextField(manual.querySelector(".compact-narrative-group > summary, input"));
       const choices = repeated || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
       const applyChoiceValue = (text) => {
         select.value = "manual";
@@ -527,7 +549,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
         entry.scrollIntoView({ block: "nearest" });
-        if (!manual.hidden) focusTextField(manual.querySelector("input"));
+        if (!manual.hidden) focusManual();
         else if (!useManual.hidden) useManual.focus();
         else source.querySelector("summary").focus();
       });
