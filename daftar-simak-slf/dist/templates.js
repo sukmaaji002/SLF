@@ -65,10 +65,16 @@ const comfortNarrative = previousComfortNarrative.replace(
   "Parameter yang diterapkan untuk [fungsi ruang] adalah",
   "Parameter pembanding untuk [fungsi ruang] ditetapkan",
 );
+const previousEaseNarrative = "Akses, sirkulasi, dan kelengkapan fasilitas dinilai dengan [acuan aksesibilitas atau dokumen teknis]. Ketentuan yang dibandingkan dengan kondisi lapangan meliputi [parameter jalur, fasilitas, atau peralatan yang berlaku].";
+const easeNarrative = previousEaseNarrative.replace(
+  "Ketentuan yang dibandingkan dengan kondisi lapangan meliputi",
+  "Parameter pembanding ditetapkan",
+);
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
   [previousComfortNarrative, comfortNarrative],
+  [previousEaseNarrative, easeNarrative],
 ]);
 
 const reportTemplates = {
@@ -113,7 +119,7 @@ const reportTemplates = {
           ["Keselamatan", {"body":safetyNarrative,"previous":"[Catat acuan struktur, kebakaran, listrik, dan penangkal petir yang berlaku pada objek.]"}],
           ["Kesehatan", {"body":healthNarrative,"previous":"[Catat acuan penghawaan, pencahayaan, air, dan sanitasi.]"}],
           ["Kenyamanan", {"body":comfortNarrative,"previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
-          ["Kemudahan", {"body":"Akses, sirkulasi, dan kelengkapan fasilitas dinilai dengan [acuan aksesibilitas atau dokumen teknis]. Ketentuan yang dibandingkan dengan kondisi lapangan meliputi [parameter jalur, fasilitas, atau peralatan yang berlaku].","previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
+          ["Kemudahan", {"body":easeNarrative,"previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
         ],
       ],
       [

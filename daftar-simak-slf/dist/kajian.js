@@ -425,6 +425,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const methods = {
       health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
       comfort: fields.has(comfortReferenceToken) || (methodHeading === "kenyamanan" && fields.has(parameterReferenceToken)),
+      ease: fields.has(easeParameterToken) || (methodHeading === "kemudahan" && fields.has(easeReferenceToken)),
     };
     for (const [token, name] of fields) {
       const links = getLinks();

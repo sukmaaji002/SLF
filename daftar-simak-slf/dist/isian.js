@@ -9,6 +9,8 @@ const healthParameterToken = "parameter, satuan, dan rujukan";
 const healthRoomToken = "ruang atau sistem";
 const comfortReferenceToken = "ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan";
 const comfortRoomToken = "fungsi ruang";
+const easeReferenceToken = "acuan aksesibilitas atau dokumen teknis";
+const easeParameterToken = "parameter jalur, fasilitas, atau peralatan yang berlaku";
 const sampleLocationToken = "area atau posisi sampel";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
@@ -22,6 +24,10 @@ const repeatedNarrativeFields = new Map([
       addGroupLabel: "Tambah acuan kenyamanan", method: "comfort" }],
   [comfortRoomToken, { key: "comfortRooms", choiceKey: "comfortRoomChoices", item: "Fungsi atau nama ruang tambahan",
     minimumRows: 0, method: "comfort" }],
+  [easeReferenceToken,
+    { key: "easeReferences", choiceKey: "easeReferenceChoices", groupKey: "easeReferenceGroups", item: "Acuan tambahan",
+      addGroupLabel: "Tambah acuan kemudahan", method: "ease" }],
+  [easeParameterToken, { key: "easeParameters", choiceKey: "easeParameterChoices", item: "Isian tambahan", minimumRows: 0, method: "ease" }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
   ["peraturan, standar teknis, dan dokumen rencana yang relevan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],

@@ -362,6 +362,35 @@ const inputChoiceGroups = new Map([
       "SNI IEC 62305-2:2009 – manajemen risiko petir",
     ]],
   ]],
+  [easeReferenceToken, [
+    ["Aksesibilitas umum", [
+      "PP Nomor 16 Tahun 2021 Pasal 46–47 – kemudahan dan aksesibilitas bangunan gedung",
+      "Permen PUPR 14/PRT/M/2017 – persyaratan kemudahan bangunan gedung",
+    ]],
+    ["Sirkulasi horizontal", [
+      "PP Nomor 16 Tahun 2021 Pasal 48 – pintu, koridor, jalur pedestrian, dan jalur pemandu",
+    ]],
+    ["Sirkulasi vertikal", [
+      "PP Nomor 16 Tahun 2021 Pasal 49 – tangga, ram, dan lift",
+      "SNI 03-6573-2001 – perancangan sistem lift gedung",
+      "SNI EN 81-20:2020 – konstruksi dan pemasangan lift penumpang dan barang",
+    ]],
+    ["Prasarana dan sarana", [
+      "PP Nomor 16 Tahun 2021 Pasal 50 – toilet, parkir, fasilitas informasi, rambu, dan marka",
+    ]],
+    ["Dokumen proyek", [
+      "gambar jalur akses",
+      "gambar rencana sarana bangunan",
+    ]],
+  ]],
+  [easeParameterToken, [
+    ["Pilih rujukan", [
+      "sesuai dengan standar teknis aksesibilitas",
+      "sesuai dengan standar teknis sirkulasi horizontal",
+      "sesuai dengan standar teknis sirkulasi vertikal",
+      "sesuai dengan standar teknis kelengkapan prasarana dan sarana",
+    ]],
+  ]],
   [comfortReferenceToken, [
     ["Ruang gerak", [
       "PP Nomor 16 Tahun 2021 Pasal 42 – luasan ruang gerak dan hubungan antarruang",
