@@ -332,7 +332,7 @@ const inputChoices = {
 };
 
 const inputChoiceGroups = new Map([
-  ["standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan", [
+  [safetyReferenceToken, [
     ["Struktur", [
       "SNI 1726:2019 – ketahanan gempa",
       "SNI 9273:2025 – evaluasi dan rehabilitasi seismik gedung eksisting",
@@ -360,6 +360,35 @@ const inputChoiceGroups = new Map([
       "Permenaker PER.02/MEN/1989 sebagaimana diubah dengan Permenaker Nomor 31 Tahun 2015 – pengawasan instalasi penyalur petir di tempat kerja",
       "SNI IEC 62305-1:2013 – prinsip umum proteksi petir",
       "SNI IEC 62305-2:2009 – manajemen risiko petir",
+    ]],
+  ]],
+  [parameterReferenceToken, [
+    ["Struktur", [
+      "beban mati dan beban hidup sesuai SNI 1727:2020",
+      "parameter ketahanan gempa sesuai SNI 1726:2019",
+      "kinerja seismik gedung eksisting sesuai SNI 9273:2025",
+      "mutu beton dan detail penulangan sesuai SNI 2847:2019",
+      "profil dan sambungan baja sesuai SNI 1729:2020",
+    ]],
+    ["Proteksi kebakaran", [
+      "lebar bersih dan jarak tempuh jalur evakuasi sesuai SNI 03-1746-2000",
+      "ketahanan api dan kompartemen sesuai SNI 03-1736-2000",
+      "debit dan tekanan pada sistem pipa tegak sesuai SNI 03-1745-2000",
+      "penempatan dan fungsi detektor serta alarm sesuai SNI 03-3985-2000",
+      "jenis dan penempatan APAR sesuai SNI 03-3987-1995",
+    ]],
+    ["Instalasi listrik", [
+      "beban dan kapasitas instalasi sesuai SNI 0225-2:2020",
+      "proteksi terhadap kejut listrik sesuai SNI 0225-4-41:2025",
+      "ukuran penghantar dan metode pemasangan sesuai SNI 0225-5-52:2020",
+      "pemilihan gawai proteksi dan penyakelaran sesuai SNI 0225-5-53:2020",
+      "kontinuitas penghantar proteksi dan resistans isolasi sesuai SNI 0225-6:2020",
+    ]],
+    ["Proteksi petir", [
+      "tingkat proteksi petir berdasarkan hasil penilaian risiko sesuai SNI IEC 62305-2:2009",
+      "cakupan proteksi terhadap sambaran langsung mengacu pada prinsip SNI IEC 62305-1:2013",
+      "kondisi penerima dan penghantar turun di tempat kerja sesuai Pasal 52 Permenaker PER.02/MEN/1989",
+      "hasil ukur tahanan pembumian penyalur petir di tempat kerja sesuai Pasal 52 Permenaker PER.02/MEN/1989",
     ]],
   ]],
 ]);

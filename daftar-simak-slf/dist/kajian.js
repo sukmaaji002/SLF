@@ -263,11 +263,12 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
   }
   if (spec.groupKey) {
     if (values.some((entry) => entry.trim())) {
-      form.append(dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Acuan tambahan sebelumnya"),
+      form.append(dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.item + " sebelumnya"),
         ...narrativeEntryList(values, spec.item, commit, 0)));
     }
+    const groupName = spec.groupName ?? "jenis acuan";
     const customGroups = dom("div");
-    const addGroup = button("Tambah acuan keselamatan", () => {
+    const addGroup = button(spec.addGroupLabel ?? "Tambah acuan keselamatan", () => {
       const group = { name: "", fixed: false, entries: [""] };
       referenceGroups.push(group);
       appendGroup(group).focus();
@@ -277,14 +278,14 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
     form.append(customGroups, addGroup);
 
     function appendGroup(group) {
-      const name = field("Nama jenis acuan", group.name, (text) => {
+      const name = field("Nama " + groupName, group.name, (text) => {
         group.name = text;
         commit();
       });
       const fieldset = dom("fieldset", { className: "scope-options" },
-        dom("legend", {}, "Jenis acuan tambahan"), name,
+        dom("legend", {}, spec.groupName ? "Kelompok parameter tambahan" : "Jenis acuan tambahan"), name,
         ...narrativeEntryList(group.entries, spec.item, commit));
-      fieldset.append(button("Hapus jenis acuan", () => {
+      fieldset.append(button("Hapus " + groupName, () => {
         referenceGroups.splice(referenceGroups.indexOf(group), 1);
         fieldset.remove();
         addGroup.focus();
@@ -390,7 +391,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
-      const repeated = repeatedNarrativeFields.get(token);
+      const safetyParameters = token === parameterReferenceToken &&
+        (fields.has(safetyReferenceToken) || (key === "body" && tokenName(data.text ?? "") === "keselamatan"));
+      const repeated = token === parameterReferenceToken && !safetyParameters ? undefined : repeatedNarrativeFields.get(token);
       const sampleLocation = token === "area atau posisi sampel";
       const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: "[" + name + "]" });
@@ -417,8 +420,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         select.dispatchEvent(new Event("change"));
         focusTextField(manual.querySelector("input"));
       }, "quiet");
-      const example = inputExample(token);
-      const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
+      const example = safetyParameters ? "lebar bersih jalur evakuasi berdasarkan SNI 03-1746-2000 dan denah evakuasi" : inputExample(token);
+      const hint = safetyParameters ? "Pilih parameter sesuai acuan yang digunakan. Untuk isian sendiri, catat parameter, nilai atau satuan jika diperlukan, dan rujukannya." :
+        (Object.hasOwn(inputHints, token) ? inputHints[token] : "");
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];

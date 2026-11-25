@@ -2,6 +2,8 @@
 
 const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
+const safetyReferenceToken = "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan";
+const parameterReferenceToken = "parameter dan rujukan";
 const repeatedNarrativeFields = new Map([
   ["area atau posisi sampel", { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
@@ -9,8 +11,11 @@ const repeatedNarrativeFields = new Map([
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],
   ["ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan tata bangunan", item: "Acuan tambahan" }],
-  ["standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan",
+  [safetyReferenceToken,
     { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
+  [parameterReferenceToken,
+    { key: "parameters", choiceKey: "parameterChoices", groupKey: "parameterGroups", legend: "Parameter keselamatan",
+      item: "Parameter tambahan", groupName: "kelompok parameter", addGroupLabel: "Tambah kelompok parameter" }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
