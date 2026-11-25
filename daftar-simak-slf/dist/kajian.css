@@ -214,3 +214,6 @@ dialog::backdrop { background: #132b27ab; }
 .upload-locked:disabled { opacity: 1; color: var(--muted); background: var(--panel, #f6f8fa); }
 
 .editor .block[id] { scroll-margin-top: 64px; }
+
+.sample-location-list { display: grid; gap: 8px; margin-bottom: 8px; }
+.sample-location-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; }

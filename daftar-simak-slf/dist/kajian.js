@@ -190,6 +190,47 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
+function sampleLocationField(data, changed) {
+  const values = data.locations?.length ? [...data.locations] : [data.value];
+  const list = dom("div", { className: "sample-location-list" });
+  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Lokasi pemeriksaan"), list,
+    button("Tambah isian", () => {
+      values.push("");
+      renderRows();
+      commit();
+      list.lastElementChild.querySelector("input").focus();
+    }));
+  function commit() {
+    const value = scopeList.format(values.map((location) => location.trim()).filter(Boolean));
+    updateTextFormat(data, "value", data.value, value);
+    data.locations = [...values];
+    data.value = value;
+    changed();
+  }
+  function renderRows() {
+    list.replaceChildren(...values.map((value, index) => {
+      const input = field("Ruang atau gedung " + (index + 1), value, (text) => {
+        values[index] = text;
+        commit();
+      });
+      const row = dom("div", { className: "sample-location-row" }, input);
+      if (values.length > 1) {
+        const remove = button("Hapus", () => {
+          values.splice(index, 1);
+          renderRows();
+          commit();
+          list.children[Math.min(index, values.length - 1)].querySelector("input").focus();
+        }, "quiet");
+        remove.setAttribute("aria-label", "Hapus ruang atau gedung " + (index + 1));
+        row.append(remove);
+      }
+      return row;
+    }));
+  }
+  renderRows();
+  return form;
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
   const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
@@ -271,31 +312,35 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
+      const sampleLocation = token === "area atau posisi sampel";
       const select = dom("select", { ariaLabel: "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
         "Otomatis · Nama dan alamat bangunan";
-      if (auto || combined) select.append(new Option(autoLabel, ""));
+      if (auto || combined) select.append(new Option(autoLabel, sampleLocation ? auto : ""));
       const directorId = "project:consultant-director";
       if (token === "nama penanggung jawab") select.append(new Option("Direktur Badan Usaha Pengkaji", directorId));
       select.append(new Option("Isi manual", "manual"));
       const ownSource = narrativeReference(data.sourceId ?? key, token);
       for (const [group, entries] of groups) {
-        const available = entries.filter(([id]) => id !== ownSource && (token !== "nama penanggung jawab" || id !== directorId));
+        const available = entries.filter(([id]) => id !== ownSource &&
+          (!sampleLocation || id !== auto) && (token !== "nama penanggung jawab" || id !== directorId));
         if (available.length) select.append(dom("optgroup", { label: group }, ...available.map(([id, label]) => new Option(label, id))));
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
-      select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : "");
+      const defaultSource = sampleLocation ? (automaticValue(token, sources) ? auto : "manual") : "";
+      select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : defaultSource);
       const value = dom("p", { className: "narrative-source-value" });
       const badge = dom("span", { className: "narrative-state" });
       const useManual = button("Isi sendiri", () => {
         select.value = "manual";
         select.dispatchEvent(new Event("change"));
-        focusTextField(manualInput);
+        focusTextField(manual.querySelector("input"));
       }, "quiet");
       const example = inputExample(token);
       const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
       const manualData = { value: saved?.value ?? "", _format: saved?._format };
+      if (sampleLocation && Array.isArray(saved?.locations)) manualData.locations = saved.locations;
       const saveManual = () => {
         setLinks({ ...getLinks(), [token]: manualData });
         if (sources.has(ownSource)) {
@@ -310,10 +355,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const manual = field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
+      const manual = sampleLocation ? sampleLocationField(manualData, saveManual) :
+        field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
-      const choices = token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
+      const choices = sampleLocation || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -359,7 +405,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
-        useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend);
+        useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend && !sampleLocation);
         if (openDate) openDate.hidden = self || (select.value || auto) !== "identity:date";
         if (choiceField) choiceField.hidden = !self && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
@@ -391,7 +437,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
         entry.scrollIntoView({ block: "nearest" });
-        if (!manual.hidden) focusTextField(manualInput);
+        if (!manual.hidden) focusTextField(manual.querySelector("input"));
         else if (!useManual.hidden) useManual.focus();
         else source.querySelector("summary").focus();
       });

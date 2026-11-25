@@ -341,7 +341,16 @@ function importLinks(links) {
   const pairs = [];
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
-    if (typeof link.value === "string") pairs.push([tokenName(token), importTextFormats({ value: link.value }, link, ["value"])]);
+    if (typeof link.value === "string") {
+      const key = tokenName(token);
+      const data = importTextFormats({ value: link.value }, link, ["value"]);
+      if (key === "area atau posisi sampel" && Array.isArray(link.locations) &&
+        link.locations.every((location) => typeof location === "string") &&
+        scopeList.format(link.locations.map((location) => location.trim()).filter(Boolean)) === link.value) {
+        data.locations = [...link.locations];
+      }
+      pairs.push([key, data]);
+    }
     else if (validReportSource(link.source)) {
       pairs.push([tokenName(token), { source: link.source }]);
     }
