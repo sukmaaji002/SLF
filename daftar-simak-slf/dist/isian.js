@@ -2,6 +2,10 @@
 
 const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
+const repeatedNarrativeFields = new Map([
+  ["area atau posisi sampel", { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
+  ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
+]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
   "luas persil": ["project:land-area"],
@@ -344,10 +348,11 @@ function importLinks(links) {
     if (typeof link.value === "string") {
       const key = tokenName(token);
       const data = importTextFormats({ value: link.value }, link, ["value"]);
-      if (key === "area atau posisi sampel" && Array.isArray(link.locations) &&
-        link.locations.every((location) => typeof location === "string") &&
-        scopeList.format(link.locations.map((location) => location.trim()).filter(Boolean)) === link.value) {
-        data.locations = [...link.locations];
+      const field = repeatedNarrativeFields.get(key);
+      const entries = field && link[field.key];
+      if (Array.isArray(entries) && entries.every((entry) => typeof entry === "string") &&
+        scopeList.format(entries.map((entry) => entry.trim()).filter(Boolean)) === link.value) {
+        data[field.key] = [...entries];
       }
       pairs.push([key, data]);
     }

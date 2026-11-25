@@ -215,5 +215,5 @@ dialog::backdrop { background: #132b27ab; }
 
 .editor .block[id] { scroll-margin-top: 64px; }
 
-.sample-location-list { display: grid; gap: 8px; margin-bottom: 8px; }
-.sample-location-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; }
+.repeated-narrative-list { display: grid; gap: 8px; margin-bottom: 8px; }
+.repeated-narrative-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; }

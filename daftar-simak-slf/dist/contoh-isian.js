@@ -265,7 +265,7 @@ const inputHints = {
   "daftar dokumen": "Diambil dari tabel Rekap Pemeriksaan Dokumen. Untuk baris bawaan, isi nomor/tanggal, keterangan, atau status seperti Tersedia atau Telah ditelaah.",
   "tanggal pemeriksaan": "Mengikuti Tanggal pemeriksaan di identitas daftar simak. Pilih Isi manual jika tanggal observasi berbeda.",
   "area atau posisi sampel": "Isi satu ruang, gedung, atau titik pemeriksaan per kolom. Pakai Tambah isian jika lokasinya lebih dari satu.",
-  "daftar alat pemeriksaan": "Nama alat diambil dari kolom Alat pada tabel di bab ini.",
+  "daftar alat pemeriksaan": "Isi satu nama alat per kolom. Pakai Tambah isian jika alatnya lebih dari satu.",
   "daftar bahan dan dokumen": "Isian dapat mengikuti sumber data yang dicatat di Lingkup Materi Pelaporan pada Bab I.",
   "peraturan, standar teknis, dan dokumen rencana yang relevan": "Pilih jenis acuan, lalu lengkapi judul, nomor, tahun atau edisi, dan bagian yang benar-benar dipakai.",
   "disiplin atau sistem yang diperiksa": "Pilih bidang atau sistem yang benar-benar masuk lingkup pemeriksaan proyek ini.",

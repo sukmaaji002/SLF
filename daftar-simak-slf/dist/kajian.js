@@ -190,10 +190,10 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function sampleLocationField(data, changed) {
-  const values = data.locations?.length ? [...data.locations] : [data.value];
-  const list = dom("div", { className: "sample-location-list" });
-  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Lokasi pemeriksaan"), list,
+function repeatedNarrativeField(spec, data, changed) {
+  const values = data[spec.key]?.length ? [...data[spec.key]] : [data.value];
+  const list = dom("div", { className: "repeated-narrative-list" });
+  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend), list,
     button("Tambah isian", () => {
       values.push("");
       renderRows();
@@ -201,19 +201,20 @@ function sampleLocationField(data, changed) {
       list.lastElementChild.querySelector("input").focus();
     }));
   function commit() {
-    const value = scopeList.format(values.map((location) => location.trim()).filter(Boolean));
+    const value = scopeList.format(values.map((entry) => entry.trim()).filter(Boolean));
     updateTextFormat(data, "value", data.value, value);
-    data.locations = [...values];
+    data[spec.key] = [...values];
     data.value = value;
     changed();
   }
   function renderRows() {
     list.replaceChildren(...values.map((value, index) => {
-      const input = field("Ruang atau gedung " + (index + 1), value, (text) => {
+      const label = spec.item + " " + (index + 1);
+      const input = field(label, value, (text) => {
         values[index] = text;
         commit();
       });
-      const row = dom("div", { className: "sample-location-row" }, input);
+      const row = dom("div", { className: "repeated-narrative-row" }, input);
       if (values.length > 1) {
         const remove = button("Hapus", () => {
           values.splice(index, 1);
@@ -221,7 +222,7 @@ function sampleLocationField(data, changed) {
           commit();
           list.children[Math.min(index, values.length - 1)].querySelector("input").focus();
         }, "quiet");
-        remove.setAttribute("aria-label", "Hapus ruang atau gedung " + (index + 1));
+        remove.setAttribute("aria-label", "Hapus " + label.toLocaleLowerCase("id"));
         row.append(remove);
       }
       return row;
@@ -312,7 +313,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
+      const repeated = repeatedNarrativeFields.get(token);
       const sampleLocation = token === "area atau posisi sampel";
+      const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
@@ -329,7 +332,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
       const defaultSource = sampleLocation ? (automaticValue(token, sources) ? auto : "manual") : "";
-      select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : defaultSource);
+      select.value = manualOnly ? "manual" : saved?.source ?? (saved || (!auto && !combined) ? "manual" : defaultSource);
       const value = dom("p", { className: "narrative-source-value" });
       const badge = dom("span", { className: "narrative-state" });
       const useManual = button("Isi sendiri", () => {
@@ -339,8 +342,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       }, "quiet");
       const example = inputExample(token);
       const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
-      const manualData = { value: saved?.value ?? "", _format: saved?._format };
-      if (sampleLocation && Array.isArray(saved?.locations)) manualData.locations = saved.locations;
+      const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
+      const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
+      if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
       const saveManual = () => {
         setLinks({ ...getLinks(), [token]: manualData });
         if (sources.has(ownSource)) {
@@ -355,11 +359,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const manual = sampleLocation ? sampleLocationField(manualData, saveManual) :
+      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual) :
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
-      const choices = sampleLocation || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
+      const choices = repeated || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -432,7 +436,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (openDate) entry.append(openDate);
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
-      entry.append(manual, value, useManual, source);
+      entry.append(manual);
+      if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
