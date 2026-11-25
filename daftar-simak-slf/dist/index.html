@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Susun laporan kajian Sertifikat Laik Fungsi, lengkapi daftar simak, dan cetak laporan.">
-  <meta name="theme-color" content="#f3f5f8">
+  <meta name="theme-color" content="#f6f8f4">
   <title>Ruang Kajian SLF</title>
   <link rel="stylesheet" href="kajian.css?v=3">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
-  <link rel="stylesheet" href="akun.css?v=2">
+  <link rel="stylesheet" href="akun.css?v=3">
   <link rel="stylesheet" href="ponsel.css?v=2">
+  <link rel="stylesheet" href="beranda.css">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js?v=2" defer></script>
@@ -18,7 +19,7 @@
   <script src="simak-form.js" defer></script>
   <script src="intensitas.js" defer></script>
   <script src="skema-tapak.js" defer></script>
-  <script src="laporan.js" defer></script>
+  <script src="laporan.js?v=2" defer></script>
   <script src="isian.js?v=3" defer></script>
   <script src="contoh-isian.js" defer></script>
   <script src="vendor/paged-0.4.3.min.js" defer></script>
@@ -26,66 +27,161 @@
   <script src="vendor/supabase-2.119.2.min.js" defer></script>
   <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
-  <script src="cloud-workspace.js?v=3" defer></script>
-  <script src="kajian.js?v=5" defer></script>
+  <script src="cloud-workspace.js?v=4" defer></script>
+  <script src="kajian.js?v=6" defer></script>
 </head>
 <body data-screen="kajian">
-  <header class="mast">
-    <div class="mast-inner">
-      <a class="app-brand" href="./index.html" aria-label="Ruang Kajian SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian</a>
-      <a class="standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
-      <div id="cloud-controls" class="cloud-controls" hidden>
-        <button id="cloud-login" type="button">Masuk / Daftar</button>
-        <span id="cloud-status" role="status" hidden></span>
-        <button id="cloud-copy" type="button" hidden>Simpan salinan perubahan</button>
-        <details id="cloud-account" class="cloud-account" hidden>
-          <summary><span id="cloud-avatar" class="cloud-avatar" aria-hidden="true"></span> Akun</summary>
-          <div class="cloud-account-panel">
-            <p id="cloud-email"></p>
-            <button id="cloud-logout" class="quiet" type="button">Keluar</button>
-          </div>
-        </details>
+  <div id="slf-public" class="landing">
+    <header class="landing-header" id="beranda">
+      <div class="landing-container landing-header-inner">
+        <a class="landing-brand" href="#beranda"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian SLF</a>
+        <nav class="landing-nav" aria-label="Navigasi publik">
+          <a href="#fitur">Fitur</a>
+          <a href="#pengumuman">Pengumuman</a>
+          <a href="#panduan">Panduan</a>
+        </nav>
+        <button id="landing-login" class="landing-button landing-button-outline" type="button" data-landing-auth="login" disabled>Masuk</button>
       </div>
-    </div>
-  </header>
-  <main>
-    <section class="overview" aria-labelledby="page-title">
-      <h1 id="page-title">Editor kajian</h1>
-      <div class="project-controls">
-        <label for="projects">Proyek</label>
-        <div class="button-row"><select id="projects"></select><button id="new-project" class="primary" type="button">Proyek baru</button></div>
-        <span id="save-status" role="status"></span>
-      </div>
-    </section>
-    <div class="workspace">
-      <aside class="sidebar">
-        <details id="section-navigation" open>
-          <summary class="section-nav-toggle"><span>Isi laporan</span><span id="mobile-section-name" class="mobile-section-name" aria-hidden="true"></span></summary>
-          <div class="side-head"><p id="template-label"></p></div>
-          <nav id="outline" aria-label="Isi laporan"></nav>
-          <div class="side-actions">
-            <button id="add-chapter" class="quiet" type="button">＋ Tambah bab</button>
-            <details class="backup-actions">
-              <summary>Cadangan proyek</summary>
-              <div>
-                <button id="backup" class="quiet" type="button">Unduh cadangan</button>
-                <button id="restore" class="quiet" type="button">Impor cadangan</button>
-                <input id="backup-file" type="file" accept=".json,application/json" hidden>
-              </div>
-            </details>
-            <a class="mobile-standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
+    </header>
+
+    <div role="main" aria-labelledby="landing-title">
+      <section class="landing-container landing-hero">
+        <div class="landing-intro">
+          <p class="landing-kicker">Sertifikat Laik Fungsi Bangunan Gedung</p>
+          <h1 id="landing-title">Susun kajian SLF<br class="landing-hero-break"> <em>lebih teratur.</em></h1>
+          <p class="landing-lead">Siapkan laporan kajian, lengkapi daftar simak dan dokumentasi, lalu tinjau semuanya dalam satu ruang kerja.</p>
+          <div class="landing-actions">
+            <button class="landing-button" type="button" data-landing-auth="signup" disabled>Buat akun</button>
+            <a class="landing-button landing-button-outline" href="#fitur">Jelajahi fitur</a>
           </div>
-        </details>
-      </aside>
-      <section class="surface" aria-labelledby="section-title">
-        <header class="surface-head">
-          <div><p id="section-type" class="eyebrow"></p><h2 id="section-title" tabindex="-1"></h2></div>
-          <div class="button-row"><button id="preview" type="button">Pratinjau</button><button id="print" class="primary" type="button">Cetak / PDF</button></div>
-        </header>
-        <div id="editor" class="editor"></div>
+          <p id="landing-auth-status" class="landing-auth-status" role="status"></p>
+          <details id="landing-local-drafts" class="landing-local-drafts" hidden>
+            <summary>Ambil draf lokal dari browser ini</summary>
+            <p>Unduh cadangan, lalu impor lewat menu Cadangan proyek setelah masuk.</p>
+            <label for="landing-local-project">Proyek lokal</label>
+            <select id="landing-local-project"></select>
+            <button id="landing-local-backup" class="landing-button landing-button-outline" type="button">Unduh cadangan</button>
+            <p id="landing-backup-status" role="status"></p>
+          </details>
+        </div>
+        <figure class="landing-photo">
+          <img src="gedung-slf.webp" alt="Ilustrasi gedung modern dengan fasad kaca dan sirip beton" width="1152" height="768" fetchpriority="high">
+          <figcaption>Dari pemeriksaan bangunan hingga laporan kajian.</figcaption>
+        </figure>
       </section>
+
+      <section id="fitur" class="landing-features" aria-labelledby="landing-features-title">
+        <div class="landing-container">
+          <div class="landing-section-heading">
+            <p class="landing-kicker">Fitur</p>
+            <h2 id="landing-features-title">Perlengkapan kajian Anda</h2>
+          </div>
+          <div class="landing-features-grid">
+            <article class="landing-feature">
+              <span class="landing-icon landing-icon-report" aria-hidden="true"></span>
+              <h3>Editor laporan</h3>
+              <p>Mulai dari templat kajian, susun bab dan dokumentasi, lalu pratinjau atau cetak laporan sebagai PDF.</p>
+            </article>
+            <article class="landing-feature">
+              <span class="landing-icon landing-icon-check" aria-hidden="true"></span>
+              <h3>Daftar simak</h3>
+              <p>Catat hasil pemeriksaan, temuan, dan bukti foto per butir. Daftar simak mandiri juga bisa dibuka tanpa akun.</p>
+              <a href="./daftar-simak.html">Buka daftar simak mandiri</a>
+            </article>
+            <article class="landing-feature">
+              <span class="landing-icon landing-icon-draft" aria-hidden="true"></span>
+              <h3>Draf tersinkron</h3>
+              <p>Simpan draf dan foto di akun Anda agar pekerjaan bisa dilanjutkan dari perangkat lain.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div class="landing-container landing-information">
+        <section id="pengumuman" aria-labelledby="landing-news-title">
+          <p class="landing-kicker">Pengumuman</p>
+          <h2 id="landing-news-title">Kabar Ruang Kajian</h2>
+          <article class="landing-news">
+            <h3>Beranda publik kini tersedia</h3>
+            <p>Informasi produk dan panduan dapat dibaca sebelum masuk. Editor kajian tersedia di ruang kerja setelah Anda masuk.</p>
+          </article>
+        </section>
+        <section id="panduan" aria-labelledby="landing-guide-title">
+          <p class="landing-kicker">Panduan</p>
+          <h2 id="landing-guide-title">Cara memulai</h2>
+          <ol class="landing-steps">
+            <li>Masuk atau buat akun Ruang Kajian SLF.</li>
+            <li>Buat proyek dan pilih templat laporan.</li>
+            <li>Lengkapi kajian dan daftar simak, lalu buka pratinjau sebelum mencetak laporan.</li>
+          </ol>
+        </section>
+      </div>
     </div>
-  </main>
+
+    <footer class="landing-footer">
+      <div class="landing-container landing-footer-inner">
+        <a class="landing-brand" href="#beranda"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian SLF</a>
+        <a href="#beranda">Kembali ke atas</a>
+      </div>
+    </footer>
+  </div>
+  <div id="slf-workspace" hidden>
+    <header class="mast">
+      <div class="mast-inner">
+        <a class="app-brand" href="./index.html" aria-label="Ruang Kajian SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian</a>
+        <a class="standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
+        <div id="cloud-controls" class="cloud-controls" hidden>
+          <span id="cloud-status" role="status" hidden></span>
+          <button id="cloud-copy" type="button" hidden>Simpan salinan perubahan</button>
+          <details id="cloud-account" class="cloud-account" hidden>
+            <summary><span id="cloud-avatar" class="cloud-avatar" aria-hidden="true"></span> Akun</summary>
+            <div class="cloud-account-panel">
+              <p id="cloud-email"></p>
+              <button id="cloud-logout" class="quiet" type="button">Keluar</button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+    <main>
+      <section class="overview" aria-labelledby="page-title">
+        <h1 id="page-title" tabindex="-1">Editor kajian</h1>
+        <div class="project-controls">
+          <label for="projects">Proyek</label>
+          <div class="button-row"><select id="projects"></select><button id="new-project" class="primary" type="button">Proyek baru</button></div>
+          <span id="save-status" role="status"></span>
+        </div>
+      </section>
+      <div class="workspace">
+        <aside class="sidebar">
+          <details id="section-navigation" open>
+            <summary class="section-nav-toggle"><span>Isi laporan</span><span id="mobile-section-name" class="mobile-section-name" aria-hidden="true"></span></summary>
+            <div class="side-head"><p id="template-label"></p></div>
+            <nav id="outline" aria-label="Isi laporan"></nav>
+            <div class="side-actions">
+              <button id="add-chapter" class="quiet" type="button">＋ Tambah bab</button>
+              <details class="backup-actions">
+                <summary>Cadangan proyek</summary>
+                <div>
+                  <button id="backup" class="quiet" type="button">Unduh cadangan</button>
+                  <button id="restore" class="quiet" type="button">Impor cadangan</button>
+                  <input id="backup-file" type="file" accept=".json,application/json" hidden>
+                </div>
+              </details>
+              <a class="mobile-standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
+            </div>
+          </details>
+        </aside>
+        <section class="surface" aria-labelledby="section-title">
+          <header class="surface-head">
+            <div><p id="section-type" class="eyebrow"></p><h2 id="section-title" tabindex="-1"></h2></div>
+            <div class="button-row"><button id="preview" type="button">Pratinjau</button><button id="print" class="primary" type="button">Cetak / PDF</button></div>
+          </header>
+          <div id="editor" class="editor"></div>
+        </section>
+      </div>
+    </main>
+  </div>
   <dialog id="cloud-dialog" aria-labelledby="cloud-dialog-title" aria-describedby="cloud-dialog-description">
     <div class="cloud-auth-layout">
       <div class="cloud-auth-intro">

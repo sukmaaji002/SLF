@@ -7,7 +7,7 @@
     min-width: 0;
   }
 
-  #cloud-login, #cloud-submit {
+  #cloud-submit {
     border: 1px solid #2254a2;
     background: #2254a2;
     color: #fff;
@@ -15,8 +15,7 @@
     font-weight: 650;
   }
 
-  #cloud-login:hover, #cloud-submit:hover { background: #173d79; }
-  #cloud-login { min-height: 38px; padding-inline: 15px; white-space: nowrap; }
+  #cloud-submit:hover { background: #173d79; }
 
   #cloud-status {
     max-width: 26ch;

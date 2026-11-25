@@ -1070,21 +1070,20 @@ function blobData(blob) {
   });
 }
 
-async function backup() {
-  const project = structuredClone(current());
-  const checklist = readChecklist(project.id);
-  const photos = {};
-  const control = $("backup");
+async function backup(project, owner, control, feedback) {
+  const copy = structuredClone(project);
   control.disabled = true;
   try {
+    const checklist = readChecklist(copy.id, owner);
+    const photos = {};
     for (const key of checklistPhotos(checklist)) {
-      const blob = await checklistPhoto(project.id, key);
+      const blob = await checklistPhoto(copy.id, key, undefined, owner);
       if (blob) photos[key] = await blobData(blob);
     }
-    download("kajian-slf-" + project.id.slice(0, 8) + ".json", JSON.stringify({ version: 1, project, checklist, photos }));
-    status.textContent = "Cadangan diunduh";
+    download("kajian-slf-" + copy.id.slice(0, 8) + ".json", JSON.stringify({ version: 1, project: copy, checklist, photos }));
+    feedback.textContent = "Cadangan diunduh";
   } catch {
-    status.textContent = "Cadangan gagal dibuat";
+    feedback.textContent = "Cadangan gagal dibuat";
   } finally {
     control.disabled = false;
   }
@@ -1215,10 +1214,18 @@ async function presentReport(print) {
   if (buttons.some((control) => control.disabled)) return;
   buttons.forEach((control) => { control.disabled = true; });
   status.textContent = "Menyiapkan laporan…";
+  const reportOwner = slfCloudOwner();
   try {
     const source = dom("article", { className: "report-print" });
     await buildReport(source, structuredClone(current()), reportUrls);
     disposePagination = await paginateReport(source, $("report"));
+    if ($("slf-workspace").hidden || slfCloudOwner() !== reportOwner) {
+      disposePagination?.();
+      disposePagination = undefined;
+      $("report").replaceChildren();
+      reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+      return;
+    }
     previewActualSize = false;
     $("preview-zoom").textContent = "Perbesar";
     dialog.showModal();
@@ -1241,9 +1248,19 @@ async function start() {
   } catch {
     status.textContent = "Penyimpanan browser tidak tersedia";
   }
-  if (!workspace?.projects?.length) {
-    const project = draft("Kajian baru", preset);
-    workspace = { projects: [project], current: project.id };
+  const localProjects = workspace?.projects ?? [];
+  if (localProjects.length) {
+    const select = $("landing-local-project");
+    select.replaceChildren(...localProjects.map(({ name, id }) => new Option(name, id)));
+    select.value = workspace.current;
+    const control = $("landing-local-backup");
+    control.addEventListener("click", () => {
+      const project = localProjects.find(({ id }) => id === select.value);
+      if (project) backup(project, "", control, $("landing-backup-status"));
+    });
+    $("landing-local-drafts").hidden = false;
+  } else {
+    workspace = slfLocalWorkspace();
   }
   for (const project of workspace.projects) upgradeReportDraft(project);
   const requested = new URLSearchParams(location.search).get("proyek");
@@ -1325,7 +1342,8 @@ async function start() {
     disposePagination = undefined;
     reportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   });
-  $("backup").addEventListener("click", backup);
+  const backupControl = $("backup");
+  backupControl.addEventListener("click", () => backup(current(), slfCloudOwner(), backupControl, status));
   $("restore").addEventListener("click", () => $("backup-file").click());
   $("backup-file").addEventListener("change", () => {
     if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
@@ -1338,7 +1356,6 @@ async function start() {
     refreshChecklistViews();
   });
   render();
-  await save(false);
   initSlfCloud();
 }
 

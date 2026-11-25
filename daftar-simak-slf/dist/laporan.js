@@ -27,9 +27,9 @@ async function storeValue(database, storeName, key, value) {
   });
 }
 
-function readChecklist(id) {
+function readChecklist(id, owner = slfCloudOwner()) {
   try {
-    return JSON.parse(localStorage.getItem(slfChecklistKey(id, slfCloudOwner()))) ?? { identity: {}, checks: {} };
+    return JSON.parse(localStorage.getItem(slfChecklistKey(id, owner))) ?? { identity: {}, checks: {} };
   } catch {
     return { identity: {}, checks: {} };
   }
@@ -66,9 +66,9 @@ function checklistPhotos(checklist) {
   return photos;
 }
 
-function checklistPhoto(id, key, blob) {
+function checklistPhoto(id, key, blob, owner = slfCloudOwner()) {
   photoDatabase ??= openStore("daftar-simak-slf", "photos");
-  return storeValue(photoDatabase, "photos", slfPhotoKey(id, key, slfCloudOwner()), blob);
+  return storeValue(photoDatabase, "photos", slfPhotoKey(id, key, owner), blob);
 }
 
 async function storeChecklistPhotos(id, files, owner) {

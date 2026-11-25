@@ -51,7 +51,6 @@ function slfUpdateAccountControls() {
   const signedIn = Boolean(slfAuthUser);
   const account = $("cloud-account");
   const email = slfAuthUser?.email ?? "";
-  $("cloud-login").hidden = signedIn;
   $("cloud-status").hidden = !signedIn;
   $("cloud-copy").hidden = !slfAccount || !workspace?.cloud?.[workspace.current]?.conflict;
   account.hidden = !signedIn;
@@ -202,10 +201,24 @@ async function slfTakeAccountLock(id) {
 
 async function slfChangeAccount(user) {
   if ((user?.id ?? "") === slfCloudOwner() && user?.id === slfAuthUser?.id) return;
+  const previousUser = slfAuthUser;
   slfAuthUser = user;
   clearTimeout(slfCloudTimer);
   const main = document.querySelector("main");
+  const publicPage = $("slf-public");
+  const workspacePage = $("slf-workspace");
+  const leaveWorkspace = previousUser?.id !== user?.id && !workspacePage.hidden;
   main.inert = true;
+  if (leaveWorkspace) {
+    for (const id of ["project-dialog", "chapter-dialog", "preview-dialog"]) {
+      const dialog = $(id);
+      if (dialog.open) dialog.close();
+    }
+    workspacePage.hidden = true;
+    publicPage.hidden = false;
+    window.scrollTo(0, 0);
+    if (!user) $("landing-login").focus({ preventScroll: true });
+  }
   try {
     if (slfAccount) {
       await save(false);
@@ -220,7 +233,7 @@ async function slfChangeAccount(user) {
       slfAccount = user;
       slfDraftStore = slfCreateDraftStore(slfCloud, user.id, checklistPhoto);
     }
-    const stored = await storeValue(database, "workspace", slfWorkspaceKey(slfCloudOwner()));
+    const stored = slfAccount ? await storeValue(database, "workspace", slfWorkspaceKey(slfAccount.id)) : undefined;
     workspace = stored ?? slfLocalWorkspace();
     const starter = stored ? undefined : workspace.current;
     if (slfAccount) workspace.cloud ??= {};
@@ -254,9 +267,26 @@ async function slfChangeAccount(user) {
     }
     if (dialog.open) dialog.close();
     render();
-    await save(false);
+    if (slfAccount) await save(false);
     slfUpdateAccountControls();
+    $("landing-auth-status").textContent = "";
+    if (user && workspacePage.hidden) {
+      const moveFocus = publicPage.contains(document.activeElement);
+      publicPage.hidden = true;
+      workspacePage.hidden = false;
+      window.scrollTo(0, 0);
+      main.inert = !slfAccount;
+      if (moveFocus) {
+        const target = slfAccount ? $("page-title") : $("cloud-account").querySelector("summary");
+        target.focus({ preventScroll: true });
+      }
+    }
     if (slfAccount) await slfSyncCloud();
+  } catch (error) {
+    if (user && workspacePage.hidden) {
+      $("landing-auth-status").textContent = "Ruang kerja belum bisa dibuka. Muat ulang halaman untuk mencoba lagi.";
+    }
+    throw error;
   } finally {
     main.inert = Boolean(slfAuthUser && !slfAccount);
   }
@@ -332,12 +362,18 @@ function slfShowAuth(mode) {
 
 function initSlfCloud() {
   slfCloud = slfCloudClient();
-  if (!slfCloud) return;
+  if (!slfCloud) {
+    $("landing-auth-status").textContent = "Layanan masuk belum tersedia. Muat ulang halaman untuk mencoba lagi.";
+    return;
+  }
   $("cloud-controls").hidden = false;
   const form = $("cloud-auth");
   const auth = $("cloud-dialog");
   const redirect = new URL("./", location.href).href;
-  $("cloud-login").addEventListener("click", () => slfShowAuth("login"));
+  for (const button of document.querySelectorAll("[data-landing-auth]")) {
+    button.addEventListener("click", () => slfShowAuth(button.dataset.landingAuth));
+    button.disabled = false;
+  }
   $("cloud-cancel").addEventListener("click", () => auth.close());
   $("cloud-password-toggle").addEventListener("click", () => slfShowPassword(form.password.type === "password"));
   auth.addEventListener("close", () => { form.password.value = ""; slfShowPassword(false); });
