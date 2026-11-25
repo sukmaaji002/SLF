@@ -446,7 +446,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         "Otomatis · Nama dan alamat bangunan";
       if (auto || combined) select.append(new Option(autoLabel, sampleLocation ? auto : ""));
       const directorId = "project:consultant-director";
-      if (token === "nama penanggung jawab") select.append(new Option("Direktur Badan Usaha Pengkaji", directorId));
+      if (token === "nama penanggung jawab" && sources.has(directorId)) select.append(new Option("Direktur Badan Usaha Pengkaji", directorId));
       select.append(new Option("Isi manual", "manual"));
       const ownSource = narrativeReference(data.sourceId ?? key, token);
       for (const [group, entries] of groups) {
@@ -1028,7 +1028,8 @@ function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
   editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) => {
-      const control = guidedField(project.cover, key, label, type);
+      const [owner, fieldKey] = key === "consultant" ? consultantNameField(project) : [project.cover, key];
+      const control = guidedField(owner, fieldKey, fieldKey === "individualName" ? "Nama pengkaji teknis" : label, type);
       if (key === "building") control.querySelector("input").id = "cover-building";
       return control;
     })),
@@ -1040,15 +1041,44 @@ function renderCover(project) {
   }, "text", project, "name"));
 }
 
+function approvalSignatoryFields(project) {
+  const front = project.front;
+  const type = dom("select", { value: "" },
+    new Option("Badan usaha", "badan-usaha"), new Option("Perorangan", "perorangan"));
+  type.value = isIndividualConsultant(project) ? "perorangan" : "badan-usaha";
+  const fields = dom("div", { className: "form-grid wide" });
+  const changed = () => { refreshLinkedFields(); save(); };
+  function renderFields() {
+    const [owner, nameKey] = consultantNameField(project);
+    if (isIndividualConsultant(project)) {
+      fields.replaceChildren(boundField(owner, nameKey, "Nama pengkaji teknis", "text", changed));
+      return;
+    }
+    fields.replaceChildren(
+      boundField(owner, nameKey, "Nama perusahaan pengkaji", "text", changed),
+      boundField(front, "signatory", "Nama penandatangan", "text", changed),
+      boundField(front, "role", "Jabatan penandatangan", "text", changed),
+      boundField(front, "consultantDirector", "Nama direktur jika berbeda dari penandatangan", "text", changed),
+    );
+  }
+  type.addEventListener("change", () => {
+    front.consultantType = type.value;
+    renderFields();
+    changed();
+  });
+  renderFields();
+  return [dom("label", {}, "Jenis pengkaji teknis", type),
+    guidedField(front, "location", "Tempat dan tanggal pengesahan"), fields];
+}
+
 function renderFront(project) {
   const sources = reportSources(project);
   title("Bagian awal", isTrial() ? "Pendahuluan" : "Bagian awal & daftar isi");
   editor.append(purposeField(project),
-    dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
-      index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
-        (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }, sources) :
-        key === "consultantDirector" ? boundField(project.front, key, label, "text", save) :
-          guidedField(project.front, key, label))),
+    dom("div", { className: "form-grid" }, ...frontFields.slice(0, 2).map(([key, label]) =>
+      linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
+        (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }, sources)),
+      ...approvalSignatoryFields(project)),
     dom("h3", {}, "Susunan bab"),
     dom("p", { className: "hint" }, "Daftar isi, daftar tabel, dan daftar gambar mengikuti susunan laporan."),
     dom("ol", { className: "chapter-list" }, ...project.chapters.map((chapter, index) => {
@@ -1573,6 +1603,9 @@ function validateBackup(data) {
     frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },
     chapters,
   };
+  if (["badan-usaha", "perorangan"].includes(source.front?.consultantType)) {
+    project.front.consultantType = source.front.consultantType;
+  }
   importTextFormats(project, source, ["name"]);
   const purpose = pickText(source.purpose, ["mode", "custom"]);
   if (purpose.mode === "manual" || purposeOptions.some(([id]) => id === purpose.mode)) project.purpose = importTextFormats(purpose, source.purpose, ["custom"]);

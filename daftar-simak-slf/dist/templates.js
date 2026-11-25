@@ -332,12 +332,20 @@ const approvalStatement = [
 const frontDefaults = {
   preface: prefaceOpening + "\n\n" + acknowledgementsText,
   approval: approvalIdentity + "\n\n" + approvalStatement,
+  consultantType: "badan-usaha",
 };
 const frontFields = [
   ["preface", "Kata pengantar"], ["approval", "Lembar pengesahan"],
   ["location", "Tempat dan tanggal pengesahan"], ["signatory", "Nama penandatangan"], ["role", "Jabatan / peran"],
   ["consultantDirector", "Nama Direktur Badan Usaha Pengkaji"],
+  ["individualName", "Nama pengkaji teknis"],
 ];
+
+const isIndividualConsultant = (project) => project.front.consultantType === "perorangan";
+
+function consultantNameField(project) {
+  return isIndividualConsultant(project) ? [project.front, "individualName"] : [project.cover, "consultant"];
+}
 
 const roman = (number) => {
   let text = "";

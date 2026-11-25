@@ -218,16 +218,21 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const purpose = project.purpose;
   add("project:purpose", "Bagian awal", "Tujuan kajian", projectPurposeValue(purpose), getTextFormat(purpose, "custom"));
   add("project:scope", "Data kajian", "Pilihan bidang pemeriksaan", scopeValue(project.scope));
-  const director = cleanValue(project.front.consultantDirector) ||
-    (/^(?:direktur(?: utama)?)?$/i.test(project.front.role?.trim() ?? "") ? cleanValue(project.front.signatory) : "");
-  add("project:consultant-director", "Bagian awal", "Direktur Badan Usaha Pengkaji", director,
-    getTextFormat(project.front, cleanValue(project.front.consultantDirector) ? "consultantDirector" : "signatory"));
+  if (!isIndividualConsultant(project)) {
+    const director = cleanValue(project.front.consultantDirector) ||
+      (/^(?:direktur(?: utama)?)?$/i.test(project.front.role?.trim() ?? "") ? cleanValue(project.front.signatory) : "");
+    add("project:consultant-director", "Bagian awal", "Direktur Badan Usaha Pengkaji", director,
+      getTextFormat(project.front, cleanValue(project.front.consultantDirector) ? "consultantDirector" : "signatory"));
+  }
   const application = purpose?.mode === "pengajuan" ? "pengajuan" : purpose?.mode === "perpanjangan" ? "perpanjangan" : "";
   add("project:application", "Data kajian", "Jenis permohonan SLF", application);
   const outline = project.chapters.map((chapter, index) => chapterLabel(project, index));
   if (!project.chapters.some((chapter) => chapter.checklist)) outline.push("Lampiran · Daftar simak kajian");
   add("project:chapter-order", "Data kajian", "Urutan bab dan lampiran", outline.join("\n"));
-  for (const [key, label] of coverFields) add("cover:" + key, "Sampul", label, project.cover[key], getTextFormat(project.cover, key));
+  for (const [key, label] of coverFields) {
+    const [owner, fieldKey] = key === "consultant" ? consultantNameField(project) : [project.cover, key];
+    add("cover:" + key, "Sampul", label, owner[fieldKey], getTextFormat(owner, fieldKey));
+  }
   for (const [key, label] of frontFields.slice(0, 2)) {
     addNarrativeSources(add, key, project.front[key] ?? "", project.frontLinks?.[key], label);
   }

@@ -152,6 +152,27 @@ function reportJump(id, label) {
   return link;
 }
 
+function approvalSignoff(project) {
+  const front = project.front;
+  const individual = isIndividualConsultant(project);
+  const signoff = dom("div", { className: "report-signoff" },
+    reportFormatted(dom("p"), front.location?.trim() || "[Tempat dan tanggal pengesahan]", getTextFormat(front, "location")));
+  if (individual) {
+    signoff.append(dom("p", {}, "Pengkaji Teknis Perorangan"));
+  } else {
+    signoff.append(
+      reportFormatted(dom("p"), project.cover.consultant?.trim() || "[Nama perusahaan pengkaji]", getTextFormat(project.cover, "consultant")),
+      dom("p", {}, "Selaku Pengkaji Teknis"),
+    );
+  }
+  const key = individual ? "individualName" : "signatory";
+  signoff.append(dom("div", { className: "signature-space", ariaHidden: "true" }),
+    reportFormatted(dom("p", { className: "signatory-name" }), front[key]?.trim() ||
+      (individual ? "[Nama pengkaji teknis]" : "[Nama penandatangan]"), getTextFormat(front, key)));
+  if (!individual) signoff.append(reportFormatted(dom("p"), front.role?.trim() || "Direktur", getTextFormat(front, "role")));
+  return signoff;
+}
+
 async function buildReport(target, project, urls, { trial = false } = {}) {
   target.replaceChildren();
   const items = trial ? trialChecklistItems : checklistItems;
@@ -159,13 +180,15 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   const checklist = readChecklist(project.id);
   const sources = reportSources(project, checklist);
   const resolveToken = (links) => (original, name) => resolveReportLink(original, name, sources, links);
-  const coverFormat = (key, token) => getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
+  const coverFormat = (key, token) => key === "consultant" ? sources.get("cover:consultant")?.format :
+    getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
   const data = {
     ...project.cover,
     building: automaticValue("nama bangunan", sources) || project.cover.building,
     address: automaticValue("alamat bangunan", sources) || project.cover.address,
     use: automaticValue("fungsi bangunan", sources) || project.cover.use,
     owner: automaticValue("nama pemilik", sources) || project.cover.owner,
+    consultant: sources.get("cover:consultant")?.value,
   };
   const title = data.title || "Laporan Kajian Teknis Sertifikat Laik Fungsi";
   const cover = dom("section", { className: "report-cover" },
@@ -244,15 +267,12 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   }
   const attach = (section) => { sections.push(section); target.append(section); };
   for (const [key, label] of frontFields.slice(0, 2)) {
-    if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
+    const signatoryKey = isIndividualConsultant(project) ? "individualName" : "signatory";
+    if (!project.front[key]?.trim() && !(key === "approval" && project.front[signatoryKey]?.trim())) continue;
     const section = reportSection(label, "report-" + key);
     section.classList.add("front-doc");
     section.append(...reportParagraphs(project.front[key] || "", getTextFormat(project.front, key), resolveToken(project.frontLinks?.[key])));
-    if (key === "approval") section.append(dom("div", { className: "report-signoff" },
-      reportFormatted(dom("p"), project.front.location?.trim() || "[Tempat dan tanggal pengesahan]", getTextFormat(project.front, "location")),
-      reportFormatted(dom("p"), project.front.role?.trim() || "Direktur", getTextFormat(project.front, "role")),
-      dom("div", { className: "signature-space", ariaHidden: "true" }),
-      reportFormatted(dom("p", { className: "signatory-name" }), project.front.signatory?.trim() || "[Nama Direktur]", getTextFormat(project.front, "signatory"))));
+    if (key === "approval") section.append(approvalSignoff(project));
     attach(section);
   }
   attach(contents);
