@@ -10,7 +10,9 @@ const healthRoomToken = "ruang atau sistem";
 const sampleLocationToken = "area atau posisi sampel";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
-  [healthReferenceToken, { key: "healthReferences", choiceKey: "healthReferenceChoices", item: "Acuan tambahan", minimumRows: 0, healthOnly: true }],
+  [healthReferenceToken,
+    { key: "healthReferences", choiceKey: "healthReferenceChoices", groupKey: "healthReferenceGroups", item: "Acuan tambahan",
+      addGroupLabel: "Tambah acuan kesehatan", healthOnly: true }],
   [healthParameterToken, { key: "healthParameters", choiceKey: "healthParameterChoices", item: "Isian tambahan", minimumRows: 0, healthOnly: true }],
   [healthRoomToken, { key: "healthRooms", choiceKey: "healthRoomChoices", item: "Ruang atau sistem tambahan", minimumRows: 0, healthOnly: true }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
@@ -19,7 +21,8 @@ const repeatedNarrativeFields = new Map([
   ["ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan tata bangunan", item: "Acuan tambahan" }],
   [safetyReferenceToken,
-    { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
+    { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan",
+      item: "Acuan tambahan", addGroupLabel: "Tambah acuan keselamatan" }],
   [parameterReferenceToken,
     { key: "parameters", choiceKey: "parameterStandardChoices", item: "Isian tambahan", minimumRows: 0 }],
 ]);

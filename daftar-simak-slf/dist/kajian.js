@@ -301,7 +301,7 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
         ...narrativeEntryList(values, spec.item, commit, 0)));
     }
     const customGroups = dom("div");
-    const addGroup = button("Tambah acuan keselamatan", () => {
+    const addGroup = button(spec.addGroupLabel, () => {
       const group = { name: "", fixed: false, entries: [""] };
       referenceGroups.push(group);
       appendGroup(group).focus();
