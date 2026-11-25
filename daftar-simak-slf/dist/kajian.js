@@ -844,7 +844,7 @@ function tableEditor(block) {
       save();
     });
     leadField.refreshMembers(sources);
-    editor.prepend(leadField);
+    editor.append(leadField);
   }
   return editor;
 }
