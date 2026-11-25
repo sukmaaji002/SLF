@@ -173,7 +173,8 @@ function formattedText(text, format, replaceToken, offset = 0) {
       literal(previous, match.index);
       const style = selectedTextStyle(format, match.index + offset);
       const source = typeof result === "object" ? result.format : undefined;
-      fragment.append(source ? formattedText(value, { ...source, base: { ...source.base, ...style } }) : styleTextSpan(value, style));
+      const node = typeof result === "object" ? result.node : undefined;
+      fragment.append(node ?? (source ? formattedText(value, { ...source, base: { ...source.base, ...style } }) : styleTextSpan(value, style)));
       previous = match.index + original.length;
     }
   }

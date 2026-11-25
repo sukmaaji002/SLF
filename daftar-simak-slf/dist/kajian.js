@@ -149,17 +149,23 @@ function methodChoiceField(choices, input, applyValue) {
   return fieldset;
 }
 
-function linkedText(project, data, key, label, getLinks, setLinks) {
-  const summary = dom("summary", {}, "Isian tertaut");
+function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
+  const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
   const details = dom("details", { className: "linked-fields" }, summary, content);
-  const wrapper = dom("div", { className: "wide" }, boundField(data, key, label, "area", () => {
-    if (data[key] !== lastText) { lastText = data[key]; update(); }
-    else linkedPreview?.();
-    save();
-  }), details);
-  const control = wrapper.querySelector("textarea");
-  const insertPurpose = button("Tambahkan tautan Tujuan Kajian", () => {
+  const preview = dom("p", { className: "linked-preview" });
+  const textEditor = dom("details", { className: "narrative-editor", open: !data[key]?.trim() },
+    dom("summary", {}, "Ubah teks dan format"),
+    dom("p", { className: "hint" }, "Teks dalam tanda kurung siku menjadi isian yang bisa dilengkapi dari panel di atas."),
+    boundField(data, key, label, "area", () => {
+      if (data[key] !== lastText) { lastText = data[key]; update(); }
+      else updatePreview();
+      save();
+    }));
+  const wrapper = dom("div", { className: "wide guided-narrative" },
+    dom("div", { className: "narrative-preview" }, dom("h4", {}, "Tampilan di laporan"), preview), details, textEditor);
+  const control = textEditor.querySelector("textarea");
+  const insertPurpose = button("Tambahkan isian Tujuan Kajian", () => {
     if (reportTokens(control.value).has("tujuan kajian")) return;
     const separator = control.value.trim() ? "\n\n" : "";
     control.value += separator + "[tujuan kajian]";
@@ -171,34 +177,50 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
     render();
     $("purpose-mode").focus();
   }, "quiet");
+  const entries = new Map();
   let lastText = data[key];
-  let linkedPreview;
+  let sources = initialSources;
 
-  function update() {
+  function openField(token) {
+    if (!details.open) {
+      details.open = true;
+      update();
+    }
+    entries.get(token)?.();
+  }
+
+  function updatePreview() {
     const text = data[key] || "";
     const fields = reportTokens(text);
-    summary.textContent = fields.size ? "Isian tertaut (" + fields.size + ")" : "Tautkan isian";
+    const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, getLinks()).value === "[" + name + "]").length;
+    summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
+      fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";
+    preview.removeAttribute("style");
+    const format = getTextFormat(data, key);
+    styleTextBlock(preview, format);
+    preview.replaceChildren(text.trim() ? formattedText(text, format, (original, name) => {
+      const resolved = resolveReportLink(original, name, sources, getLinks());
+      return resolved.value === original ? { value: "Isi " + name,
+        node: button("Isi " + name.trim(), () => openField(tokenName(name)), "narrative-placeholder") } : resolved;
+    }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
+  }
+
+  function update(nextSources = reportSources(project)) {
+    sources = nextSources;
+    updatePreview();
     if (!details.open) return;
+    entries.clear();
+    const fields = reportTokens(data[key] || "");
     if (!fields.size) {
-      linkedPreview = undefined;
       content.replaceChildren(insertPurpose);
       return;
     }
-    const sources = reportSources(project);
     const groups = new Map();
     for (const [id, source] of sources) {
       if (!groups.has(source.group)) groups.set(source.group, []);
       groups.get(source.group).push([id, source.label]);
     }
-    const grid = dom("div", { className: "form-grid" });
-    const preview = dom("p", { className: "linked-preview" });
-    const updatePreview = () => {
-      const format = getTextFormat(data, key);
-      preview.removeAttribute("style");
-      styleTextBlock(preview, format);
-      preview.replaceChildren(formattedText(text, format, (token, name) => resolveReportLink(token, name, sources, getLinks())));
-    };
-    linkedPreview = updatePreview;
+    const grid = dom("div", { className: "form-grid narrative-fields" });
     for (const [token, name] of fields) {
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
@@ -218,7 +240,13 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
       select.value = saved?.source ?? (saved || (!auto && !combined) ? "manual" : "");
-      const value = dom("p", { className: "hint" });
+      const value = dom("p", { className: "narrative-source-value" });
+      const badge = dom("span", { className: "narrative-state" });
+      const useManual = button("Isi sendiri", () => {
+        select.value = "manual";
+        select.dispatchEvent(new Event("change"));
+        focusTextField(manualInput);
+      }, "quiet");
       const example = inputExample(token);
       const hint = Object.hasOwn(inputHints, token) ? inputHints[token] : "";
       const manualData = { value: saved?.value ?? "", _format: saved?._format };
@@ -228,6 +256,7 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
           sources.get(ownSource).value = cleanValue(manualData.value);
           sources.get(ownSource).format = getTextFormat(manualData, "value");
         }
+        updateValue();
         updatePreview();
         refreshLinkedFields(details);
         save();
@@ -268,13 +297,21 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         refreshLinkedFields(details);
         save();
       }) : null;
+      const sourceSummary = dom("summary");
       const updateValue = () => {
-        manual.hidden = select.value !== "manual";
-        value.hidden = select.value === "manual";
-        if (choiceField) choiceField.hidden = select.value !== "manual" && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
+        const self = select.value === "manual";
+        const linkedValue = select.value ? sources.get(select.value)?.value : automaticValue(token, sources);
+        const filled = Boolean(self ? manualData.value.trim() : linkedValue);
+        badge.textContent = filled ? "Terisi" : "Belum terisi";
+        badge.dataset.filled = String(filled);
+        sourceSummary.textContent = self ? "Sumber: Isi sendiri" :
+          "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
+        manual.hidden = !self;
+        value.hidden = self;
+        useManual.hidden = self || Boolean(linkedValue);
+        if (choiceField) choiceField.hidden = !self && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
-        value.textContent = (select.value ? sources.get(select.value)?.value : automaticValue(token, sources)) ||
-          (select.value ? "Sumber kosong atau sudah dihapus" : "Isian belum tersedia");
+        value.textContent = linkedValue || "Data dari sumber ini belum terisi.";
       };
       select.addEventListener("change", () => {
         const links = { ...getLinks() };
@@ -284,35 +321,50 @@ function linkedText(project, data, key, label, getLinks, setLinks) {
         setLinks(links);
         updateValue();
         updatePreview();
+        refreshLinkedFields(details);
         save();
       });
       updateValue();
-      const entry = dom("div", { className: "link-entry" }, dom("label", {}, name[0].toLocaleUpperCase("id") + name.slice(1), select));
+      const source = dom("details", { className: "narrative-source" },
+        sourceSummary, dom("label", {}, "Ambil data untuk " + name, select));
+      const entry = dom("div", { className: "link-entry" }, dom("div", { className: "narrative-field-head" },
+        dom("strong", {}, name[0].toLocaleUpperCase("id") + name.slice(1)), badge));
       if (hint) entry.append(dom("p", { className: "hint" }, hint));
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
-      entry.append(manual, value);
-      if (example) entry.append(dom("p", { className: "field-example" }, dom("strong", {}, "Contoh isian"), " · " + example));
+      entry.append(manual, value, useManual, source);
+      if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
+        dom("p", { className: "field-example" }, example)));
+      entries.set(token, () => {
+        entry.scrollIntoView({ block: "nearest" });
+        if (!manual.hidden) focusTextField(manualInput);
+        else if (!useManual.hidden) useManual.focus();
+        else source.querySelector("summary").focus();
+      });
       grid.append(entry);
     }
-    updatePreview();
-    content.replaceChildren(fields.has("tujuan kajian") ? editPurpose : insertPurpose, grid, dom("h4", {}, "Hasil di laporan"), preview);
+    content.replaceChildren(grid, fields.has("tujuan kajian") ? editPurpose : insertPurpose);
   }
 
-  details.addEventListener("toggle", update);
+  details.addEventListener("toggle", () => {
+    if (details.open && !content.firstChild) update();
+    if (!details.open) {
+      content.replaceChildren();
+      entries.clear();
+    }
+  });
   details.refreshSources = update;
-  update();
+  update(initialSources);
   return wrapper;
 }
 
 function refreshLinkedFields(except) {
-  for (const details of editor.querySelectorAll(".linked-fields[open]")) {
-    if (details !== except) details.refreshSources();
-  }
+  const narratives = [...editor.querySelectorAll(".linked-fields")];
   const tableFields = [...editor.querySelectorAll(".table-link[data-linked]")];
   const leadFields = [...editor.querySelectorAll(".team-lead")];
-  if (tableFields.length || leadFields.length) {
+  if (narratives.length || tableFields.length || leadFields.length) {
     const sources = reportSources(current());
+    for (const details of narratives) if (details !== except) details.refreshSources(sources);
     for (const details of tableFields) details.refreshValue(sources);
     for (const control of leadFields) control.refreshMembers(sources);
   }
@@ -723,11 +775,12 @@ function renderCover(project) {
 }
 
 function renderFront(project) {
+  const sources = reportSources(project);
   title("Bagian awal", isTrial() ? "Pendahuluan" : "Bagian awal & daftar isi");
   editor.append(purposeField(project),
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
-        (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }) :
+        (links) => { project.frontLinks = { ...project.frontLinks, [key]: links }; }, sources) :
         key === "consultantDirector" ? boundField(project.front, key, label, "text", save) :
           guidedField(project.front, key, label))),
     dom("h3", {}, "Susunan bab"),
@@ -808,7 +861,7 @@ function renderChapter(project) {
   if (!isTrial()) editor.append(chapterActions);
   editor.append(sectionPhotoEditor(chapter, "Unggah foto bab", () => workspace.projects.includes(project) && project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
-  editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
+  editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
   const headings = headingEntries(chapter, index);
   const checklist = readChecklist(project.id);
   const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
@@ -822,9 +875,10 @@ function renderChapter(project) {
       dom("summary", {}, "Hasil daftar simak dan acuan untuk subbab ini"), wrapper));
   }
   const intensity = intensityDestination(project);
+  const sources = reportSources(project, checklist);
   appendChecklist(-1);
   for (const [bi, block] of chapter.blocks.entries()) {
-    editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
+    editor.append(blockEditor(chapter, block, bi, headings.get(bi), sources));
     if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
     appendChecklist(bi);
   }
@@ -867,7 +921,7 @@ function tableEditor(block) {
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
-    rows.append(dom("tr", { ariaLabel: team ? "Pengkaji " + (index + 1) : undefined }, ...row.map((_, column) =>
+    rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...row.map((_, column) =>
       dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
@@ -946,8 +1000,7 @@ function tableEditor(block) {
 }
 
 function tableCellField(block, row, column, sources, options) {
-  const label = isTeamTable(block) && block.headers[column].trim() ? block.headers[column] :
-    "Baris " + (row + 1) + ", kolom " + (column + 1);
+  const label = block.headers[column].trim() || "Kolom " + (column + 1);
   const key = tableCellKey(block, row, column);
   const value = block.rows[row][column];
   const token = value.match(/^\[([^\[\]\r\n]+)\]$/)?.[1];
@@ -1114,7 +1167,7 @@ function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
 }
 
 
-function blockEditor(chapter, block, index, headingInfo) {
+function blockEditor(chapter, block, index, headingInfo, sources) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
   const bar = dom("div", { className: "block-head" }, dom("strong", {}, marker));
@@ -1137,7 +1190,7 @@ function blockEditor(chapter, block, index, headingInfo) {
   }, "danger"));
   bar.append(controls);
   const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index }, bar);
-  const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; });
+  const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; }, sources);
   if (block.type === "heading") {
     wrapper.append(boundField(block, "text", "Judul subbab"));
     const project = current();
