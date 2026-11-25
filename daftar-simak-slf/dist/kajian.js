@@ -198,7 +198,7 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function healthRoomSources(project, sources, beforeBlock) {
+function priorRoomSources(project, sources, beforeBlock) {
   const names = new Set([sources.get("cover:building")?.value].filter(Boolean));
   const links = dom("div", { className: "button-row" }, button("Buka Nama bangunan di Sampul", () => {
     active = "cover";
@@ -421,17 +421,22 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       groups.get(source.group).push([id, source.label]);
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
-    const healthMethod = fields.has(healthParameterToken) ||
-      (key === "body" && tokenName(data.text ?? "") === "kesehatan" && fields.has(healthReferenceToken));
+    const methodHeading = key === "body" ? tokenName(data.text ?? "") : "";
+    const methods = {
+      health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
+      comfort: fields.has(comfortReferenceToken) || (methodHeading === "kenyamanan" && fields.has(parameterReferenceToken)),
+    };
     for (const [token, name] of fields) {
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
       const safetyParameters = token === parameterReferenceToken &&
         (fields.has(safetyReferenceToken) || (key === "body" && tokenName(data.text ?? "") === "keselamatan"));
+      const comfortParameters = token === parameterReferenceToken && methods.comfort && !safetyParameters;
       const spec = repeatedNarrativeFields.get(token);
-      const repeated = (token === parameterReferenceToken && !safetyParameters) || (spec?.healthOnly && !healthMethod) ? undefined : spec;
-      const healthRoom = token === healthRoomToken && Boolean(repeated);
+      const otherParameters = token === parameterReferenceToken && !safetyParameters && !comfortParameters;
+      const repeated = otherParameters || (spec?.method && !methods[spec.method]) ? undefined : spec;
+      const roomField = repeated && (token === healthRoomToken || token === comfortRoomToken);
       const sampleLocation = token === sampleLocationToken;
       const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: "[" + name + "]" });
@@ -458,7 +463,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         select.dispatchEvent(new Event("change"));
         focusManual();
       }, "quiet");
-      const simpleChoices = safetyParameters || repeated?.healthOnly;
+      const simpleChoices = safetyParameters || comfortParameters || repeated?.method;
       const example = simpleChoices ? "" : inputExample(token);
       const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
@@ -485,12 +490,14 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const groupsForChoices = repeated?.choiceKey ?
-        inputChoiceGroups.get(token) ?? [[healthRoom ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan", choicesForInput(token)]] : [];
-      const roomSources = healthRoom ? healthRoomSources(project, sources, data) : undefined;
+      const presetGroups = comfortParameters ? comfortParameterGroups : inputChoiceGroups.get(token);
+      const choicesLegend = token === comfortRoomToken ? "Pilihan fungsi ruang" :
+        roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
+      const groupsForChoices = repeated?.choiceKey ? presetGroups ?? [[choicesLegend, choicesForInput(token)]] : [];
+      const roomSources = roomField ? priorRoomSources(project, sources, data) : undefined;
       if (roomSources) {
         const used = new Set(groupsForChoices.flatMap(([, options]) => options.map(tokenName)));
-        const names = [...roomSources.names, ...(manualData.healthRoomChoices ?? [])].filter((name) => {
+        const names = [...roomSources.names, ...(manualData[repeated.choiceKey] ?? [])].filter((name) => {
           const key = tokenName(name);
           if (used.has(key)) return false;
           used.add(key);

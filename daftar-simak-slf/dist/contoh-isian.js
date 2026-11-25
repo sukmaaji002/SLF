@@ -362,6 +362,23 @@ const inputChoiceGroups = new Map([
       "SNI IEC 62305-2:2009 – manajemen risiko petir",
     ]],
   ]],
+  [comfortReferenceToken, [
+    ["Ruang gerak", [
+      "PP Nomor 16 Tahun 2021 Pasal 42 – luasan ruang gerak dan hubungan antarruang",
+      "Permen PUPR 14/PRT/M/2017 – persyaratan kemudahan dan sirkulasi bangunan gedung",
+    ]],
+    ["Suhu dan kelembapan", [
+      "PP Nomor 16 Tahun 2021 Pasal 43 – kenyamanan termal dan kondisi udara dalam ruang",
+      "SNI 6390:2020 – konservasi energi sistem tata udara",
+      "SNI 7061:2019 – pengukuran dan evaluasi iklim kerja",
+    ]],
+    ["Getaran dan kebisingan", [
+      "PP Nomor 16 Tahun 2021 Pasal 45 – kenyamanan terhadap getaran dan kebisingan",
+      "SNI 7186:2021 – pengukuran paparan getaran seluruh tubuh pekerja",
+      "SNI 03-6386-2000 – tingkat bunyi dan waktu dengung dalam bangunan gedung",
+      "SNI 8427:2017 – pengukuran tingkat kebisingan lingkungan",
+    ]],
+  ]],
   [healthReferenceToken, [
     ["Ketentuan umum", [
       "PP Nomor 16 Tahun 2021 – persyaratan kesehatan bangunan gedung",
@@ -398,6 +415,15 @@ const inputChoiceGroups = new Map([
     ]],
   ]],
 ]);
+
+const comfortParameterGroups = [
+  ["Pilih rujukan", [
+    "sesuai dengan standar teknis ruang gerak",
+    "sesuai dengan standar teknis suhu dan kelembapan",
+    "sesuai dengan standar teknis getaran",
+    "sesuai dengan standar teknis kebisingan",
+  ]],
+];
 
 function choicesForInput(token) {
   if (Object.hasOwn(inputChoices, token)) return inputChoices[token];

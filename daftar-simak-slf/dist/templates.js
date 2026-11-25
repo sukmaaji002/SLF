@@ -60,6 +60,17 @@ const healthNarrative = previousHealthNarrative.replace(
   "Parameter pembanding untuk [ruang atau sistem] ditetapkan",
 );
 
+const previousComfortNarrative = "Acuan aspek kenyamanan mencakup [ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan]. Parameter yang diterapkan untuk [fungsi ruang] adalah [parameter dan rujukan].";
+const comfortNarrative = previousComfortNarrative.replace(
+  "Parameter yang diterapkan untuk [fungsi ruang] adalah",
+  "Parameter pembanding untuk [fungsi ruang] ditetapkan",
+);
+const revisedStandardNarratives = new Map([
+  [previousSafetyNarrative, safetyNarrative],
+  [previousHealthNarrative, healthNarrative],
+  [previousComfortNarrative, comfortNarrative],
+]);
+
 const reportTemplates = {
   disiplin: {
     label: "Kajian per disiplin · 8 bab",
@@ -101,7 +112,7 @@ const reportTemplates = {
           ["Tata bangunan", {"body":"Penilaian tata bangunan mengacu pada [ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan]. Aspek pembanding meliputi fungsi bangunan, intensitas, sempadan, tata ruang dalam, dan hubungan dengan lingkungan tapak.","previous":"[Catat acuan pemeriksaan fungsi, intensitas, sempadan, dan tata ruang.]"}],
           ["Keselamatan", {"body":safetyNarrative,"previous":"[Catat acuan struktur, kebakaran, listrik, dan penangkal petir yang berlaku pada objek.]"}],
           ["Kesehatan", {"body":healthNarrative,"previous":"[Catat acuan penghawaan, pencahayaan, air, dan sanitasi.]"}],
-          ["Kenyamanan", {"body":"Acuan aspek kenyamanan mencakup [ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan]. Parameter yang diterapkan untuk [fungsi ruang] adalah [parameter dan rujukan].","previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
+          ["Kenyamanan", {"body":comfortNarrative,"previous":"[Catat acuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan.]"}],
           ["Kemudahan", {"body":"Akses, sirkulasi, dan kelengkapan fasilitas dinilai dengan [acuan aksesibilitas atau dokumen teknis]. Ketentuan yang dibandingkan dengan kondisi lapangan meliputi [parameter jalur, fasilitas, atau peralatan yang berlaku].","previous":"[Catat acuan akses, sirkulasi, dan kelengkapan fasilitas.]"}],
         ],
       ],
@@ -374,13 +385,10 @@ function upgradeDisciplineDraft(project) {
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
-    if (block.type === "heading" && block.body === previousSafetyNarrative) {
-      updateTextFormat(block, "body", block.body, safetyNarrative);
-      block.body = safetyNarrative;
-    }
-    if (block.type === "heading" && block.body === previousHealthNarrative) {
-      updateTextFormat(block, "body", block.body, healthNarrative);
-      block.body = healthNarrative;
+    const revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
+    if (revisedNarrative) {
+      updateTextFormat(block, "body", block.body, revisedNarrative);
+      block.body = revisedNarrative;
     }
     if (block.type !== "photo" || !block.image) continue;
     const first = importTextFormats({ image: block.image, text: block.text }, block, ["text"]);

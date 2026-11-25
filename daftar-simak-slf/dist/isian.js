@@ -7,14 +7,21 @@ const parameterReferenceToken = "parameter dan rujukan";
 const healthReferenceToken = "standar atau dokumen pembanding";
 const healthParameterToken = "parameter, satuan, dan rujukan";
 const healthRoomToken = "ruang atau sistem";
+const comfortReferenceToken = "ketentuan ruang gerak, suhu, kelembapan, getaran, atau kebisingan yang relevan";
+const comfortRoomToken = "fungsi ruang";
 const sampleLocationToken = "area atau posisi sampel";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
   [healthReferenceToken,
     { key: "healthReferences", choiceKey: "healthReferenceChoices", groupKey: "healthReferenceGroups", item: "Acuan tambahan",
-      addGroupLabel: "Tambah acuan kesehatan", healthOnly: true }],
-  [healthParameterToken, { key: "healthParameters", choiceKey: "healthParameterChoices", item: "Isian tambahan", minimumRows: 0, healthOnly: true }],
-  [healthRoomToken, { key: "healthRooms", choiceKey: "healthRoomChoices", item: "Ruang atau sistem tambahan", minimumRows: 0, healthOnly: true }],
+      addGroupLabel: "Tambah acuan kesehatan", method: "health" }],
+  [healthParameterToken, { key: "healthParameters", choiceKey: "healthParameterChoices", item: "Isian tambahan", minimumRows: 0, method: "health" }],
+  [healthRoomToken, { key: "healthRooms", choiceKey: "healthRoomChoices", item: "Ruang atau sistem tambahan", minimumRows: 0, method: "health" }],
+  [comfortReferenceToken,
+    { key: "comfortReferences", choiceKey: "comfortReferenceChoices", groupKey: "comfortReferenceGroups", item: "Acuan tambahan",
+      addGroupLabel: "Tambah acuan kenyamanan", method: "comfort" }],
+  [comfortRoomToken, { key: "comfortRooms", choiceKey: "comfortRoomChoices", item: "Fungsi atau nama ruang tambahan",
+    minimumRows: 0, method: "comfort" }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
   ["peraturan, standar teknis, dan dokumen rencana yang relevan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],
