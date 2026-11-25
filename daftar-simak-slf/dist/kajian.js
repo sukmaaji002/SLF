@@ -968,7 +968,7 @@ function tableEditor(block) {
   for (const [index, row] of block.rows.entries()) {
     rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...row.map((_, column) =>
       dom("td", {}, tableCellField(block, index, column, sources,
-        column === statusColumn ? ["Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
+        column === statusColumn ? ["Tersedia", "Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
       const populated = row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
       if (populated && !confirm("Hapus baris tabel ini?")) return;

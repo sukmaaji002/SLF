@@ -158,7 +158,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const designatedLeads = new Set();
   let hasDesignation = false;
   const locations = new Set();
-  const reviewedDocuments = new Set();
+  const availableDocuments = new Set();
   const permits = new Set();
   const reviewers = new Map([["arsitektur", new Set()], ["struktur", new Set()], ["mep", new Set()]]);
   const tools = new Set();
@@ -219,8 +219,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         addNarrativeSources(add, block.sourceId, block.type === "heading" ? block.body : block.text, block.links,
           chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
       }
-      if (block.type !== "table" || !block.sourceId) continue;
-      tables.push(block);
+      if (block.type !== "table") continue;
+      if (block.sourceId || isDocumentReviewTable(block)) tables.push(block);
+      if (!block.sourceId) continue;
       for (const [ri, row] of block.rows.entries()) {
         for (const [ci, value] of row.entries()) {
           const key = tableCellKey(block, ri, ci);
@@ -232,6 +233,10 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       }
     }
   }
+  const presetDocuments = new Set((reportTemplates[project.template]?.chapters ?? [])
+    .flatMap(([, ...sections]) => sections.flatMap((section) =>
+      typeof section?.table === "string" && isDocumentReviewTable({ type: "table", text: section.table })
+        ? (section.rows ?? []).map(([name]) => tokenName(name)) : [])));
   for (const block of tables) {
     const title = tokenName(block.text);
     const columns = block.headers.map(tokenName);
@@ -258,18 +263,27 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       for (const row of rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
     }
     if (isDocumentReviewTable(block)) {
-      const name = columns.indexOf("dokumen");
-      const reference = columns.indexOf("nomor / tanggal");
-      const verification = columns.indexOf("status verifikasi");
+      const name = columns.findIndex((column) => ["dokumen", "nama dokumen", "jenis dokumen"].includes(column));
+      const reference = columns.findIndex((column) => ["nomor / tanggal", "nomor/tanggal", "nomor dan tanggal"].includes(column));
+      const verification = columns.findIndex((column) => ["status verifikasi", "hasil verifikasi", "status"].includes(column));
+      const notes = columns.indexOf("keterangan");
       for (const [ri, row] of rows.entries()) {
         const document = cleanValue(row[name]);
-        const status = tokenName(row[verification] ?? "");
-        if (!document || !["terverifikasi", "telah ditelaah", "ditelaah", "sesuai", "valid"].includes(status)) continue;
+        if (!document) continue;
+        const status = tokenName(cleanValue(row[verification]));
         const number = cleanValue(row[reference]);
+        const note = cleanValue(row[notes]);
+        const reviewed = ["terverifikasi", "telah ditelaah", "sudah ditelaah", "ditelaah", "sesuai", "valid"].includes(status);
+        const available = ["ada", "tersedia", "lengkap", "diterima"].includes(status);
+        const unavailable = /^(?:(?:belum|tidak) (?:tersedia|ada|diterima|disampaikan|diperoleh)|tidak berlaku)\b/i;
+        if (unavailable.test(status) || (!reviewed && !available && unavailable.test(note))) continue;
         const value = number ? document + " (" + number + ")" : document;
-        reviewedDocuments.add(value);
+        if (reviewed || available || number || note || !presetDocuments.has(tokenName(document))) availableDocuments.add(value);
+        if (!reviewed) continue;
         if (/\b(?:pbg|imb)\b/i.test(document)) permits.add(value);
-        add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
+        if (block.sourceId && block.rowIds?.[ri]) {
+          add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
+        }
       }
     }
   }
@@ -278,7 +292,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
-  add("project:reviewed-documents", "Data kajian", "Daftar dokumen yang sudah ditelaah dari Rekap Pemeriksaan Dokumen", scopeList.format([...reviewedDocuments]));
+  add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format([...availableDocuments]));
   add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", permits.size === 1 ? [...permits][0] : "");
   for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
     const names = reviewers.get(role);
