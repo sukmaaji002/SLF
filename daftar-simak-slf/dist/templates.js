@@ -1,5 +1,10 @@
 "use strict";
 
+const oldDocumentReviewNames = ["Bukti penguasaan tanah", "PBG / IMB", "Gambar rencana / terbangun", "Dokumen pendukung lainnya"];
+const documentReviewExamples = ["Data Tanah", "Dokumen Perjanjian Sewa", "NIB", "Dokumen Tata Ruang", "IMB/PBG", "Dokumen Lingkungan", "Andalalin"];
+const documentReviewHeaders = ["Dokumen", "Nomor / tanggal", "Status verifikasi", "Keterangan"];
+const documentReviewRow = (name) => [name, "[Nomor / tanggal]", "[Hasil verifikasi]", "[Catatan]"];
+
 const originalPurposeText = "Kajian ini bertujuan membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, dan merumuskan tindak lanjut atas temuan yang didukung bukti pemeriksaan.";
 const purposeText = "Kajian ini disusun untuk [tujuan kajian]. Dalam lingkup tersebut, pengkaji membandingkan kondisi aktual dan pemanfaatan bangunan dengan dokumen yang tersedia, menilai aspek tata bangunan serta keselamatan, kesehatan, kenyamanan, dan kemudahan, lalu merumuskan tindak lanjut berdasarkan bukti pemeriksaan.";
 const purposeOptions = [
@@ -136,7 +141,8 @@ const reportTemplates = {
         "Tinjauan aspek dokumen administrasi",
         ["Dokumen pemilik dan pertanahan", {"body":"Identitas pemilik atau pengelola dicatat berdasarkan [nama dan rujukan dokumen]. Data penguasaan atau penggunaan tanah diperoleh dari [jenis dokumen, nomor, dan tanggal]. Hasil pencocokan identitas, lokasi, dan data persil adalah [hasil verifikasi].","previous":"[Ringkas dokumen pemilik, bukti penguasaan tanah, serta status dan catatan verifikasinya.]"}],
         ["Dokumen perizinan dan teknis", {"body":"Dokumen perizinan yang ditelaah adalah [jenis dokumen dan nomor], sedangkan dokumen teknis yang tersedia meliputi [gambar rencana, gambar terbangun, dan dokumen terkait]. Pencocokan fungsi, data teknis, dan lingkup izin terhadap kondisi aktual menghasilkan [ringkasan hasil telaah].","previous":"[Bandingkan PBG/IMB, gambar rencana, gambar terbangun, dan dokumen pendukung yang tersedia.]"}],
-        {"table":"Rekap pemeriksaan dokumen","columns":["Dokumen","Nomor / tanggal","Status verifikasi","Keterangan"],"rows":[["Bukti penguasaan tanah","[Nomor / tanggal]","[Hasil verifikasi]","[Catatan]"],["PBG / IMB","[Nomor / tanggal]","[Hasil verifikasi]","[Catatan]"],["Gambar rencana / terbangun","[Nomor / tanggal]","[Hasil verifikasi]","[Catatan]"],["Dokumen pendukung lainnya","[Nomor / tanggal]","[Hasil verifikasi]","[Catatan]"]]},
+        { table: "Rekap pemeriksaan dokumen", columns: documentReviewHeaders,
+          rows: documentReviewExamples.map((name) => documentReviewRow("[" + name + "]")) },
         ["Kesenjangan dan tindak lanjut", {"body":"Dari penelaahan dokumen, tercatat [dokumen yang kurang atau perbedaan data] dengan dampak terhadap verifikasi [aspek yang terdampak]. Konfirmasi atau pelengkapan dokumen menjadi tindak lanjut [penanggung jawab] dengan bukti yang diperlukan berupa [bukti atau dokumen].","previous":"[Sebutkan dokumen yang kurang, data yang berbeda, dan siapa yang perlu menindaklanjutinya.]"}],
       ],
       [

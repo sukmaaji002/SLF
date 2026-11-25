@@ -177,7 +177,8 @@ function tableCellValue(block, row, column, sources) {
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
   if (source) return sources.get(source)?.value || "";
   const automatic = sources.get(automaticTableCellSource(block, row, column));
-  return automatic?.value || block.rows[row][column];
+  const value = automatic?.value || block.rows[row][column];
+  return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
 }
 
 function tableSourceAvailable(id) {
@@ -356,10 +357,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       }
     }
   }
-  const presetDocuments = new Set((reportTemplates[project.template]?.chapters ?? [])
-    .flatMap(([, ...sections]) => sections.flatMap((section) =>
-      typeof section?.table === "string" && isDocumentReviewTable({ type: "table", text: section.table })
-        ? (section.rows ?? []).map(([name]) => tokenName(name)) : [])));
+  const presetDocuments = new Set(oldDocumentReviewNames.map(tokenName));
   for (const block of tables) {
     const title = tokenName(block.text);
     const columns = block.headers.map(tokenName);

@@ -1279,7 +1279,9 @@ function tableEditor(block) {
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : [])));
     cells.at(-1).append(tableRowImageEditor(current(), block, rowId, index));
     rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
-      const populated = block.rowImages?.[rowId] || row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
+      const populated = block.rowImages?.[rowId] || row.some((cell, column) =>
+        (isDocumentReviewTable(block) ? tableCellValue(block, index, column, sources) : cell).trim() ||
+        block.cellLinks?.[tableCellKey(block, index, column)]);
       if (populated && !confirm("Hapus baris tabel ini?")) return;
       for (const column of row.keys()) {
         const key = tableCellKey(block, index, column);
@@ -1380,11 +1382,12 @@ function tableCellField(block, row, column, sources, options) {
     link.toggleAttribute("data-automatic", Boolean(automatic) || tokenName(block.text) === "data umum bangunan gedung");
     const readOnly = Boolean(source);
     const nextValue = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
-    const changed = input.value !== nextValue || input.readOnly !== readOnly;
+    const placeholder = source && !entry?.value ? "Sumber belum tersedia" :
+      automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
+    const changed = input.value !== nextValue || input.readOnly !== readOnly || input.placeholder !== placeholder;
     if (input.value !== nextValue) input.value = nextValue;
     if (input.readOnly !== readOnly) input.readOnly = readOnly;
-    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" :
-      automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
+    input.placeholder = placeholder;
     summary.textContent = source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
     if (changed) control.syncTextFormat();
   }
