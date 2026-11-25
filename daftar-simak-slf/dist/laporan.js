@@ -39,7 +39,9 @@ function readChecklist(id, owner = slfCloudOwner()) {
 
 const checklistItems = catalog.flatMap((category) => category.groups.flatMap((group, gi) =>
   group.items.map((item, ii) => ({ ...item, group, category, id: category.code + "-" + gi + "-" + ii }))));
+const trialChapterCount = 2;
 const trialChecklistItems = checklistItems.slice(0, Math.floor(checklistItems.length / 4));
+const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
 const checklistLabels = {
   location: "Lokasi sampel", observation: "Pengamatan visual", damage: "Kerusakan", presence: "Ketersediaan",
   measurement: "Pengukuran", direction: "Arah bukaan", conformity: "Kesesuaian", nonconformity: "Uraian ketidaksesuaian",
@@ -70,8 +72,6 @@ function checklistPhotos(checklist) {
 }
 
 function checklistPhoto(id, key, blob, owner = slfCloudOwner()) {
-  const trial = globalThis.slfTrialData?.(id);
-  if (trial) return Promise.resolve(trial.photos.get(key));
   photoDatabase ??= openStore("daftar-simak-slf", "photos");
   return storeValue(photoDatabase, "photos", slfPhotoKey(id, key, owner), blob);
 }
@@ -142,7 +142,7 @@ async function renderChecklist(target, project, urls, checklist, summaryAnchors,
   await renderSimakForm(target, { identity, checks: checklist.checks }, {
     tegal: project.intensity?.region === "tegal",
     anchors: primary, summaryAnchors, photoUrls: urls, items,
-    loadPhoto: (key) => checklistPhoto(project.id, key),
+    loadPhoto: items === trialChecklistItems ? undefined : (key) => checklistPhoto(project.id, key),
   });
 }
 
@@ -155,32 +155,32 @@ function reportJump(id, label) {
 async function buildReport(target, project, urls, { trial = false } = {}) {
   target.replaceChildren();
   const items = trial ? trialChecklistItems : checklistItems;
-  if (trial) project = { ...project, chapters: project.chapters.slice(0, 2) };
+  if (trial) project = { ...project, chapters: project.chapters.slice(0, trialChapterCount) };
   const checklist = readChecklist(project.id);
   const sources = reportSources(project, checklist);
   const resolveToken = (links) => (original, name) => resolveReportLink(original, name, sources, links);
-  if (!trial) {
-    const coverFormat = (key, token) => getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
-    const data = {
-      ...project.cover,
-      building: automaticValue("nama bangunan", sources) || project.cover.building,
-      address: automaticValue("alamat bangunan", sources) || project.cover.address,
-      use: automaticValue("fungsi bangunan", sources) || project.cover.use,
-      owner: automaticValue("nama pemilik", sources) || project.cover.owner,
-    };
-    const title = data.title || "Laporan Kajian Teknis Sertifikat Laik Fungsi";
-    const cover = dom("section", { className: "report-cover" },
-      dom("p", { className: "paper-kicker" }, "Sertifikat Laik Fungsi"),
-      reportFormatted(dom("h1"), title, coverFormat("title")),
-      reportFormatted(dom("p", { className: "cover-building" }), data.building || project.name, data.building ? coverFormat("building", "nama bangunan") : getTextFormat(project, "name")),
-      reportFormatted(dom("p"), data.address || data.city || "", data.address ? coverFormat("address", "alamat bangunan") : coverFormat("city")));
-    if (imageSource.test(data.image || "")) {
-      cover.append(dom("img", { className: "cover-photo", src: data.image, alt: data.building || project.name }));
-    }
-    const coverDetails = coverFields.filter(([key]) => !["title", "building", "address"].includes(key) && data[key]?.trim());
-    if (coverDetails.length) cover.append(reportTable(["Identitas laporan", "Keterangan"], coverDetails.map(([key, label]) => [label, formattedValue(data[key], coverFormat(key, { use: "fungsi bangunan", owner: "nama pemilik" }[key]))])));
-    target.append(cover);
+  const coverFormat = (key, token) => getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
+  const data = {
+    ...project.cover,
+    building: automaticValue("nama bangunan", sources) || project.cover.building,
+    address: automaticValue("alamat bangunan", sources) || project.cover.address,
+    use: automaticValue("fungsi bangunan", sources) || project.cover.use,
+    owner: automaticValue("nama pemilik", sources) || project.cover.owner,
+  };
+  const title = data.title || "Laporan Kajian Teknis Sertifikat Laik Fungsi";
+  const cover = dom("section", { className: "report-cover" },
+    dom("p", { className: "paper-kicker" }, "Sertifikat Laik Fungsi"),
+    reportFormatted(dom("h1"), title, coverFormat("title")),
+    reportFormatted(dom("p", { className: "cover-building" }), data.building || project.name, data.building ? coverFormat("building", "nama bangunan") : getTextFormat(project, "name")),
+    reportFormatted(dom("p"), data.address || data.city || "", data.address ? coverFormat("address", "alamat bangunan") : coverFormat("city")));
+  if (imageSource.test(data.image || "")) {
+    cover.append(dom("img", { className: "cover-photo", src: data.image, alt: data.building || project.name }));
   }
+  const coverDetails = coverFields.filter(([key]) => !["title", "building", "address"].includes(key) && data[key]?.trim());
+  if (coverDetails.length) cover.append(reportTable(["Identitas laporan", "Keterangan"], coverDetails.map(([key, label]) => [label, formattedValue(data[key], coverFormat(key, { use: "fungsi bangunan", owner: "nama pemilik" }[key]))])));
+  if (trial) cover.append(dom("p", { className: "paper-kicker" }, "Versi coba · " + items.length +
+    " dari " + checklistItems.length + " butir Daftar Simak"));
+  target.append(cover);
   const contents = reportSection("Daftar isi", "report-contents");
   const sections = [];
   const tableEntries = [];
@@ -207,7 +207,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     summaries.get(key).push({ item, summary, id });
   }
   const intensity = calculateIntensity(project, checklist);
-  const showIntensity = !trial && Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram || intensity.data.additional.some((entry) => entry.name.trim()) ||
+  const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram || intensity.data.additional.some((entry) => entry.name.trim()) ||
     intensity.metrics.some((metric) => metric.measurement.value !== null || metric.measurement.error));
   const intensityTarget = intensityDestination(project);
   let intensityRendered = false;
@@ -240,16 +240,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, caption), table));
   }
   const attach = (section) => { sections.push(section); target.append(section); };
-  const introduction = trial ? reportSection("Pendahuluan", "report-trial-introduction") : undefined;
-  if (introduction) {
-    introduction.append(dom("p", { className: "paper-kicker" }, "Ruang Kajian SLF · Versi coba"),
-      dom("p", { className: "report-text" }, "Laporan terbatas pada Pendahuluan, Bab I, Bab II, dan " +
-        items.length + " dari " + checklistItems.length + " butir daftar simak."));
-    attach(introduction);
-  }
   for (const [key, label] of frontFields.slice(0, 2)) {
     if (!project.front[key]?.trim() && !(key === "approval" && project.front.signatory?.trim())) continue;
-    const section = introduction ? dom("div", {}, dom("h3", {}, label)) : reportSection(label, "report-" + key);
+    const section = reportSection(label, "report-" + key);
     section.classList.add("front-doc");
     section.append(...reportParagraphs(project.front[key] || "", getTextFormat(project.front, key), resolveToken(project.frontLinks?.[key])));
     if (key === "approval") section.append(dom("div", { className: "report-signoff" },
@@ -257,8 +250,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
       reportFormatted(dom("p"), project.front.role?.trim() || "Direktur", getTextFormat(project.front, "role")),
       dom("div", { className: "signature-space", ariaHidden: "true" }),
       reportFormatted(dom("p", { className: "signatory-name" }), project.front.signatory?.trim() || "[Nama Direktur]", getTextFormat(project.front, "signatory"))));
-    if (introduction) introduction.append(section);
-    else attach(section);
+    attach(section);
   }
   attach(contents);
   for (const [index, chapter] of project.chapters.entries()) {
@@ -301,7 +293,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     if (chapter.checklist) checklistTargets.push(section);
     attach(section);
   }
-  if (!trial && (summaries.has("fallback") || (showIntensity && !intensityRendered))) {
+  if (summaries.has("fallback") || (showIntensity && !intensityRendered)) {
     const section = reportSection("Ringkasan teknis", "report-technical-summary");
     if (showIntensity && !intensityRendered) appendIntensity(section);
     appendSummary(section, "fallback", "Hasil daftar simak terkait");
@@ -309,7 +301,6 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   }
   if (!checklistTargets.length) {
     const section = reportSection(trial ? "Daftar simak kajian (25%)" : "Lampiran · Daftar simak kajian", "report-checklist");
-    if (trial) appendSummary(section, "fallback", "Hasil daftar simak terkait");
     checklistTargets.push(section);
     attach(section);
   }

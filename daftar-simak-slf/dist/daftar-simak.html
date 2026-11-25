@@ -6,19 +6,38 @@
   <meta name="description" content="Form kajian pemeriksaan bangunan gedung untuk Sertifikat Laik Fungsi.">
   <meta name="theme-color" content="#f3f5f8">
   <title>Daftar Simak SLF</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="ponsel.css">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="acuan-simak.js" defer></script>
-  <script src="laporan.js?v=3" defer></script>
+  <script src="laporan.js?v=4" defer></script>
   <script src="simak-form.js?v=2" defer></script>
+  <script src="vendor/supabase-2.119.2.min.js" defer></script>
+  <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
-  <script src="app.js?v=2" defer></script>
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const embeddedAccount = params.has("cloud") && window.parent !== window && window.parent.slfCloudOwner?.();
+    const auth = params.has("trial") || embeddedAccount ? undefined : slfCloudClient()?.auth;
+    const session = (await auth?.getSession().catch(() => null))?.data?.session;
+    if (params.has("trial") || embeddedAccount || session) {
+      await import("./app.js?v=3");
+      document.body.hidden = false;
+      auth?.onAuthStateChange((event) => {
+        if (event === "SIGNED_OUT") {
+          document.body.hidden = true;
+          location.replace("./index.html");
+        }
+      });
+    } else {
+      location.replace("./index.html");
+    }
+  </script>
 </head>
-<body data-screen="simak">
+<body data-screen="simak" hidden>
   <header class="top">
     <div class="shell top-inner">
       <a class="app-brand" href="#judul" aria-label="Daftar Simak SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Pemeriksaan</a>

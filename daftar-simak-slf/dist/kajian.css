@@ -181,3 +181,5 @@ dialog::backdrop { background: #132b27ab; }
 @media (max-width: 760px) {
   .mast-inner:has(#trial-controls:not([hidden])) { flex-wrap: wrap; padding-block: 6px; }
 }
+
+.upload-locked:disabled { opacity: 1; color: var(--muted); background: var(--panel, #f6f8fa); }

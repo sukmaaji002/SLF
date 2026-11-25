@@ -22,13 +22,13 @@ function setTrialView(visible) {
   if (visible && slfAuthUser) return;
   if (visible && !trial) {
     const project = draft("Kajian SLF versi coba", preset);
-    project.chapters = project.chapters.slice(0, 2);
-    trial = { workspace: { projects: [project], current: project.id }, checklist: { identity: {}, checks: {} }, photos: new Map() };
+    const lockedChapters = project.chapters.splice(trialChapterCount);
+    trial = { workspace: { projects: [project], current: project.id }, lockedChapters, checklist: { identity: {}, checks: {} } };
   }
   if (dialog.open) dialog.close();
   workspace = visible ? trial.workspace : slfLocalWorkspace();
   slfChecklistItem = "";
-  active = visible ? "front" : "cover";
+  active = "cover";
   if (visible) ensureReportReferences(current());
   render();
   $("slf-public").hidden = visible;
@@ -349,26 +349,25 @@ function outlineEntry(label, id, marker) {
 function renderOutline() {
   const project = current();
   const nav = $("outline");
-  if (isTrial()) {
-    const locked = (label, marker = "") => dom("button", { type: "button", className: "outline-entry trial-locked", disabled: true },
-      dom("span", { className: "nav-marker", ariaHidden: "true" }, marker),
-      dom("span", {}, label, dom("small", {}, "Perlu login")));
-    nav.replaceChildren(locked("Sampul"), outlineEntry("Pendahuluan", "front", ""),
-      locked("Intensitas dan tata ruang"), locked("Peta tautan dan acuan"));
-    for (const [index, [name]] of reportTemplates[preset].chapters.entries()) {
-      const label = project.chapters[index]?.title.trim() || name;
-      nav.append(index < project.chapters.length ? outlineEntry(label, index, roman(index + 1)) : locked(label, roman(index + 1)));
-    }
-    nav.append(outlineEntry("Daftar simak (25%)", "checklist", ""));
-    return;
-  }
-  nav.replaceChildren(outlineEntry("Sampul", "cover", ""), outlineEntry("Bagian awal & daftar isi", "front", ""));
-  nav.append(outlineEntry("Intensitas dan tata ruang", "intensity", ""), outlineEntry("Peta tautan dan acuan", "links", ""));
+  const trying = isTrial();
+  nav.replaceChildren(outlineEntry("Sampul", "cover", ""), outlineEntry(trying ? "Pendahuluan" : "Bagian awal & daftar isi", "front", ""),
+    outlineEntry("Intensitas dan tata ruang", "intensity", ""), outlineEntry("Peta tautan dan acuan", "links", ""));
   for (const [index, chapter] of project.chapters.entries()) {
-    nav.append(outlineEntry(chapter.title.trim() || "Bab tanpa judul", index, roman(index + 1)));
+    const entry = outlineEntry(chapter.title.trim() || "Bab tanpa judul", index, roman(index + 1));
+    entry.setAttribute("aria-label", chapterLabel(project, index));
+    nav.append(entry);
   }
-  if (!project.chapters.some((chapter) => chapter.checklist)) {
-    nav.append(outlineEntry("Daftar simak", "checklist", ""));
+  if (trying) {
+    for (const [index, chapter] of trial.lockedChapters.entries()) {
+      const marker = roman(project.chapters.length + index + 1);
+      const name = "Bab " + marker + " · " + chapter.title;
+      nav.append(dom("button", { type: "button", className: "outline-entry trial-locked", disabled: true, ariaLabel: name + " · Perlu login" },
+        dom("span", { className: "nav-marker", ariaHidden: "true" }, marker),
+        dom("span", {}, chapter.title, dom("small", {}, "Perlu login"))));
+    }
+  }
+  if (trying || !project.chapters.some((chapter) => chapter.checklist)) {
+    nav.append(outlineEntry(trying ? "Daftar simak (25% dapat diisi)" : "Daftar simak", "checklist", ""));
   }
 }
 
@@ -380,6 +379,7 @@ function render() {
   for (const id of ["workspace-standalone", "cloud-controls", "projects-label", "project-picker", "workspace-side-actions"]) {
     $(id).hidden = trying || (id === "cloud-controls" && !slfCloud);
   }
+  $("backup-file").disabled = trying;
   if (trying) status.textContent = "";
   $("projects").replaceChildren(...slfProjectOptions());
   $("projects").value = project.id;
@@ -580,6 +580,7 @@ function projectChecklistUrl(project, item, embed = false) {
 }
 
 function checklistEditorLink(project, item, label) {
+  if (isTrial() && !trialChecklistIds.has(item)) return dom("span", {}, label);
   const link = dom("a", { href: projectChecklistUrl(project, item), target: "_blank", rel: "noopener" }, label);
   if (isTrial() || slfCloudOwner()) {
     link.removeAttribute("target");
@@ -597,6 +598,7 @@ function renderChecklistMap(project) {
   title("Daftar simak", "Peta tautan dan acuan");
   const search = dom("input", { type: "search", placeholder: "Cari nama butir atau acuan", ariaLabel: "Cari nama butir atau acuan" });
   const list = dom("div", { className: "auto-checklist", id: "checklist-map-items" });
+  const linkedProject = isTrial() ? { ...project, chapters: [...project.chapters, ...trial.lockedChapters] } : project;
   function update() {
     const checklist = readChecklist(project.id);
     const term = tokenName(search.value);
@@ -605,16 +607,19 @@ function renderChecklistMap(project) {
       const reference = checklistReference(item.id, project.intensity?.region === "tegal");
       const label = item.group.code + " · " + item.title;
       if (!tokenName(label + " " + reference).includes(term)) continue;
-      const to = checklistDestination(project, item);
-      const value = checklistSummary(item, checklist.checks[item.id]);
-      const summary = value || "Belum diisi";
+      const to = checklistDestination(linkedProject, item);
+      const locked = isTrial() && !trialChecklistIds.has(item.id);
+      const summary = locked ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]) || "Belum diisi";
       let jump = "Ringkasan teknis sebelum daftar simak";
-      if (to) jump = button("Bab " + roman(to.chapter + 1) + " · " + to.title, () => {
-        active = to.chapter;
-        render();
-        const section = document.getElementById("checklist-links-" + to.block);
-        if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
-      }, "quiet");
+      if (to) {
+        const destination = "Bab " + roman(to.chapter + 1) + " · " + to.title;
+        jump = to.chapter >= project.chapters.length ? destination + " · Perlu login" : button(destination, () => {
+          active = to.chapter;
+          render();
+          const section = document.getElementById("checklist-links-" + to.block);
+          if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
+        }, "quiet");
+      }
       rows.push([checklistEditorLink(project, item.id, label), summary, reference, jump]);
     }
     list.replaceChildren(rows.length ? editorTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
@@ -652,10 +657,10 @@ function refreshChecklistViews() {
 
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
-  for (const item of isTrial() ? trialChecklistItems : checklistItems) {
+  for (const item of checklistItems) {
     const to = checklistDestination(project, item);
     if (to?.chapter !== active || to.block !== blockIndex) continue;
-    const summary = checklistSummary(item, checklist.checks[item.id]);
+    const summary = isTrial() && !trialChecklistIds.has(item.id) ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]);
     rows.push([checklistEditorLink(project, item.id, item.title),
       summary || "Belum diisi", checklistReference(item.id, project.intensity?.region === "tegal")]);
   }
@@ -707,12 +712,12 @@ function renderFront(project) {
 
 function renderChecklistEditor(project) {
   const trying = isTrial();
-  if (active === "checklist") title("Lampiran", trying ? "Daftar simak kajian (25%)" : "Daftar simak kajian");
+  if (active === "checklist") title("Lampiran", trying ? "Daftar simak kajian (25% dapat diisi)" : "Daftar simak kajian");
   const item = slfChecklistItem;
   slfChecklistItem = "";
   const head = dom("div", { className: "checklist-head" },
     dom("p", { className: "lead" }, trying
-      ? trialChecklistItems.length + " dari " + checklistItems.length + " butir tersedia. Butir lainnya · Perlu login."
+      ? trialChecklistItems.length + " dari " + checklistItems.length + " butir dapat diisi. Butir lainnya · Perlu login."
       : "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."));
   if (!trying) head.append(dom("a", { href: projectChecklistUrl(project), target: "_blank", rel: "noopener" }, "Buka layar penuh"));
   editor.append(head, dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
@@ -769,7 +774,7 @@ function renderChapter(project) {
   editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
   const headings = headingEntries(chapter, index);
   const checklist = readChecklist(project.id);
-  const mapped = new Set((isTrial() ? trialChecklistItems : checklistItems).map((item) => checklistDestination(project, item))
+  const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;
@@ -783,11 +788,15 @@ function renderChapter(project) {
   appendChecklist(-1);
   for (const [bi, block] of chapter.blocks.entries()) {
     editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
-    if (!isTrial() && intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
+    if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
     appendChecklist(bi);
   }
   const actions = dom("div", { className: "button-row add-block" });
   for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
+    if (isTrial() && type === "photo") {
+      actions.append(lockedUpload("Foto"));
+      continue;
+    }
     actions.append(button("＋ " + label, () => {
       const data = type === "heading" ? heading("") :
         type === "table" ? { type, text: "", headers: ["Uraian", "Keterangan"], rows: [["", ""]] } : { type, text: "" };
@@ -975,7 +984,12 @@ async function imageData(file) {
   }
 }
 
+function lockedUpload(label) {
+  return dom("button", { type: "button", className: "upload-locked", disabled: true }, label + " · Perlu login");
+}
+
 function pictureEditor(block, label, isAttached = () => true) {
+  if (isTrial()) return lockedUpload("Unggah " + label);
   const upload = dom("input", { type: "file", accept: "image/*" });
   const feedback = dom("p", { className: "hint", role: "status" });
   const image = dom("img", { className: "photo-thumb", alt: "Pratinjau dokumentasi", hidden: true });
@@ -1010,6 +1024,7 @@ function pictureEditor(block, label, isAttached = () => true) {
 }
 
 function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
+  if (isTrial()) return dom("div", { className: "section-photos" }, lockedUpload(label));
   const upload = dom("input", { type: "file", accept: "image/*", multiple: true, hidden: true, ariaLabel: label });
   const add = button(label, () => upload.click());
   const feedback = dom("p", { className: "hint", role: "status", hidden: true });
@@ -1379,7 +1394,7 @@ function start() {
   backupControl.addEventListener("click", () => backup(current(), slfCloudOwner(), backupControl, status));
   $("restore").addEventListener("click", () => $("backup-file").click());
   $("backup-file").addEventListener("change", () => {
-    if ($("backup-file").files[0]) importBackup($("backup-file").files[0]);
+    if (!isTrial() && $("backup-file").files[0]) importBackup($("backup-file").files[0]);
   });
   window.addEventListener("storage", (event) => {
     if (event.key !== slfChecklistKey(current().id, slfCloudOwner())) return;

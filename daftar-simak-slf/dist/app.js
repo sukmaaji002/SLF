@@ -6,7 +6,7 @@ const projectId = params.get("proyek");
 const tegalReference = params.get("acuan") === "tegal";
 const trialMode = params.has("trial");
 const trialData = trialMode ? (window.parent !== window ? window.parent.slfTrialData?.(projectId) : undefined)
-  ?? { checklist: { identity: {}, checks: {} }, photos: new Map() } : undefined;
+  ?? { checklist: { identity: {}, checks: {} } } : undefined;
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
 const cloudChecklist = !trialMode && projectMode && params.has("cloud");
 const cloudOwner = cloudChecklist && window.parent !== window ? window.parent.slfCloudOwner?.() || "" : "";
@@ -235,10 +235,10 @@ function refresh() {
     for (const group of section.groups) {
       let groupCount = 0;
       for (const item of group.items) {
-        const check = state.checks[item.id];
+        const check = item.locked ? undefined : state.checks[item.id];
         const { filled, issue, na } = check ? flags(check) : { filled: false, issue: false, na: false };
-        const status = na ? "na" : issue ? "issue" : filled ? "filled" : "empty";
-        const labels = { na: "Tidak berlaku", issue: "Ada temuan", filled: "Sudah diisi", empty: "Belum diisi" };
+        const status = item.locked ? "locked" : na ? "na" : issue ? "issue" : filled ? "filled" : "empty";
+        const labels = { locked: "Perlu login", na: "Tidak berlaku", issue: "Ada temuan", filled: "Sudah diisi", empty: "Belum diisi" };
         item.badge.textContent = labels[status];
         item.badge.dataset.state = status;
         item.node.classList.toggle("has-data", filled && !na);
@@ -254,10 +254,11 @@ function refresh() {
     section.node.hidden = sectionCount === 0;
     visible += sectionCount;
   }
-  const percent = Math.round(checked / items.length * 100);
+  const available = trialMode ? trialChecklistItems.length : items.length;
+  const percent = available ? Math.round(checked / available * 100) : 0;
   byId("percent").textContent = percent + "%";
   byId("progress").value = percent;
-  byId("count").textContent = checked + " dari " + items.length + " butir ditinjau";
+  byId("count").textContent = checked + " dari " + available + " butir ditinjau";
   byId("findings").textContent = issues + " butir dengan temuan";
   byId("result-count").textContent = visible ? visible + " butir ditampilkan" : "Tidak ada butir yang cocok dengan filter.";
 }
@@ -275,12 +276,7 @@ function database() {
 }
 
 async function photoStore(operation, key, value) {
-  if (trialData) {
-    if (operation === "put") trialData.photos.set(key, value);
-    else if (operation === "delete") trialData.photos.delete(key);
-    else return trialData.photos.get(key);
-    return;
-  }
+  if (trialMode) return;
   const db = await database();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("photos", operation === "get" ? "readonly" : "readwrite");
@@ -292,6 +288,7 @@ async function photoStore(operation, key, value) {
 }
 
 function attachPhoto(item, row, onChange, labelText, property = "photo") {
+  if (trialMode) return el("p", "photo-lock wide", labelText + " · Perlu login");
   const wrapper = el("div", "photo-field wide");
   wrapper.classList.toggle("has-value", Boolean(row[property]));
   const label = el("label", "", labelText);
@@ -472,9 +469,7 @@ function renderItem(item) {
 }
 
 function renderCatalog() {
-  const allowed = trialMode ? new Set(trialChecklistItems.map(({ id }) => id)) : undefined;
   for (const source of catalog) {
-    if (trialMode && !trialChecklistItems.some(({ category }) => category === source)) continue;
     const section = { ...source, groups: [], node: el("section", "catalog-section") };
     section.node.id = "bagian-" + source.code.replace(".", "");
     const title = source.code + " " + source.title;
@@ -490,29 +485,31 @@ function renderCatalog() {
     });
     byId("category-nav").append(link);
     for (const [groupIndex, sourceGroup] of source.groups.entries()) {
-      if (trialMode && !trialChecklistItems.some(({ group }) => group === sourceGroup)) continue;
       const group = { ...sourceGroup, items: [], node: el("details", "group") };
       group.node.open = true;
       group.node.append(el("summary", "", sourceGroup.code + " " + sourceGroup.title));
       for (const [itemIndex, sourceItem] of sourceGroup.items.entries()) {
         const item = { ...sourceItem, category: section, group, id: source.code + "-" + groupIndex + "-" + itemIndex };
-        if (allowed && !allowed.has(item.id)) continue;
-        item.initialCount = startRows(item).length;
+        item.locked = trialMode && !trialChecklistIds.has(item.id);
+        if (!item.locked) item.initialCount = startRows(item).length;
         item.search = [sourceItem.title, sourceGroup.code, sourceGroup.title, title, ...(sourceItem.components || [])].join(" ").toLocaleLowerCase("id");
-        item.node = el("details", "item");
+        item.node = item.locked ? el("div", "item locked-item") : el("details", "item");
         item.node.id = "butir-" + item.id;
-        const summary = el("summary", "item-summary");
+        const summary = el(item.locked ? "div" : "summary", "item-summary");
         item.badge = el("span", "item-status");
         const name = el("span", "item-title", [item.no, item.title].filter(Boolean).join(". "));
         summary.append(name, item.badge);
-        item.body = el("div", "item-body");
-        item.node.append(summary, item.body);
-        summary.addEventListener("click", () => {
-          if (!item.body.hasChildNodes()) renderItem(item);
-        });
-        item.node.addEventListener("toggle", () => {
-          if (item.node.open && !item.body.hasChildNodes()) renderItem(item);
-        });
+        item.node.append(summary);
+        if (!item.locked) {
+          item.body = el("div", "item-body");
+          item.node.append(item.body);
+          summary.addEventListener("click", () => {
+            if (!item.body.hasChildNodes()) renderItem(item);
+          });
+          item.node.addEventListener("toggle", () => {
+            if (item.node.open && !item.body.hasChildNodes()) renderItem(item);
+          });
+        }
         group.node.append(item.node);
         group.items.push(item);
         items.push(item);
@@ -554,7 +551,7 @@ function exportCsv() {
   const uniqueFields = [...new Map(rowFields.map((definition) => [definition[0], definition])).values()];
   const lines = [
     [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],
-    ...items.flatMap((item) => {
+    ...items.filter((item) => !item.locked).flatMap((item) => {
       const check = getCheck(item);
       return check.rows.map((row) => [
         ...identity.map(([key]) => state.identity[key]),
@@ -577,14 +574,15 @@ function toggleGroups() {
 
 if (trialMode) {
   byId("save-status").textContent = "Versi coba · Data tersimpan selama tab terbuka";
-  byId("check-title").textContent = "Butir pemeriksaan (25%)";
-  byId("check-title").after(el("p", "result", trialChecklistItems.length + " dari " + checklistItems.length + " butir. Sisanya · Perlu login."));
+  byId("check-title").after(el("p", "result", trialChecklistItems.length + " dari " + checklistItems.length +
+    " butir dapat diisi. Butir lainnya · Perlu login."));
+  byId("status-filter").add(new Option("Perlu login", "locked"));
   byId("export").hidden = true;
 }
 renderCatalog();
 const requestedItem = items.find((item) => "#" + item.node.id === location.hash);
 if (requestedItem) {
-  requestedItem.node.open = true;
+  if (!requestedItem.locked) requestedItem.node.open = true;
   requestAnimationFrame(() => requestedItem.node.scrollIntoView({ block: "start" }));
 }
 renderIdentity();
@@ -611,7 +609,7 @@ async function prepareSimakPaper() {
   const draft = dom("div");
   simakPaper.append(draft);
   await renderSimakForm(draft, structuredClone(state), {
-    tegal: tegalReference, photoUrls: urls, loadPhoto: (key) => photoStore("get", key),
+    tegal: tegalReference, photoUrls: urls, loadPhoto: trialMode ? undefined : (key) => photoStore("get", key),
     items: trialMode ? trialChecklistItems : checklistItems,
   });
   if (urls !== simakPhotoUrls) {
@@ -673,6 +671,7 @@ byId("reset").addEventListener("click", async () => {
     }
     state = { identity: {}, checks: {} };
     for (const item of items) {
+      if (item.locked) continue;
       for (const photo of item.body.querySelectorAll(".photo-field")) photo.dispose();
       item.body.replaceChildren();
       item.node.open = false;

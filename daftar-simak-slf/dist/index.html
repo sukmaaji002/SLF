@@ -6,7 +6,7 @@
   <meta name="description" content="Susun laporan kajian Sertifikat Laik Fungsi, lengkapi daftar simak, dan cetak laporan.">
   <meta name="theme-color" content="#f6f8f4">
   <title>Ruang Kajian SLF</title>
-  <link rel="stylesheet" href="kajian.css?v=4">
+  <link rel="stylesheet" href="kajian.css?v=5">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="akun.css?v=3">
@@ -19,7 +19,7 @@
   <script src="simak-form.js?v=2" defer></script>
   <script src="intensitas.js" defer></script>
   <script src="skema-tapak.js" defer></script>
-  <script src="laporan.js?v=3" defer></script>
+  <script src="laporan.js?v=4" defer></script>
   <script src="isian.js?v=3" defer></script>
   <script src="contoh-isian.js" defer></script>
   <script src="vendor/paged-0.4.3.min.js" defer></script>
@@ -28,7 +28,7 @@
   <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
   <script src="cloud-workspace.js?v=4" defer></script>
-  <script src="kajian.js?v=8" defer></script>
+  <script src="kajian.js?v=9" defer></script>
 </head>
 <body data-screen="kajian">
   <div id="slf-public" class="landing">
@@ -54,7 +54,7 @@
             <button id="start-trial" class="landing-button" type="button" disabled>Coba buat kajian</button>
             <button class="landing-button landing-button-outline" type="button" data-landing-auth="signup" disabled>Buat akun</button>
           </div>
-          <p class="landing-trial-note">Coba Pendahuluan, Bab I, Bab II, dan 25% daftar simak tanpa akun.</p>
+          <p class="landing-trial-note">Coba Sampul, Pendahuluan, Intensitas dan Tata Ruang, Peta Tautan dan Acuan, Bab I, Bab II, serta 25% isian Daftar Simak tanpa akun.</p>
           <p id="landing-auth-status" class="landing-auth-status" role="status"></p>
         </div>
         <figure class="landing-photo">
@@ -148,14 +148,14 @@
           <span id="save-status" role="status"></span>
         </div>
       </section>
-      <p id="trial-notice" class="trial-notice" hidden>Versi coba berlaku selama tab ini terbuka. PDF hanya memuat bagian yang tersedia. Masuk untuk mengakses seluruh bagian dan menyimpan draf ke akun.</p>
+      <p id="trial-notice" class="trial-notice" hidden>Versi coba berlaku selama tab ini terbuka. PDF hanya memuat bagian yang tersedia. Masuk untuk membuka seluruh bagian, mengunggah foto atau dokumen, dan menyimpan draf ke akun.</p>
       <div class="workspace">
         <aside class="sidebar">
           <details id="section-navigation" open>
             <summary class="section-nav-toggle"><span>Isi laporan</span><span id="mobile-section-name" class="mobile-section-name" aria-hidden="true"></span></summary>
             <div class="side-head"><p id="template-label"></p></div>
             <nav id="outline" aria-label="Isi laporan"></nav>
-            <p id="trial-locked-tools" class="hint trial-locked-tools" hidden>Tambah bab dan cadangan proyek · Perlu login</p>
+            <p id="trial-locked-tools" class="hint trial-locked-tools" hidden>Tambah bab dan impor cadangan · Perlu login</p>
             <div id="workspace-side-actions" class="side-actions">
               <button id="add-chapter" class="quiet" type="button">＋ Tambah bab</button>
               <details class="backup-actions">
