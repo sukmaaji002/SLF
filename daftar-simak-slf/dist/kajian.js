@@ -198,52 +198,29 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function repeatedNarrativeField(spec, data, changed, groups = []) {
-  const choices = groups.flatMap(([, options]) => options);
-  const choiceKeys = new Set(choices.map(tokenName));
-  const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
-  let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
-  const extra = selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
-  const values = data[spec.key]?.length ? [...data[spec.key]] : [extra];
+function narrativeEntryList(values, item, changed, minimumRows = 1) {
   const list = dom("div", { className: "repeated-narrative-list" });
-  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
-  for (const [legend, options] of groups) {
-    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
-      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
-      if (checked) selected.push(choice);
-      commit();
-    });
-    sync(selected);
-    form.append(fieldset);
-  }
-  form.append(list, button("Tambah isian", () => {
+  const appendEntry = button("Tambah isian", () => {
     values.push("");
     renderRows();
-    commit();
-    list.lastElementChild.querySelector("input").focus();
-  }));
-  function commit() {
-    const value = scopeList.format([...selected, ...values].map((entry) => entry.trim()).filter(Boolean));
-    updateTextFormat(data, "value", data.value, value);
-    data[spec.key] = [...values];
-    if (spec.choiceKey) data[spec.choiceKey] = [...selected];
-    data.value = value;
     changed();
-  }
+    list.lastElementChild.querySelector("input").focus();
+  });
   function renderRows() {
     list.replaceChildren(...values.map((value, index) => {
-      const label = spec.item + " " + (index + 1);
+      const label = item + " " + (index + 1);
       const input = field(label, value, (text) => {
         values[index] = text;
-        commit();
+        changed();
       });
       const row = dom("div", { className: "repeated-narrative-row" }, input);
-      if (values.length > 1) {
+      if (values.length > minimumRows) {
         const remove = button("Hapus", () => {
           values.splice(index, 1);
           renderRows();
-          commit();
-          list.children[Math.min(index, values.length - 1)].querySelector("input").focus();
+          changed();
+          const next = list.children[Math.min(index, values.length - 1)];
+          (next?.querySelector("input") ?? appendEntry).focus();
         }, "quiet");
         remove.setAttribute("aria-label", "Hapus " + label.toLocaleLowerCase("id"));
         row.append(remove);
@@ -252,6 +229,83 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
     }));
   }
   renderRows();
+  return [list, appendEntry];
+}
+
+function repeatedNarrativeField(spec, data, changed, groups = []) {
+  const choices = groups.flatMap(([, options]) => options);
+  const choiceKeys = new Set(choices.map(tokenName));
+  const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
+  let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
+  const extra = selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
+  const values = [...(data[spec.key] ?? [])];
+  if (!values.length && (!spec.groupKey || (!data[spec.groupKey] && extra.trim()))) values.push(extra);
+  const fixedNames = new Set(groups.map(([name]) => name));
+  const referenceGroups = (data[spec.groupKey] ?? []).map(({ name, fixed, entries }) =>
+    ({ name, fixed: fixed && fixedNames.has(name), entries: [...entries] }));
+  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
+  for (const [legend, options] of groups) {
+    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
+      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
+      if (checked) selected.push(choice);
+      commit();
+    });
+    sync(selected);
+    if (spec.groupKey) {
+      let group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
+      if (!group) {
+        group = { name: legend, fixed: true, entries: [] };
+        referenceGroups.push(group);
+      }
+      fieldset.append(...narrativeEntryList(group.entries, spec.item, commit, 0));
+    }
+    form.append(fieldset);
+  }
+  if (spec.groupKey) {
+    if (values.some((entry) => entry.trim())) {
+      form.append(dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Acuan tambahan sebelumnya"),
+        ...narrativeEntryList(values, spec.item, commit, 0)));
+    }
+    const customGroups = dom("div");
+    const addGroup = button("Tambah acuan keselamatan", () => {
+      const group = { name: "", fixed: false, entries: [""] };
+      referenceGroups.push(group);
+      appendGroup(group).focus();
+      commit();
+    });
+    for (const group of referenceGroups.filter(({ fixed }) => !fixed)) appendGroup(group);
+    form.append(customGroups, addGroup);
+
+    function appendGroup(group) {
+      const name = field("Nama jenis acuan", group.name, (text) => {
+        group.name = text;
+        commit();
+      });
+      const fieldset = dom("fieldset", { className: "scope-options" },
+        dom("legend", {}, "Jenis acuan tambahan"), name,
+        ...narrativeEntryList(group.entries, spec.item, commit));
+      fieldset.append(button("Hapus jenis acuan", () => {
+        referenceGroups.splice(referenceGroups.indexOf(group), 1);
+        fieldset.remove();
+        addGroup.focus();
+        commit();
+      }, "quiet"));
+      customGroups.append(fieldset);
+      return name.querySelector("input");
+    }
+  } else {
+    form.append(...narrativeEntryList(values, spec.item, commit));
+  }
+  function commit() {
+    const value = narrativeEntryValue(selected, values, referenceGroups);
+    updateTextFormat(data, "value", data.value, value);
+    data[spec.key] = [...values];
+    if (spec.choiceKey) data[spec.choiceKey] = [...selected];
+    if (spec.groupKey) data[spec.groupKey] = referenceGroups.map(({ name, fixed, entries }) =>
+      ({ name, fixed, entries: [...entries] }));
+    data.value = value;
+    changed();
+  }
   return form;
 }
 
@@ -369,6 +423,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
       if (repeated?.choiceKey && Array.isArray(saved?.[repeated.choiceKey])) manualData[repeated.choiceKey] = saved[repeated.choiceKey];
+      if (repeated?.groupKey && Array.isArray(saved?.[repeated.groupKey])) manualData[repeated.groupKey] = saved[repeated.groupKey];
       const saveManual = () => {
         setLinks({ ...getLinks(), [token]: manualData });
         if (sources.has(ownSource)) {

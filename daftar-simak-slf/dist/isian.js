@@ -10,7 +10,7 @@ const repeatedNarrativeFields = new Map([
   ["ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan tata bangunan", item: "Acuan tambahan" }],
   ["standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan",
-    { key: "references", choiceKey: "referenceChoices", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
+    { key: "references", choiceKey: "referenceChoices", groupKey: "referenceGroups", legend: "Acuan keselamatan", item: "Acuan tambahan" }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
@@ -346,6 +346,15 @@ function resolveReportText(text, sources, links) {
 const sourceUuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const validReportSource = (source) => typeof source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(source);
 
+function narrativeEntryValue(choices, entries, groups = []) {
+  const groupEntries = groups.flatMap(({ name, entries, fixed }) => {
+    const references = entries.map((entry) => entry.trim()).filter(Boolean);
+    return !fixed && name.trim() && references.length ?
+      [name.trim() + " (" + scopeList.format(references) + ")"] : references;
+  });
+  return scopeList.format([...choices, ...entries, ...groupEntries].map((entry) => entry.trim()).filter(Boolean));
+}
+
 function importLinks(links) {
   if (!links || typeof links !== "object" || Array.isArray(links)) return {};
   const pairs = [];
@@ -357,10 +366,14 @@ function importLinks(links) {
       const field = repeatedNarrativeFields.get(key);
       const entries = field && link[field.key];
       const choices = field?.choiceKey ? link[field.choiceKey] : [];
+      const groups = field?.groupKey ? link[field.groupKey] ?? [] : [];
       if (Array.isArray(entries) && Array.isArray(choices) && [...choices, ...entries].every((entry) => typeof entry === "string") &&
-        scopeList.format([...choices, ...entries].map((entry) => entry.trim()).filter(Boolean)) === link.value) {
+        Array.isArray(groups) && groups.every((group) => group && typeof group.name === "string" &&
+          typeof group.fixed === "boolean" && Array.isArray(group.entries) && group.entries.every((entry) => typeof entry === "string")) &&
+        narrativeEntryValue(choices, entries, groups) === link.value) {
         data[field.key] = [...entries];
         if (field.choiceKey) data[field.choiceKey] = [...choices];
+        if (field.groupKey) data[field.groupKey] = groups.map(({ name, fixed, entries }) => ({ name, fixed, entries: [...entries] }));
       }
       pairs.push([key, data]);
     }

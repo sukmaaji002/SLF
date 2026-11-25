@@ -261,7 +261,7 @@ const inputExamples = {
 };
 
 const inputHints = {
-  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan sesuai sistem yang diperiksa. Gunakan Tambah isian untuk mencatat acuan lain beserta nomor dan edisinya.",
+  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan atau pilih Tambah isian pada jenis yang sesuai. Untuk jenis lain, pilih Tambah acuan keselamatan.",
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
   "daftar dokumen": "Diambil dari tabel Rekap Pemeriksaan Dokumen. Untuk baris bawaan, isi nomor/tanggal, keterangan, atau status seperti Tersedia atau Telah ditelaah.",
   "tanggal pemeriksaan": "Mengikuti Tanggal pemeriksaan di identitas daftar simak. Pilih Isi manual jika tanggal observasi berbeda.",
