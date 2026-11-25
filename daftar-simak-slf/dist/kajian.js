@@ -121,24 +121,38 @@ function scopeField(project, onChange) {
   return form;
 }
 
+const multipleChoiceLegends = new Map([
+  ["metode pemeriksaan yang digunakan", "Pilih satu atau beberapa metode"],
+  ["fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan", "Pilih satu atau beberapa kriteria"],
+  ["daftar dokumen", "Pilih satu atau beberapa dokumen"],
+  ["dokumen rujukan", "Pilih satu atau beberapa dokumen rujukan"],
+  ["gambar terbangun atau data lapangan", "Pilih satu atau beberapa data pembanding"],
+]);
+
 function multipleChoiceField(legend, choices, input, applyValue) {
   const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
-  const known = (part) => choices.includes(tokenName(part));
+  const choiceKeys = new Set(choices.map(tokenName));
+  const known = (part) => choiceKeys.has(tokenName(part));
   const parts = () => input.value.trim().split(/\s*,\s*/).filter(Boolean).flatMap((part) => {
     const tail = part.replace(/^dan\s+/i, "");
     if (known(tail)) return [tail];
-    const joined = part.split(/\s+dan\s+/i);
-    return joined.every(known) ? joined : [part];
+    for (const match of part.matchAll(/\s+dan\s+/gi)) {
+      const left = part.slice(0, match.index);
+      const right = part.slice(match.index + match[0].length);
+      if (known(left) && known(right)) return [left, right];
+    }
+    return [part];
   });
   const controls = choices.map((choice) => {
+    const choiceKey = tokenName(choice);
     const control = dom("input", { type: "checkbox" });
     control.addEventListener("change", () => {
-      const values = parts().filter((part) => tokenName(part) !== choice);
+      const values = parts().filter((part) => tokenName(part) !== choiceKey);
       if (control.checked) values.push(choice);
       applyValue(values.every(known) ? scopeList.format(values) : values.join(", "));
     });
     fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
-    return [choice, control];
+    return [choiceKey, control];
   });
   const sync = () => {
     const selected = new Set(parts().map(tokenName));
@@ -261,8 +275,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         refreshLinkedFields(details);
         save();
       };
-      const criteria = token === "fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan";
-      const manualLabel = criteria ? "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
+      const choiceLegend = multipleChoiceLegends.get(token);
+      const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
+        "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const manual = field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
@@ -275,8 +290,6 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       };
       const isExample = !Object.hasOwn(inputChoices, token);
       let choiceField;
-      const choiceLegend = criteria ? "Pilih satu atau beberapa kriteria" :
-        token === "metode pemeriksaan yang digunakan" ? "Pilih satu atau beberapa metode" : "";
       if (choiceLegend) {
         choiceField = multipleChoiceField(choiceLegend, choices, manualInput, applyChoiceValue);
       } else if (choices.length) {
@@ -312,7 +325,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
-        useManual.hidden = self || Boolean(linkedValue);
+        useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend);
         if (choiceField) choiceField.hidden = !self && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
         value.textContent = linkedValue || "Data dari sumber ini belum terisi.";
