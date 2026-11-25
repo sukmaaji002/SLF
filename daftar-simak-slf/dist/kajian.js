@@ -121,8 +121,8 @@ function scopeField(project, onChange) {
   return form;
 }
 
-function methodChoiceField(choices, input, applyValue) {
-  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Pilih satu atau beberapa metode"));
+function multipleChoiceField(legend, choices, input, applyValue) {
+  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
   const known = (part) => choices.includes(tokenName(part));
   const parts = () => input.value.trim().split(/\s*,\s*/).filter(Boolean).flatMap((part) => {
     const tail = part.replace(/^dan\s+/i, "");
@@ -261,7 +261,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         refreshLinkedFields(details);
         save();
       };
-      const manual = field("Isi " + name, manualData.value, (input) => { manualData.value = input; saveManual(); },
+      const criteria = token === "fungsi, variasi kondisi, keterwakilan, atau riwayat gangguan";
+      const manualLabel = criteria ? "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
+      const manual = field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
       const choices = token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
@@ -273,8 +275,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       };
       const isExample = !Object.hasOwn(inputChoices, token);
       let choiceField;
-      if (token === "metode pemeriksaan yang digunakan") {
-        choiceField = methodChoiceField(choices, manualInput, applyChoiceValue);
+      const choiceLegend = criteria ? "Pilih satu atau beberapa kriteria" :
+        token === "metode pemeriksaan yang digunakan" ? "Pilih satu atau beberapa metode" : "";
+      if (choiceLegend) {
+        choiceField = multipleChoiceField(choiceLegend, choices, manualInput, applyChoiceValue);
       } else if (choices.length) {
         const pick = dom("select", { ariaLabel: "Pilihan isian " + name },
           new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option)));
