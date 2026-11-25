@@ -7,6 +7,8 @@ const repeatedNarrativeFields = new Map([
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
   ["peraturan, standar teknis, dan dokumen rencana yang relevan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],
+  ["ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan",
+    { key: "references", choiceKey: "referenceChoices", legend: "Acuan tata bangunan", item: "Acuan tambahan" }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
