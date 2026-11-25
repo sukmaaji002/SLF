@@ -235,8 +235,17 @@ const earlierPermitFields = new Set([
   "dokumen", technicalDocumentsToken, ownerDocumentsToken, "jenis dokumen, nomor, dan tanggal",
 ]);
 
+function permitNumberFromText(value, kind) {
+  const pattern = new RegExp(kind.source +
+    String.raw`(?:\s*/\s*(?:IMB|PBG))?\)?\s*(?:\(\s*|[-:–]\s*)?(?:(?:nomor|no\.?)\s*[:.]?\s*)?([\w/-]*\d[\w./-]*)`, "i");
+  return cleanValue(value).match(pattern)?.[1]?.replace(/[./-]+$/, "");
+}
+
 function recordedPermitNumbers(project, beforeBlock, sources) {
   const recorded = { ...sources.get("project:reviewed-permit")?.numbers };
+  const [spatialPlan, kkpr] = permitKinds[0];
+  const kkprNumber = permitNumberFromText(project.intensity?.local?.source, kkpr);
+  if (kkprNumber) recorded[spatialPlan] = kkprNumber;
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
       if (block === beforeBlock) return recorded;
@@ -247,9 +256,7 @@ function recordedPermitNumbers(project, beforeBlock, sources) {
         const value = resolveReportLink("", token, sources, block.links).value;
         for (const [type, kind] of permitKinds) {
           if (recorded[type]) continue;
-          const pattern = new RegExp(kind.source +
-            String.raw`(?:\s*/\s*(?:IMB|PBG))?\)?\s*(?:\(\s*|[-:]\s*)?(?:(?:nomor|no\.?)\s*[:.]?\s*)?([\w/-]*\d[\w./-]*)`, "i");
-          const number = value.match(pattern)?.[1]?.replace(/[./-]+$/, "");
+          const number = permitNumberFromText(value, kind);
           if (number) recorded[type] = number;
         }
       }
