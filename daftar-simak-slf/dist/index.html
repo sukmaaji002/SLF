@@ -6,20 +6,20 @@
   <meta name="description" content="Susun laporan kajian Sertifikat Laik Fungsi, lengkapi daftar simak, dan cetak laporan.">
   <meta name="theme-color" content="#f6f8f4">
   <title>Ruang Kajian SLF</title>
-  <link rel="stylesheet" href="kajian.css?v=3">
+  <link rel="stylesheet" href="kajian.css?v=4">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="akun.css?v=3">
   <link rel="stylesheet" href="ponsel.css?v=2">
-  <link rel="stylesheet" href="beranda.css">
+  <link rel="stylesheet" href="beranda.css?v=2">
   <script src="format-teks.js" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js?v=2" defer></script>
   <script src="acuan-simak.js" defer></script>
-  <script src="simak-form.js" defer></script>
+  <script src="simak-form.js?v=2" defer></script>
   <script src="intensitas.js" defer></script>
   <script src="skema-tapak.js" defer></script>
-  <script src="laporan.js?v=2" defer></script>
+  <script src="laporan.js?v=3" defer></script>
   <script src="isian.js?v=3" defer></script>
   <script src="contoh-isian.js" defer></script>
   <script src="vendor/paged-0.4.3.min.js" defer></script>
@@ -28,7 +28,7 @@
   <script src="cloud-config.js" defer></script>
   <script src="cloud.js" defer></script>
   <script src="cloud-workspace.js?v=4" defer></script>
-  <script src="kajian.js?v=7" defer></script>
+  <script src="kajian.js?v=8" defer></script>
 </head>
 <body data-screen="kajian">
   <div id="slf-public" class="landing">
@@ -51,18 +51,11 @@
           <h1 id="landing-title">Susun kajian SLF<br class="landing-hero-break"> <em>lebih teratur.</em></h1>
           <p class="landing-lead">Siapkan laporan kajian, lengkapi daftar simak dan dokumentasi, lalu tinjau semuanya dalam satu ruang kerja.</p>
           <div class="landing-actions">
-            <button class="landing-button" type="button" data-landing-auth="signup" disabled>Buat akun</button>
-            <a class="landing-button landing-button-outline" href="#fitur">Jelajahi fitur</a>
+            <button id="start-trial" class="landing-button" type="button" disabled>Coba buat kajian</button>
+            <button class="landing-button landing-button-outline" type="button" data-landing-auth="signup" disabled>Buat akun</button>
           </div>
+          <p class="landing-trial-note">Coba Pendahuluan, Bab I, Bab II, dan 25% daftar simak tanpa akun.</p>
           <p id="landing-auth-status" class="landing-auth-status" role="status"></p>
-          <details id="landing-local-drafts" class="landing-local-drafts" hidden>
-            <summary>Ambil draf lokal dari browser ini</summary>
-            <p>Unduh cadangan, lalu impor lewat menu Cadangan proyek setelah masuk.</p>
-            <label for="landing-local-project">Proyek lokal</label>
-            <select id="landing-local-project"></select>
-            <button id="landing-local-backup" class="landing-button landing-button-outline" type="button">Unduh cadangan</button>
-            <p id="landing-backup-status" role="status"></p>
-          </details>
         </div>
         <figure class="landing-photo">
           <img src="gedung-slf.webp" alt="Ilustrasi gedung modern dengan fasad kaca dan sirip beton" width="1152" height="768" fetchpriority="high">
@@ -85,8 +78,7 @@
             <article class="landing-feature">
               <span class="landing-icon landing-icon-check" aria-hidden="true"></span>
               <h3>Daftar simak</h3>
-              <p>Catat hasil pemeriksaan, temuan, dan bukti foto per butir. Daftar simak mandiri juga bisa dibuka tanpa akun.</p>
-              <a href="./daftar-simak.html">Buka daftar simak mandiri</a>
+              <p>Catat hasil pemeriksaan, temuan, dan bukti foto per butir.</p>
             </article>
             <article class="landing-feature">
               <span class="landing-icon landing-icon-draft" aria-hidden="true"></span>
@@ -103,7 +95,7 @@
           <h2 id="landing-news-title">Kabar Ruang Kajian</h2>
           <article class="landing-news">
             <h3>Beranda publik kini tersedia</h3>
-            <p>Informasi produk dan panduan dapat dibaca sebelum masuk. Editor kajian tersedia di ruang kerja setelah Anda masuk.</p>
+            <p>Informasi produk dan panduan dapat dibaca sebelum masuk. Coba bagian awal kajian tanpa akun, atau masuk untuk membuka semua bagian.</p>
           </article>
         </section>
         <section id="panduan" aria-labelledby="landing-guide-title">
@@ -129,7 +121,11 @@
     <header class="mast">
       <div class="mast-inner">
         <a class="app-brand" href="./index.html" aria-label="Ruang Kajian SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian</a>
-        <a class="standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
+        <div id="trial-controls" class="button-row" hidden>
+          <button id="exit-trial" type="button">Beranda</button>
+          <button class="primary" type="button" data-landing-auth="login" disabled>Masuk</button>
+        </div>
+        <a id="workspace-standalone" class="standalone" href="./daftar-simak.html">Daftar simak mandiri</a>
         <div id="cloud-controls" class="cloud-controls" hidden>
           <span id="cloud-status" role="status" hidden></span>
           <button id="cloud-copy" type="button" hidden>Simpan salinan perubahan</button>
@@ -147,18 +143,20 @@
       <section class="overview" aria-labelledby="page-title">
         <h1 id="page-title" tabindex="-1">Editor kajian</h1>
         <div class="project-controls">
-          <label for="projects">Proyek</label>
-          <div class="button-row"><select id="projects"></select><button id="new-project" class="primary" type="button">Proyek baru</button></div>
+          <label id="projects-label" for="projects">Proyek</label>
+          <div id="project-picker" class="button-row"><select id="projects"></select><button id="new-project" class="primary" type="button">Proyek baru</button></div>
           <span id="save-status" role="status"></span>
         </div>
       </section>
+      <p id="trial-notice" class="trial-notice" hidden>Versi coba berlaku selama tab ini terbuka. PDF hanya memuat bagian yang tersedia. Masuk untuk mengakses seluruh bagian dan menyimpan draf ke akun.</p>
       <div class="workspace">
         <aside class="sidebar">
           <details id="section-navigation" open>
             <summary class="section-nav-toggle"><span>Isi laporan</span><span id="mobile-section-name" class="mobile-section-name" aria-hidden="true"></span></summary>
             <div class="side-head"><p id="template-label"></p></div>
             <nav id="outline" aria-label="Isi laporan"></nav>
-            <div class="side-actions">
+            <p id="trial-locked-tools" class="hint trial-locked-tools" hidden>Tambah bab dan cadangan proyek · Perlu login</p>
+            <div id="workspace-side-actions" class="side-actions">
               <button id="add-chapter" class="quiet" type="button">＋ Tambah bab</button>
               <details class="backup-actions">
                 <summary>Cadangan proyek</summary>

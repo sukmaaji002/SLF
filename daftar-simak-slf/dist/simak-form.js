@@ -200,7 +200,7 @@ async function renderSimakForm(target, checklist, settings = {}) {
     }
     return cells;
   }
-  for (const item of checklistItems) {
+  for (const item of settings.items ?? checklistItems) {
     if (item.category !== category) {
       category = item.category;
       form.append(dom("h4", { className: "simak-band" }, category.code + " " + simakCategoryTitles[category.code].toUpperCase()));

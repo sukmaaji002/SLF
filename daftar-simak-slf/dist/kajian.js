@@ -13,6 +13,30 @@ let disposePagination;
 let workspace;
 let active = "cover";
 let saving = 0;
+let trial;
+
+const isTrial = () => Boolean(trial && workspace === trial.workspace);
+globalThis.slfTrialData = (id) => isTrial() && trial.workspace.current === id ? trial : undefined;
+
+function setTrialView(visible) {
+  if (visible && slfAuthUser) return;
+  if (visible && !trial) {
+    const project = draft("Kajian SLF versi coba", preset);
+    project.chapters = project.chapters.slice(0, 2);
+    trial = { workspace: { projects: [project], current: project.id }, checklist: { identity: {}, checks: {} }, photos: new Map() };
+  }
+  if (dialog.open) dialog.close();
+  workspace = visible ? trial.workspace : slfLocalWorkspace();
+  slfChecklistItem = "";
+  active = visible ? "front" : "cover";
+  if (visible) ensureReportReferences(current());
+  render();
+  $("slf-public").hidden = visible;
+  $("slf-workspace").hidden = !visible;
+  window.scrollTo(0, 0);
+  $(visible ? "page-title" : "start-trial").focus({ preventScroll: true });
+}
+
 
 function heading(text) {
   return { type: "heading", text, body: "" };
@@ -35,6 +59,7 @@ const current = () => workspace.projects.find(({ id }) => id === workspace.curre
 
 async function save(markDirty = true) {
   ensureReportReferences(current());
+  if (isTrial()) return;
   if (markDirty !== false) slfRememberEdit(current().id);
   const revision = ++saving;
   status.textContent = "Menyimpan…";
@@ -324,6 +349,19 @@ function outlineEntry(label, id, marker) {
 function renderOutline() {
   const project = current();
   const nav = $("outline");
+  if (isTrial()) {
+    const locked = (label, marker = "") => dom("button", { type: "button", className: "outline-entry trial-locked", disabled: true },
+      dom("span", { className: "nav-marker", ariaHidden: "true" }, marker),
+      dom("span", {}, label, dom("small", {}, "Perlu login")));
+    nav.replaceChildren(locked("Sampul"), outlineEntry("Pendahuluan", "front", ""),
+      locked("Intensitas dan tata ruang"), locked("Peta tautan dan acuan"));
+    for (const [index, [name]] of reportTemplates[preset].chapters.entries()) {
+      const label = project.chapters[index]?.title.trim() || name;
+      nav.append(index < project.chapters.length ? outlineEntry(label, index, roman(index + 1)) : locked(label, roman(index + 1)));
+    }
+    nav.append(outlineEntry("Daftar simak (25%)", "checklist", ""));
+    return;
+  }
   nav.replaceChildren(outlineEntry("Sampul", "cover", ""), outlineEntry("Bagian awal & daftar isi", "front", ""));
   nav.append(outlineEntry("Intensitas dan tata ruang", "intensity", ""), outlineEntry("Peta tautan dan acuan", "links", ""));
   for (const [index, chapter] of project.chapters.entries()) {
@@ -336,9 +374,16 @@ function renderOutline() {
 
 function render() {
   const project = current();
+  const trying = isTrial();
+  $("page-title").textContent = trying ? "Coba buat kajian" : "Editor kajian";
+  for (const id of ["trial-controls", "trial-notice", "trial-locked-tools"]) $(id).hidden = !trying;
+  for (const id of ["workspace-standalone", "cloud-controls", "projects-label", "project-picker", "workspace-side-actions"]) {
+    $(id).hidden = trying || (id === "cloud-controls" && !slfCloud);
+  }
+  if (trying) status.textContent = "";
   $("projects").replaceChildren(...slfProjectOptions());
   $("projects").value = project.id;
-  $("template-label").textContent = reportTemplates[project.template].label;
+  $("template-label").textContent = trying ? "Kajian per disiplin · versi coba" : reportTemplates[project.template].label;
   renderOutline();
   $("mobile-section-name").textContent = $("outline").querySelector("[aria-current=page]")?.lastElementChild.textContent ?? "Daftar simak";
   photoEditors.clear();
@@ -529,13 +574,14 @@ function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });
   if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
   if (embed) params.set("embed", "1");
+  if (isTrial()) params.set("trial", "1");
   if (slfCloudOwner()) params.set("cloud", "1");
   return "./daftar-simak.html?" + params + (item ? "#butir-" + item : "");
 }
 
 function checklistEditorLink(project, item, label) {
   const link = dom("a", { href: projectChecklistUrl(project, item), target: "_blank", rel: "noopener" }, label);
-  if (slfCloudOwner()) {
+  if (isTrial() || slfCloudOwner()) {
     link.removeAttribute("target");
     link.onclick = (event) => {
       event.preventDefault();
@@ -606,7 +652,7 @@ function refreshChecklistViews() {
 
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
-  for (const item of checklistItems) {
+  for (const item of isTrial() ? trialChecklistItems : checklistItems) {
     const to = checklistDestination(project, item);
     if (to?.chapter !== active || to.block !== blockIndex) continue;
     const summary = checklistSummary(item, checklist.checks[item.id]);
@@ -635,7 +681,7 @@ function renderCover(project) {
 }
 
 function renderFront(project) {
-  title("Bagian awal", "Bagian awal & daftar isi");
+  title("Bagian awal", isTrial() ? "Pendahuluan" : "Bagian awal & daftar isi");
   editor.append(purposeField(project),
     dom("div", { className: "form-grid" }, ...frontFields.map(([key, label], index) =>
       index < 2 ? linkedText(project, project.front, key, label, () => project.frontLinks?.[key] ?? {},
@@ -660,14 +706,16 @@ function renderFront(project) {
 }
 
 function renderChecklistEditor(project) {
-  if (active === "checklist") title("Lampiran", "Daftar simak kajian");
-  const url = projectChecklistUrl(project);
+  const trying = isTrial();
+  if (active === "checklist") title("Lampiran", trying ? "Daftar simak kajian (25%)" : "Daftar simak kajian");
   const item = slfChecklistItem;
   slfChecklistItem = "";
-  editor.append(dom("div", { className: "checklist-head" },
-    dom("p", { className: "lead" }, "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."),
-    dom("a", { href: url, target: "_blank", rel: "noopener" }, "Buka layar penuh")),
-    dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
+  const head = dom("div", { className: "checklist-head" },
+    dom("p", { className: "lead" }, trying
+      ? trialChecklistItems.length + " dari " + checklistItems.length + " butir tersedia. Butir lainnya · Perlu login."
+      : "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."));
+  if (!trying) head.append(dom("a", { href: projectChecklistUrl(project), target: "_blank", rel: "noopener" }, "Buka layar penuh"));
+  editor.append(head, dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
 
 function renderIntensityAnalysis(project, checklist) {
@@ -703,7 +751,7 @@ function renderChapter(project) {
     control.disabled = !project.chapters[index + delta];
     chapterActions.append(control);
   }
-  if (!chapter.checklist) chapterActions.append(button("Hapus bab", () => {
+  if (!isTrial() && !chapter.checklist) chapterActions.append(button("Hapus bab", () => {
     if (!confirm("Hapus bab ini beserta seluruh isinya?")) return;
     project.chapters.splice(index, 1);
     active = "front";
@@ -714,12 +762,14 @@ function renderChapter(project) {
     title("Bab " + roman(index + 1), chapter.title || "Bab tanpa judul");
     renderOutline();
     save();
-  }), chapterActions, sectionPhotoEditor(chapter, "Unggah foto bab", () => project.chapters.includes(chapter)));
+  }));
+  if (!isTrial()) editor.append(chapterActions);
+  editor.append(sectionPhotoEditor(chapter, "Unggah foto bab", () => workspace.projects.includes(project) && project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
   editor.append(dom("p", { className: "lead" }, "Buka Isian tertaut pada setiap poin untuk memakai data baku proyek, sel tabel, atau hasil daftar simak yang sudah diisi."));
   const headings = headingEntries(chapter, index);
   const checklist = readChecklist(project.id);
-  const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
+  const mapped = new Set((isTrial() ? trialChecklistItems : checklistItems).map((item) => checklistDestination(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;
@@ -733,7 +783,7 @@ function renderChapter(project) {
   appendChecklist(-1);
   for (const [bi, block] of chapter.blocks.entries()) {
     editor.append(blockEditor(chapter, block, bi, headings.get(bi)));
-    if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
+    if (!isTrial() && intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
     appendChecklist(bi);
   }
   const actions = dom("div", { className: "button-row add-block" });
@@ -1215,11 +1265,12 @@ async function presentReport(print) {
   buttons.forEach((control) => { control.disabled = true; });
   status.textContent = "Menyiapkan laporan…";
   const reportOwner = slfCloudOwner();
+  const reportTrial = isTrial();
   try {
     const source = dom("article", { className: "report-print" });
-    await buildReport(source, structuredClone(current()), reportUrls);
+    await buildReport(source, structuredClone(current()), reportUrls, { trial: reportTrial });
     disposePagination = await paginateReport(source, $("report"));
-    if ($("slf-workspace").hidden || slfCloudOwner() !== reportOwner) {
+    if ($("slf-workspace").hidden || slfCloudOwner() !== reportOwner || reportTrial !== isTrial()) {
       disposePagination?.();
       disposePagination = undefined;
       $("report").replaceChildren();
@@ -1242,29 +1293,11 @@ async function presentReport(print) {
   }
 }
 
-async function start() {
-  try {
-    workspace = await storeValue(database, "workspace", "drafts");
-  } catch {
-    status.textContent = "Penyimpanan browser tidak tersedia";
-  }
-  const localProjects = workspace?.projects ?? [];
-  if (localProjects.length) {
-    const select = $("landing-local-project");
-    select.replaceChildren(...localProjects.map(({ name, id }) => new Option(name, id)));
-    select.value = workspace.current;
-    const control = $("landing-local-backup");
-    control.addEventListener("click", () => {
-      const project = localProjects.find(({ id }) => id === select.value);
-      if (project) backup(project, "", control, $("landing-backup-status"));
-    });
-    $("landing-local-drafts").hidden = false;
-  } else {
-    workspace = slfLocalWorkspace();
-  }
-  for (const project of workspace.projects) upgradeReportDraft(project);
-  const requested = new URLSearchParams(location.search).get("proyek");
-  if (workspace.projects.some(({ id }) => id === requested)) workspace.current = requested;
+function start() {
+  workspace = slfLocalWorkspace();
+  $("start-trial").addEventListener("click", () => setTrialView(true));
+  $("start-trial").disabled = false;
+  $("exit-trial").addEventListener("click", () => setTrialView(false));
   const sizeNavigation = () => { $("section-navigation").open = !narrowLayout.matches; };
   sizeNavigation();
   narrowLayout.addEventListener("change", sizeNavigation);

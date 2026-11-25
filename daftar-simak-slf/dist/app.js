@@ -1,10 +1,14 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
-const projectId = new URLSearchParams(location.search).get("proyek");
-const tegalReference = new URLSearchParams(location.search).get("acuan") === "tegal";
+const params = new URLSearchParams(location.search);
+const projectId = params.get("proyek");
+const tegalReference = params.get("acuan") === "tegal";
+const trialMode = params.has("trial");
+const trialData = trialMode ? (window.parent !== window ? window.parent.slfTrialData?.(projectId) : undefined)
+  ?? { checklist: { identity: {}, checks: {} }, photos: new Map() } : undefined;
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
-const cloudChecklist = projectMode && new URLSearchParams(location.search).has("cloud");
+const cloudChecklist = !trialMode && projectMode && params.has("cloud");
 const cloudOwner = cloudChecklist && window.parent !== window ? window.parent.slfCloudOwner?.() || "" : "";
 if (cloudChecklist && !cloudOwner) {
   const query = new URLSearchParams({ proyek: projectId, bagian: "simak", butir: location.hash.slice(7) });
@@ -16,7 +20,7 @@ const slfChecklistWriting = () => photoWrites > 0;
 globalThis.slfChecklistWriting = slfChecklistWriting;
 if (projectMode) {
   document.getElementById("project-editor").href = "./index.html?proyek=" + encodeURIComponent(projectId);
-  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embedded-checklist");
+  if (params.has("embed")) document.body.classList.add("embedded-checklist");
 }
 const legacyKey = "daftar-simak-slf:v1";
 const yesNo = ["Ya", "Tidak"];
@@ -99,10 +103,15 @@ function load(key) {
   }
 }
 
-const previous = projectMode ? null : load(legacyKey);
-let state = load(storageKey) ?? { identity: { ...previous?.building }, checks: {} };
+const previous = projectMode || trialMode ? null : load(legacyKey);
+let state = (trialData ? structuredClone(trialData.checklist) : load(storageKey)) ?? { identity: { ...previous?.building }, checks: {} };
 
 function save() {
+  if (trialData) {
+    trialData.checklist = structuredClone(state);
+    byId("save-status").textContent = "Tersimpan selama tab terbuka";
+    return;
+  }
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
     byId("save-status").textContent = "Tersimpan di browser ini";
@@ -266,6 +275,12 @@ function database() {
 }
 
 async function photoStore(operation, key, value) {
+  if (trialData) {
+    if (operation === "put") trialData.photos.set(key, value);
+    else if (operation === "delete") trialData.photos.delete(key);
+    else return trialData.photos.get(key);
+    return;
+  }
   const db = await database();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("photos", operation === "get" ? "readonly" : "readwrite");
@@ -457,7 +472,9 @@ function renderItem(item) {
 }
 
 function renderCatalog() {
+  const allowed = trialMode ? new Set(trialChecklistItems.map(({ id }) => id)) : undefined;
   for (const source of catalog) {
+    if (trialMode && !trialChecklistItems.some(({ category }) => category === source)) continue;
     const section = { ...source, groups: [], node: el("section", "catalog-section") };
     section.node.id = "bagian-" + source.code.replace(".", "");
     const title = source.code + " " + source.title;
@@ -473,11 +490,13 @@ function renderCatalog() {
     });
     byId("category-nav").append(link);
     for (const [groupIndex, sourceGroup] of source.groups.entries()) {
+      if (trialMode && !trialChecklistItems.some(({ group }) => group === sourceGroup)) continue;
       const group = { ...sourceGroup, items: [], node: el("details", "group") };
       group.node.open = true;
       group.node.append(el("summary", "", sourceGroup.code + " " + sourceGroup.title));
       for (const [itemIndex, sourceItem] of sourceGroup.items.entries()) {
         const item = { ...sourceItem, category: section, group, id: source.code + "-" + groupIndex + "-" + itemIndex };
+        if (allowed && !allowed.has(item.id)) continue;
         item.initialCount = startRows(item).length;
         item.search = [sourceItem.title, sourceGroup.code, sourceGroup.title, title, ...(sourceItem.components || [])].join(" ").toLocaleLowerCase("id");
         item.node = el("details", "item");
@@ -556,6 +575,12 @@ function toggleGroups() {
   byId("toggle-groups").textContent = expand ? "Ciutkan bagian" : "Buka bagian";
 }
 
+if (trialMode) {
+  byId("save-status").textContent = "Versi coba · Data tersimpan selama tab terbuka";
+  byId("check-title").textContent = "Butir pemeriksaan (25%)";
+  byId("check-title").after(el("p", "result", trialChecklistItems.length + " dari " + checklistItems.length + " butir. Sisanya · Perlu login."));
+  byId("export").hidden = true;
+}
 renderCatalog();
 const requestedItem = items.find((item) => "#" + item.node.id === location.hash);
 if (requestedItem) {
@@ -587,6 +612,7 @@ async function prepareSimakPaper() {
   simakPaper.append(draft);
   await renderSimakForm(draft, structuredClone(state), {
     tegal: tegalReference, photoUrls: urls, loadPhoto: (key) => photoStore("get", key),
+    items: trialMode ? trialChecklistItems : checklistItems,
   });
   if (urls !== simakPhotoUrls) {
     urls.forEach((url) => URL.revokeObjectURL(url));

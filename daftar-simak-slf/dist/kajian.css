@@ -173,3 +173,11 @@ dialog::backdrop { background: #132b27ab; }
   #preview-dialog[open] { display: block; position: static; width: 100%; max-width: none; height: auto; max-height: none; overflow: visible; margin: 0; border: 0; border-radius: 0; background: #fff; }
   #report .pagedjs_page:last-child { break-after: auto; }
 }
+
+.trial-notice { margin: 0 0 10px; padding: 10px 14px; color: var(--dark); background: #eef3fc; border: 1px solid var(--line); border-radius: 6px; }
+.trial-locked-tools { padding: 8px; }
+.outline-entry.trial-locked { opacity: 1; color: var(--muted); }
+.trial-locked small { display: block; font-size: .8125rem; font-weight: 550; }
+@media (max-width: 760px) {
+  .mast-inner:has(#trial-controls:not([hidden])) { flex-wrap: wrap; padding-block: 6px; }
+}

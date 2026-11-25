@@ -155,7 +155,6 @@
 
 .landing-feature h3, .landing-news h3 { font-size: 1.1rem; }
 .landing-feature p, .landing-news p { margin-top: .4rem; color: var(--landing-muted); }
-.landing-feature a { display: inline-block; padding-block: .45rem; margin-top: .5rem; color: var(--landing-green); font-weight: 650; text-underline-offset: .18em; }
 
 .landing-icon {
   position: relative;
@@ -208,23 +207,4 @@
   .landing-footer-inner > a:last-child { white-space: nowrap; }
 }
 
-.landing-local-drafts {
-  max-width: 32rem;
-  margin-top: 1rem;
-  color: var(--landing-muted);
-}
-
-.landing-local-drafts summary { color: var(--landing-green); font-weight: 650; cursor: pointer; }
-.landing-local-drafts p:not(:empty) { margin-block: .5rem; }
-.landing-local-drafts label { display: block; font-weight: 650; }
-.landing-local-drafts select {
-  display: block;
-  width: 100%;
-  min-height: 2.75rem;
-  margin-block: .3rem .6rem;
-  padding-inline: .5rem;
-  border: 1px solid #a9bfb1;
-  border-radius: .45rem;
-  background: #fff;
-  color: var(--landing-ink);
-}
+.landing-trial-note { margin-top: .9rem; color: var(--landing-muted); font-size: .9375rem; }
