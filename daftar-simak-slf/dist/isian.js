@@ -143,6 +143,10 @@ function isTeamTable(block) {
   return tokenName(block.text) === "susunan tim pengkaji teknis";
 }
 
+function isDocumentReviewTable(block) {
+  return block.type === "table" && tokenName(block.text) === "rekap pemeriksaan dokumen";
+}
+
 function teamMembers(block, sources) {
   const name = block.headers.findIndex((header) => tokenName(header) === "nama");
   return block.rowIds.map((id, index) => [id, name < 0 ? "" : cleanValue(tableCellValue(block, index, name, sources))]);
@@ -253,7 +257,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       const column = columns.indexOf("alat");
       for (const row of rows) if (cleanValue(row[column])) tools.add(cleanValue(row[column]));
     }
-    if (title === "rekap pemeriksaan dokumen") {
+    if (isDocumentReviewTable(block)) {
       const name = columns.indexOf("dokumen");
       const reference = columns.indexOf("nomor / tanggal");
       const verification = columns.indexOf("status verifikasi");
@@ -274,7 +278,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
-  add("project:reviewed-documents", "Data kajian", "Daftar dokumen yang sudah ditelaah dari Bab IV", scopeList.format([...reviewedDocuments]));
+  add("project:reviewed-documents", "Data kajian", "Daftar dokumen yang sudah ditelaah dari Rekap Pemeriksaan Dokumen", scopeList.format([...reviewedDocuments]));
   add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", permits.size === 1 ? [...permits][0] : "");
   for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
     const names = reviewers.get(role);

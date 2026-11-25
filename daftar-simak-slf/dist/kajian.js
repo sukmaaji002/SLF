@@ -163,6 +163,33 @@ function multipleChoiceField(legend, choices, input, applyValue) {
   return fieldset;
 }
 
+function documentReviewLinks(project) {
+  const label = "Rekap Pemeriksaan Dokumen";
+  const links = dom("div", { className: "button-row" });
+  project.chapters.forEach((chapter, chapterIndex) => {
+    chapter.blocks.forEach((block, blockIndex) => {
+      if (!isDocumentReviewTable(block)) return;
+      links.append(button("Buka " + label + " · Bab " + roman(chapterIndex + 1), () => {
+        active = chapterIndex;
+        render();
+        if (narrowLayout.matches) $("section-navigation").open = false;
+        const target = $("edit-block-" + blockIndex);
+        target.tabIndex = -1;
+        target.setAttribute("aria-label", label);
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: "start" });
+      }));
+    });
+  });
+  if (links.childElementCount) return links;
+  const lockedIndex = isTrial() ? trial.lockedChapters.findIndex((chapter) => chapter.blocks.some(isDocumentReviewTable)) : -1;
+  if (lockedIndex >= 0) {
+    const labelWithChapter = label + " · Bab " + roman(project.chapters.length + lockedIndex + 1);
+    return dom("button", { type: "button", className: "upload-locked", disabled: true }, labelWithChapter + " · Perlu login");
+  }
+  return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
   const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
@@ -347,6 +374,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const entry = dom("div", { className: "link-entry" }, dom("div", { className: "narrative-field-head" },
         dom("strong", {}, name[0].toLocaleUpperCase("id") + name.slice(1)), badge));
       if (hint) entry.append(dom("p", { className: "hint" }, hint));
+      if (token === "daftar dokumen") entry.append(documentReviewLinks(project));
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
       entry.append(manual, value, useManual, source);
@@ -933,7 +961,7 @@ function tableEditor(block) {
   const rows = dom("tbody");
   const sources = reportSources(current());
   const tableName = tokenName(block.text);
-  const statusColumn = tableName === "rekap pemeriksaan dokumen" ?
+  const statusColumn = isDocumentReviewTable(block) ?
     block.headers.findIndex((header) => tokenName(header) === "status verifikasi") : -1;
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;

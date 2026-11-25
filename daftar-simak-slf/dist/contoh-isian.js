@@ -262,7 +262,7 @@ const inputExamples = {
 
 const inputHints = {
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
-  "daftar dokumen": "Otomatis memakai baris berstatus Terverifikasi atau Telah ditelaah dari Rekap Pemeriksaan Dokumen di Bab IV, jika tersedia.",
+  "daftar dokumen": "Otomatis memakai baris berstatus Terverifikasi atau Telah ditelaah dari tabel Rekap Pemeriksaan Dokumen pada kajian ini.",
   "tanggal pemeriksaan": "Mengikuti Tanggal pemeriksaan di identitas daftar simak. Pilih Isi manual jika tanggal observasi berbeda.",
   "area atau posisi sampel": "Lokasi diambil dari isian sampel daftar simak. Gunakan sumber lain jika narasi hanya membahas titik tertentu.",
   "daftar alat pemeriksaan": "Nama alat diambil dari kolom Alat pada tabel di bab ini.",
