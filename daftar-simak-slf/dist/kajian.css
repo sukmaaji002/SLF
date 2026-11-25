@@ -215,5 +215,8 @@ dialog::backdrop { background: #132b27ab; }
 
 .editor .block[id] { scroll-margin-top: 64px; }
 
+.table-row-image-editor { display: grid; justify-items: start; gap: 4px; margin-top: 5px; }
+.table-row-image-editor .hint:empty { display: none; }
+.table-row-image { display: block; width: auto; height: auto; max-width: min(100%, 120px); max-height: 88px; object-fit: contain; }
 .repeated-narrative-list { display: grid; gap: 8px; margin-bottom: 8px; }
 .repeated-narrative-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 5px; }

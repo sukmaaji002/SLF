@@ -57,10 +57,10 @@ function draft(name, template) {
 
 const current = () => workspace.projects.find(({ id }) => id === workspace.current);
 
-async function save(markDirty = true) {
-  ensureReportReferences(current());
+async function save(markDirty = true, project = current()) {
+  ensureReportReferences(project);
   if (isTrial()) return;
-  if (markDirty !== false) slfRememberEdit(current().id);
+  if (markDirty !== false) slfRememberEdit(project.id);
   const revision = ++saving;
   status.textContent = "Menyimpan…";
   try {
@@ -1221,19 +1221,23 @@ function tableEditor(block) {
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
-    rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...row.map((_, column) =>
+    const rowId = block.rowIds[index];
+    const cells = row.map((_, column) =>
       dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Tersedia", "Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
-          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []))), dom("td", {}, button("Hapus", () => {
-      const populated = row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
+          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : [])));
+    cells.at(-1).append(tableRowImageEditor(current(), block, rowId, index));
+    rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
+      const populated = block.rowImages?.[rowId] || row.some((cell, column) => cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
       if (populated && !confirm("Hapus baris tabel ini?")) return;
       for (const column of row.keys()) {
         const key = tableCellKey(block, index, column);
         if (block.cellLinks) delete block.cellLinks[key];
         setTextFormat(block, "cell:" + key, undefined);
       }
+      if (block.rowImages) delete block.rowImages[rowId];
       block.rows.splice(index, 1);
-      if (block.teamLead === block.rowIds[index]) delete block.teamLead;
+      if (block.teamLead === rowId) delete block.teamLead;
       block.rowIds.splice(index, 1);
       save();
       render();
@@ -1359,10 +1363,71 @@ function tableCellField(block, row, column, sources, options) {
   return dom("div", {}, control, link);
 }
 
-async function imageData(file) {
+const tableRowImageUploads = new WeakMap();
+
+function tableRowImageEditor(project, block, rowId, index) {
+  if (isTrial()) return lockedUpload("Unggah gambar");
+  const label = "Gambar baris " + (index + 1);
+  const input = dom("input", { type: "file", accept: "image/*", hidden: true, ariaLabel: label });
+  const preview = dom("img", { className: "table-row-image", alt: label });
+  const upload = button("Unggah gambar", () => input.click());
+  const remove = button("Hapus gambar", () => {
+    tableRowImageUploads.get(block)?.delete(rowId);
+    delete block.rowImages[rowId];
+    refreshImage();
+    save(true, project);
+  }, "quiet");
+  const status = dom("p", { className: "hint", role: "status" });
+  const control = dom("div", { className: "table-row-image-editor" }, input, preview, upload, remove, status);
+  control.dataset.tableRowImage = rowId;
+  upload.setAttribute("aria-label", "Unggah " + label.toLocaleLowerCase("id"));
+  remove.setAttribute("aria-label", "Hapus " + label.toLocaleLowerCase("id"));
+  function refreshImage() {
+    const image = block.rowImages?.[rowId];
+    preview.hidden = remove.hidden = !image;
+    if (image) preview.src = image;
+    else preview.removeAttribute("src");
+    upload.textContent = image ? "Ganti gambar" : "Unggah gambar";
+    upload.setAttribute("aria-label", (image ? "Ganti " : "Unggah ") + label.toLocaleLowerCase("id"));
+  }
+  control.refreshImage = refreshImage;
+  refreshImage();
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const pending = tableRowImageUploads.get(block) ?? new Map();
+    tableRowImageUploads.set(block, pending);
+    const request = Symbol();
+    pending.set(rowId, request);
+    upload.disabled = remove.disabled = true;
+    status.textContent = "Menyiapkan gambar…";
+    try {
+      const image = await imageData(file, 900);
+      const attached = workspace.projects.includes(project) && block.rowIds.includes(rowId) &&
+        project.chapters.some((chapter) => chapter.blocks.includes(block));
+      if (!attached || pending.get(rowId) !== request) return;
+      (block.rowImages ??= {})[rowId] = image;
+      refreshImage();
+      if (!control.isConnected && current() === project) {
+        editor.querySelector('[data-table-row-image="' + rowId + '"]')?.refreshImage();
+      }
+      status.textContent = "Gambar ditambahkan.";
+      save(true, project);
+    } catch {
+      status.textContent = "Gambar tidak dapat dibuka. Pilih file gambar lain.";
+    } finally {
+      if (pending.get(rowId) === request) pending.delete(rowId);
+      input.value = "";
+      upload.disabled = remove.disabled = false;
+    }
+  });
+  return control;
+}
+
+async function imageData(file, maximumEdge = 1440) {
   const image = await createImageBitmap(file);
   try {
-    const scale = Math.min(1, 1440 / Math.max(image.width, image.height));
+    const scale = Math.min(1, maximumEdge / Math.max(image.width, image.height));
     const canvas = dom("canvas", { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) });
     const context = canvas.getContext("2d", { alpha: false });
     context.fillStyle = "white";
@@ -1582,6 +1647,13 @@ function validateBackup(data) {
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
         clean.rowIds = importIds(block.rowIds, block.rows.length);
         clean.columnIds = importIds(block.columnIds, block.headers.length);
+        if (clean.rowIds && block.rowImages && typeof block.rowImages === "object") {
+          const images = clean.rowIds.flatMap((id) => {
+            const image = block.rowImages[id];
+            return typeof image === "string" && imageSource.test(image) ? [[id, image]] : [];
+          });
+          if (images.length) clean.rowImages = Object.fromEntries(images);
+        }
         if (block.teamLead === "director" || clean.rowIds?.includes(block.teamLead)) clean.teamLead = block.teamLead;
         if (clean.rowIds && clean.columnIds && block.cellLinks && typeof block.cellLinks === "object") {
           const keys = new Set(clean.rowIds.flatMap((row) => clean.columnIds.map((column) => row + ":" + column)));

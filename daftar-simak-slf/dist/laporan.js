@@ -311,7 +311,10 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
           const source = sources.get(block.cellLinks?.[key]);
           const own = getTextFormat(block, "cell:" + key);
           const format = source?.format && own ? { base: { ...source.format.base, ...own.base }, block: own.block, runs: own.runs.length ? own.runs : source.format.runs } : own || source?.format;
-          return formattedValue(tableCellValue(block, ri, ci, sources), format, resolveToken());
+          const value = formattedValue(tableCellValue(block, ri, ci, sources), format, resolveToken());
+          const image = ci === row.length - 1 ? block.rowImages?.[block.rowIds?.[ri]] : undefined;
+          return imageSource.test(image || "") ?
+            dom("div", {}, value, dom("img", { className: "report-table-image", src: image, alt: "Gambar baris " + (ri + 1) })) : value;
         }));
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
