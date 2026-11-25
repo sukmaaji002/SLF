@@ -1328,12 +1328,15 @@ function tableCellField(block, row, column, sources, options) {
     const entry = registry.get(source ?? automatic);
     link.toggleAttribute("data-linked", Boolean(source));
     link.toggleAttribute("data-automatic", Boolean(automatic) || tokenName(block.text) === "data umum bangunan gedung");
-    input.readOnly = Boolean(source);
-    input.value = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
+    const readOnly = Boolean(source);
+    const nextValue = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
+    const changed = input.value !== nextValue || input.readOnly !== readOnly;
+    if (input.value !== nextValue) input.value = nextValue;
+    if (input.readOnly !== readOnly) input.readOnly = readOnly;
     input.placeholder = source && !entry?.value ? "Sumber belum tersedia" :
       automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
     summary.textContent = source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
-    control.syncTextFormat();
+    if (changed) control.syncTextFormat();
   }
   link.refreshValue = refreshValue;
   function refreshOptions() {
