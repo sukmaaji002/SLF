@@ -261,6 +261,8 @@ const inputExamples = {
 };
 
 const inputHints = {
+  [technicalDocumentsToken]: "Centang dokumen yang dipakai atau tulis nama dan nomornya lewat Tambah isian.",
+  [technicalFieldCheckToken]: "Centang cara pengecekan yang dilakukan. Gunakan Tambah isian untuk cara lain.",
   "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan atau pilih Tambah isian pada jenis yang sesuai. Untuk jenis lain, pilih Tambah acuan keselamatan.",
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
   "daftar dokumen": "Diambil dari tabel Rekap Pemeriksaan Dokumen. Untuk baris bawaan, isi nomor/tanggal, keterangan, atau status seperti Tersedia atau Telah ditelaah.",
@@ -332,6 +334,22 @@ const inputChoices = {
 };
 
 const inputChoiceGroups = new Map([
+  [technicalDocumentsToken, [
+    ["Pilihan dokumen", [
+      "PBG atau IMB",
+      "gambar rencana",
+      "gambar terbangun (as-built)",
+      "arsip data bangunan dari pemilik atau pengelola",
+    ]],
+  ]],
+  [technicalFieldCheckToken, [
+    ["Pilihan cara cek", [
+      "pengukuran langsung di lapangan",
+      "pengamatan langsung di lapangan",
+      "dokumentasi foto lapangan",
+      "wawancara dengan pemilik atau pengelola",
+    ]],
+  ]],
   [safetyReferenceToken, [
     ["Struktur", [
       "SNI 1726:2019 – ketahanan gempa",

@@ -12,8 +12,16 @@ const comfortRoomToken = "fungsi ruang";
 const easeReferenceToken = "acuan aksesibilitas atau dokumen teknis";
 const easeParameterToken = "parameter jalur, fasilitas, atau peralatan yang berlaku";
 const sampleLocationToken = "area atau posisi sampel";
+const technicalDocumentsToken = "sumber dokumen";
+const technicalFieldCheckToken = "sumber verifikasi lapangan";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
+  [technicalDocumentsToken,
+    { key: "technicalDocuments", choiceKey: "technicalDocumentChoices", item: "Dokumen tambahan", minimumRows: 0,
+      label: "Dokumen apa yang dipakai?", previewLabel: "Pilih dokumen yang dipakai" }],
+  [technicalFieldCheckToken,
+    { key: "technicalFieldChecks", choiceKey: "technicalFieldCheckChoices", item: "Cara pengecekan tambahan", minimumRows: 0,
+      label: "Bagaimana data dicek di lapangan?", previewLabel: "Pilih cara cek di lapangan" }],
   [healthReferenceToken,
     { key: "healthReferences", choiceKey: "healthReferenceChoices", groupKey: "healthReferenceGroups", item: "Acuan tambahan",
       addGroupLabel: "Tambah acuan kesehatan", method: "health" }],
@@ -336,7 +344,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   sources.get("project:sample-locations").locations = sampleLocations;
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
-  add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format([...availableDocuments]));
+  const documents = [...availableDocuments];
+  add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format(documents));
+  sources.get("project:reviewed-documents").documents = documents;
   add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", permits.size === 1 ? [...permits][0] : "");
   for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
     const names = reviewers.get(role);
