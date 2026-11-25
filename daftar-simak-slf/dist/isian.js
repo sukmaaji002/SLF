@@ -224,6 +224,40 @@ function teamMembers(block, sources) {
   return block.rowIds.map((id, index) => [id, name < 0 ? "" : cleanValue(tableCellValue(block, index, name, sources))]);
 }
 
+const permitKinds = [
+  ["Tata Ruang", /\b(?:pkkpr|kkpr)\b/i],
+  ["IMB/PBG", /\b(?:imb|pbg)\b/i],
+];
+const earlierPermitFields = new Set([
+  "dokumen, hasil survei, atau hasil uji", "daftar dokumen", "dokumen rujukan",
+  "peraturan, standar teknis, dan dokumen rencana yang relevan",
+  "ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan",
+  "dokumen", technicalDocumentsToken, ownerDocumentsToken, "jenis dokumen, nomor, dan tanggal",
+]);
+
+function recordedPermitNumbers(project, beforeBlock, sources) {
+  const recorded = { ...sources.get("project:reviewed-permit")?.numbers };
+  for (const chapter of project.chapters) {
+    for (const block of chapter.blocks) {
+      if (block === beforeBlock) return recorded;
+      if (block.type !== "heading" && block.type !== "text") continue;
+      const text = block.type === "heading" ? block.body : block.text;
+      for (const token of reportTokens(text ?? "").keys()) {
+        if (!earlierPermitFields.has(token)) continue;
+        const value = resolveReportLink("", token, sources, block.links).value;
+        for (const [type, kind] of permitKinds) {
+          if (recorded[type]) continue;
+          const pattern = new RegExp(kind.source +
+            String.raw`(?:\s*/\s*(?:IMB|PBG))?\)?\s*(?:\(\s*|[-:]\s*)?(?:(?:nomor|no\.?)\s*[:.]?\s*)?([\w/-]*\d[\w./-]*)`, "i");
+          const number = value.match(pattern)?.[1]?.replace(/[./-]+$/, "");
+          if (number) recorded[type] = number;
+        }
+      }
+    }
+  }
+  return recorded;
+}
+
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
   const teamLeads = new Set();
@@ -232,6 +266,8 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const locations = new Set();
   const availableDocuments = new Set();
   const permits = new Set();
+  const permitNumbers = new Map();
+  const reviewedPermitNumbers = new Map();
   const reviewers = new Map([["arsitektur", new Set()], ["struktur", new Set()], ["mep", new Set()]]);
   const tools = new Set();
   const tables = [];
@@ -344,7 +380,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
     if (isDocumentReviewTable(block)) {
       const name = columns.findIndex((column) => ["dokumen", "nama dokumen", "jenis dokumen"].includes(column));
-      const reference = columns.findIndex((column) => ["nomor / tanggal", "nomor/tanggal", "nomor dan tanggal"].includes(column));
+      const reference = columns.findIndex((column) => ["nomor / tanggal", "nomor/tanggal", "nomor dan tanggal", "nomor", "nomor dokumen"].includes(column));
       const verification = columns.findIndex((column) => ["status verifikasi", "hasil verifikasi", "status"].includes(column));
       const notes = columns.indexOf("keterangan");
       for (const [ri, row] of rows.entries()) {
@@ -359,8 +395,17 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         if (unavailable.test(status) || (!reviewed && !available && unavailable.test(note))) continue;
         const value = number ? document + " (" + number + ")" : document;
         if (reviewed || available || number || note || !presetDocuments.has(tokenName(document))) availableDocuments.add(value);
+        const kind = permitKinds.find(([, pattern]) => pattern.test(document))?.[0] ??
+          (/\btata ruang\b/i.test(document) ? "Tata Ruang" : undefined);
+        if (kind && /\d/.test(number)) {
+          if (!permitNumbers.has(kind)) permitNumbers.set(kind, new Set());
+          permitNumbers.get(kind).add(number);
+        }
         if (!reviewed) continue;
-        if (/\b(?:pbg|imb)\b/i.test(document)) permits.add(value);
+        if (kind === "IMB/PBG") {
+          permits.add(value);
+          if (/\d/.test(number)) reviewedPermitNumbers.set(value, number);
+        }
         if (block.sourceId && block.rowIds?.[ri]) {
           add("document:" + block.sourceId + ":" + block.rowIds[ri], "Dokumen yang sudah ditelaah", document, value);
         }
@@ -378,6 +423,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format(documents));
   sources.get("project:reviewed-documents").documents = documents;
   add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", scopeList.format([...permits]));
+  const permitSource = sources.get("project:reviewed-permit");
+  permitSource.numbers = Object.fromEntries([...permitNumbers].map(([kind, numbers]) => [kind, [...numbers].join(", ")]));
+  if (permits.size && reviewedPermitNumbers.size === permits.size) {
+    permitSource.reviewedNumbers = [...new Set(reviewedPermitNumbers.values())].join(", ");
+  }
   for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
     const names = reviewers.get(role);
     add("project:reviewer-" + id, "Data kajian", "Pengkaji " + role + " dari tabel tim", names.size === 1 ? [...names][0] : "");

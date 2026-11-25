@@ -151,7 +151,7 @@ function narrativeChoiceCheckboxes(legend, choices, changed, choiceDetail) {
     const detail = choiceDetail?.(choice);
     control.addEventListener("change", () => {
       if (detail) detail.hidden = !control.checked;
-      changed(choice, control.checked);
+      changed(choice, control.checked, detail);
     });
     fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
     if (detail) fieldset.append(detail);
@@ -276,7 +276,7 @@ function narrativeEntryList(values, item, changed, minimumRows = 1) {
   return [list, appendEntry];
 }
 
-function repeatedNarrativeField(spec, data, changed, groups = []) {
+function repeatedNarrativeField(spec, data, changed, groups = [], suggestedNumbers = {}) {
   const choices = groups.flatMap(([, options]) => options);
   const choiceKeys = new Set(choices.map(tokenName));
   const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
@@ -296,9 +296,15 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
     ({ name, fixed: fixed && fixedNames.has(name), entries: [...entries] }));
   const form = spec.legend ? dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend)) : dom("div");
   for (const [legend, options] of groups) {
-    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
+    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked, detail) => {
       selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
-      if (checked) selected.push(choice);
+      if (checked) {
+        selected.push(choice);
+        if (detail && !Object.hasOwn(numbers, choice) && suggestedNumbers[choice]) {
+          numbers[choice] = suggestedNumbers[choice];
+          detail.querySelector("input").value = numbers[choice];
+        }
+      }
       commit();
     }, choiceDetail);
     sync(selected);
@@ -496,6 +502,13 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
       if (repeated?.choiceKey && Array.isArray(saved?.[repeated.choiceKey])) manualData[repeated.choiceKey] = saved[repeated.choiceKey];
       if (repeated?.numberKey && saved?.[repeated.numberKey]) manualData[repeated.numberKey] = saved[repeated.numberKey];
+      const permitSource = permitDocuments ? sources.get("project:reviewed-permit") : undefined;
+      if (permitSource?.reviewedNumbers && (saved?.source ?? (!saved ? auto : "")) === "project:reviewed-permit") {
+        manualData[repeated.key] = [];
+        manualData[repeated.choiceKey] = ["IMB/PBG"];
+        manualData[repeated.numberKey] = { "IMB/PBG": permitSource.reviewedNumbers };
+        manualData.value = narrativeEntryValue(manualData[repeated.choiceKey], [], [], manualData[repeated.numberKey]);
+      }
       if (repeated?.groupKey && Array.isArray(saved?.[repeated.groupKey])) manualData[repeated.groupKey] = saved[repeated.groupKey];
       if (safetyParameters && !manualData.parameterStandardChoices && Array.isArray(saved?.parameterChoices)) {
         manualData.parameters = [...saved.parameterChoices, ...(saved.parameters ?? []), ...narrativeGroupEntries(saved.parameterGroups ?? [])]
@@ -538,7 +551,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         });
         if (names.length) groupsForChoices.unshift([technicalDocuments ? "Dokumen dari rekap" : "Dari isian sebelumnya", names]);
       }
-      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices) :
+      const suggestedNumbers = permitDocuments ? recordedPermitNumbers(project, data, sources) : undefined;
+      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices, suggestedNumbers) :
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
