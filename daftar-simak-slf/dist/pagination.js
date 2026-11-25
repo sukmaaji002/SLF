@@ -1,12 +1,7 @@
 "use strict";
 
-const reportPrintStyle = `
-  @page {
-    size: A4;
-    margin: 18mm 18mm 20mm;
-    @bottom-center { content: counter(page); font: 10pt "Segoe UI", sans-serif; color: #38564f; }
-  }
-  @page :first { @bottom-center { content: none; } }
+const reportPaper = { width: 210, height: 297, top: 18, side: 18, bottom: 20 };
+const reportLayoutStyle = `
   .report-print { font: 11pt/1.4 "Segoe UI", sans-serif; color: #172a27; overflow-wrap: anywhere; }
   .report-print .report-cover { display: grid; align-content: center; min-height: 235mm; text-align: center; }
   .report-print .report-cover h1 { font-size: 27pt; margin: 14px 0; text-transform: uppercase; }
@@ -39,7 +34,10 @@ const reportPrintStyle = `
   .report-print table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 8px 0 12px; }
   .report-print th, .report-print td { padding: 6px; border: 1px solid #c7d4cf; text-align: left; vertical-align: top; white-space: pre-wrap; }
   .report-print th { background: #e8efeb; }
+  .report-print thead { display: table-header-group; break-inside: avoid; break-after: avoid; }
   .report-print tr, .report-print figure { break-inside: avoid; }
+  .report-print .report-table-fit { break-inside: avoid; }
+  .report-print .simak-item.fit:not(.report-table-fit) { break-inside: auto; }
   .report-print figure { margin: 12px 0; }
   .report-print img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; margin: 4px 0; }
   .report-print .caption, .report-print figcaption { font-size: 10pt; font-weight: 650; break-after: avoid; }
@@ -54,6 +52,80 @@ const reportPrintStyle = `
   .report-print .result-values dd { margin-left: 0; margin-bottom: 3px; }
   .report-print .result-values img { max-height: 180px; }
 `;
+const reportPrintStyle = `
+  @page {
+    size: A4;
+    margin: ${reportPaper.top}mm ${reportPaper.side}mm ${reportPaper.bottom}mm;
+    @bottom-center { content: counter(page); font: 10pt "Segoe UI", sans-serif; color: #38564f; }
+  }
+  @page :first { @bottom-center { content: none; } }
+  ${reportLayoutStyle}
+`;
+
+function reportTableBlock(table) {
+  return table.parentElement.matches(".report-block, .simak-item") ? table.parentElement : table;
+}
+
+async function measureReportTables(source, staging) {
+  const tables = [...source.querySelectorAll("table")].filter((table) => table.tHead && table.tBodies.length);
+  if (!tables.length) return;
+  const styles = dom("style", {}, reportLayoutStyle + simakFormStyle);
+  const ruler = dom("div");
+  const measure = dom("div", {}, ruler, source);
+  measure.style.width = (reportPaper.width - 2 * reportPaper.side) + "mm";
+  ruler.style.height = (reportPaper.height - reportPaper.top - reportPaper.bottom) + "mm";
+  staging.append(styles, measure);
+  try {
+    await Promise.all([...source.querySelectorAll("table img")].map((img) => img.decode().catch(() => {})));
+    await document.fonts.ready;
+    const pageHeight = ruler.getBoundingClientRect().height;
+    for (const table of tables) {
+      const block = reportTableBlock(table);
+      const box = block.getBoundingClientRect();
+      const css = getComputedStyle(block);
+      const height = box.height + parseFloat(css.marginTop) + parseFloat(css.marginBottom);
+      block.classList.toggle("report-table-fit", height <= pageHeight - 2);
+    }
+  } finally {
+    source.remove();
+    styles.remove();
+    measure.remove();
+  }
+}
+
+function connectTablePagination(chunker) {
+  let continuedTable;
+  chunker.hooks.onPageLayout.register((_rendered, token) => {
+    const node = token?.node;
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    continuedTable = element?.closest("tbody")?.closest("table");
+  });
+  chunker.hooks.layout.register((rendered) => {
+    if (!continuedTable?.tHead) return;
+    const table = rendered.querySelector('table[data-ref="' + continuedTable.dataset.ref + '"]');
+    if (!table || table.tHead || !table.tBodies.length) return;
+    if (!table.querySelector(":scope > colgroup")) {
+      for (const columns of continuedTable.querySelectorAll(":scope > colgroup")) {
+        table.insertBefore(columns.cloneNode(true), table.tBodies[0]);
+      }
+    }
+    table.insertBefore(continuedTable.tHead.cloneNode(true), table.tBodies[0]);
+  });
+  chunker.hooks.onOverflow.register((range, rendered, bounds) => {
+    if (!range) return;
+    const container = range.startContainer;
+    const node = container.nodeType === Node.ELEMENT_NODE ? container.childNodes[range.startOffset] ?? container : container;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const table = element?.closest("table");
+    if (!table?.tHead) return;
+    const firstRow = table.tBodies[0]?.rows[0];
+    if (!table.tHead.contains(element) && !firstRow?.contains(element)) return;
+    if (table.dataset.ref === continuedTable?.dataset.ref) return;
+    const block = reportTableBlock(table);
+    if (block.getBoundingClientRect().top > bounds.top + 2 && rendered.contains(block)) range.setStartBefore(block);
+    return range;
+  });
+}
 
 function connectContents(pages) {
   const destinations = new Map();
@@ -89,12 +161,14 @@ function connectContents(pages) {
 async function paginateReport(source, target) {
   const staging = dom("div", { className: "pagination-stage", ariaHidden: "true" });
   const previewer = new PagedModule.Previewer();
+  connectTablePagination(previewer.chunker);
   const dispose = () => previewer.polisher.destroy();
   document.body.append(staging);
   const fragment = document.createDocumentFragment();
-  fragment.append(source);
   try {
     await document.fonts.ready;
+    await measureReportTables(source, staging);
+    fragment.append(source);
     await previewer.preview(fragment, [{ [location.href]: reportPrintStyle + simakFormStyle }], staging);
     connectContents(staging);
     target.replaceChildren(...staging.childNodes);
