@@ -14,12 +14,16 @@ const easeParameterToken = "parameter jalur, fasilitas, atau peralatan yang berl
 const sampleLocationToken = "area atau posisi sampel";
 const existingAreaToken = "area atau unit";
 const ownerDocumentsToken = "nama dan rujukan dokumen";
+const permitDocumentsToken = "jenis dokumen dan nomor";
+const permitDocumentTypes = ["Tata Ruang", "NIB", "IMB/PBG", "Dokumen Lingkungan", "ANDALALIN"];
 const technicalDocumentsToken = "sumber dokumen";
 const technicalFieldCheckToken = "sumber verifikasi lapangan";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
   [existingAreaToken, { key: "existingAreas", choiceKey: "existingAreaChoices", item: "Area atau unit tambahan", minimumRows: 0 }],
   [ownerDocumentsToken, { key: "ownerDocuments", choiceKey: "ownerDocumentChoices", item: "Nama atau rujukan tambahan", minimumRows: 0 }],
+  [permitDocumentsToken, { key: "permitDocuments", choiceKey: "permitDocumentChoices", numberKey: "permitDocumentNumbers",
+    item: "Nama dan nomor dokumen tambahan", minimumRows: 0 }],
   [technicalDocumentsToken,
     { key: "technicalDocuments", choiceKey: "technicalDocumentChoices", item: "Dokumen tambahan", minimumRows: 0,
       label: "Dokumen apa yang dipakai?", previewLabel: "Pilih dokumen yang dipakai" }],
@@ -89,7 +93,7 @@ const tokenAliases = {
   "daftar dokumen": ["project:reviewed-documents"],
   "daftar alat pemeriksaan": ["project:inspection-tools"],
   "daftar bahan dan dokumen": ["project:intro-materials"],
-  "jenis dokumen dan nomor": ["project:reviewed-permit"],
+  [permitDocumentsToken]: ["project:reviewed-permit"],
   "nama pengkaji arsitektur": ["project:reviewer-architecture"],
   "nama pengkaji struktur": ["project:reviewer-structure"],
   "nama pengkaji mep": ["project:reviewer-mep"],
@@ -424,8 +428,12 @@ function narrativeGroupEntries(groups) {
   });
 }
 
-function narrativeEntryValue(choices, entries, groups = []) {
-  return scopeList.format([...choices, ...entries, ...narrativeGroupEntries(groups)].map((entry) => entry.trim()).filter(Boolean));
+function narrativeEntryValue(choices, entries, groups = [], numbers = {}) {
+  const selected = choices.map((choice) => {
+    const number = Object.hasOwn(numbers, choice) ? numbers[choice].trim() : "";
+    return number ? choice + " (" + number + ")" : choice;
+  });
+  return scopeList.format([...selected, ...entries, ...narrativeGroupEntries(groups)].map((entry) => entry.trim()).filter(Boolean));
 }
 
 function importLinks(links) {
@@ -444,12 +452,17 @@ function importLinks(links) {
       const groupKey = legacyParameters ? "parameterGroups" : field?.groupKey;
       const choices = choiceKey ? link[choiceKey] : [];
       const groups = groupKey ? link[groupKey] ?? [] : [];
+      const numbers = field?.numberKey ? Object.fromEntries(permitDocumentTypes.flatMap((type) => {
+        const number = link[field.numberKey]?.[type];
+        return typeof number === "string" ? [[type, number]] : [];
+      })) : undefined;
       if (Array.isArray(entries) && Array.isArray(choices) && [...choices, ...entries].every((entry) => typeof entry === "string") &&
         Array.isArray(groups) && groups.every((group) => group && typeof group.name === "string" &&
           typeof group.fixed === "boolean" && Array.isArray(group.entries) && group.entries.every((entry) => typeof entry === "string")) &&
-        narrativeEntryValue(choices, entries, groups) === link.value) {
+        narrativeEntryValue(choices, entries, groups, numbers) === link.value) {
         data[field.key] = [...entries];
         if (choiceKey) data[choiceKey] = [...choices];
+        if (field.numberKey) data[field.numberKey] = numbers;
         if (groupKey) data[groupKey] = groups.map(({ name, fixed, entries }) => ({ name, fixed, entries: [...entries] }));
       }
       pairs.push([key, data]);

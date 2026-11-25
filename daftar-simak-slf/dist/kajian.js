@@ -144,17 +144,25 @@ function narrativeChoiceParts(value, choiceKeys) {
   });
 }
 
-function narrativeChoiceCheckboxes(legend, choices, changed) {
+function narrativeChoiceCheckboxes(legend, choices, changed, choiceDetail) {
   const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
   const controls = choices.map((choice) => {
     const control = dom("input", { type: "checkbox" });
-    control.addEventListener("change", () => changed(choice, control.checked));
+    const detail = choiceDetail?.(choice);
+    control.addEventListener("change", () => {
+      if (detail) detail.hidden = !control.checked;
+      changed(choice, control.checked);
+    });
     fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
-    return [tokenName(choice), control];
+    if (detail) fieldset.append(detail);
+    return [tokenName(choice), control, detail];
   });
   const sync = (values) => {
     const selected = new Set(values.map(tokenName));
-    for (const [choice, control] of controls) control.checked = selected.has(choice);
+    for (const [choice, control, detail] of controls) {
+      control.checked = selected.has(choice);
+      if (detail) detail.hidden = !control.checked;
+    }
   };
   return { fieldset, sync };
 }
@@ -273,8 +281,13 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
   const choiceKeys = new Set(choices.map(tokenName));
   const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
   let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
-  const extra = selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
+  const extra = data[spec.key] ? "" : selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
   const values = [...(data[spec.key] ?? [])];
+  const numbers = { ...data[spec.numberKey] };
+  const choiceDetail = spec.numberKey ? (choice) => field("Nomor " + choice, numbers[choice], (value) => {
+    numbers[choice] = value;
+    commit();
+  }) : undefined;
   const minimumRows = spec.minimumRows ?? 1;
   const hasLegacyValue = !data[spec.groupKey] && extra.trim();
   if (!values.length && ((!spec.groupKey && minimumRows) || hasLegacyValue)) values.push(extra);
@@ -287,7 +300,7 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
       selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
       if (checked) selected.push(choice);
       commit();
-    });
+    }, choiceDetail);
     sync(selected);
     if (spec.groupKey) {
       let group = referenceGroups.find(({ name, fixed }) => fixed && name === legend);
@@ -335,10 +348,11 @@ function repeatedNarrativeField(spec, data, changed, groups = []) {
     form.append(...narrativeEntryList(values, spec.item, commit, minimumRows));
   }
   function commit() {
-    const value = narrativeEntryValue(selected, values, referenceGroups);
+    const value = narrativeEntryValue(selected, values, referenceGroups, numbers);
     updateTextFormat(data, "value", data.value, value);
     data[spec.key] = [...values];
     if (spec.choiceKey) data[spec.choiceKey] = [...selected];
+    if (spec.numberKey) data[spec.numberKey] = { ...numbers };
     if (spec.groupKey) data[spec.groupKey] = referenceGroups.map(({ name, fixed, entries }) =>
       ({ name, fixed, entries: [...entries] }));
     data.value = value;
@@ -444,6 +458,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const repeated = otherParameters || (spec?.method && !methods[spec.method]) ? undefined : spec;
       const roomField = repeated && (token === healthRoomToken || token === comfortRoomToken || token === existingAreaToken);
       const ownerDocuments = token === ownerDocumentsToken;
+      const permitDocuments = token === permitDocumentsToken;
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
       const fieldTitle = repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
@@ -463,11 +478,12 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         if (available.length) select.append(dom("optgroup", { label: group }, ...available.map(([id, label]) => new Option(label, id))));
       }
       if (saved?.source && !sources.has(saved.source)) select.append(new Option("Sumber tidak tersedia", saved.source));
-      const defaultSource = sampleLocation ? (automaticValue(token, sources) ? auto : "manual") : "";
+      const defaultSource = sampleLocation || permitDocuments ?
+        (automaticValue(token, sources) ? (sampleLocation ? auto : "") : "manual") : "";
       select.value = manualOnly ? "manual" : saved?.source ?? (saved || (!auto && !combined) ? "manual" : defaultSource);
       const value = dom("p", { className: "narrative-source-value" });
       const badge = dom("span", { className: "narrative-state" });
-      const useManual = button("Isi sendiri", () => {
+      const useManual = button(permitDocuments ? "Pilih beberapa dokumen" : "Isi sendiri", () => {
         select.value = "manual";
         select.dispatchEvent(new Event("change"));
         focusManual();
@@ -475,10 +491,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const simpleChoices = safetyParameters || comfortParameters || repeated?.method;
       const example = simpleChoices || repeated?.label ? "" : inputExample(token);
       const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
-      const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
+      const previousValue = manualOnly || permitDocuments ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
       if (repeated?.choiceKey && Array.isArray(saved?.[repeated.choiceKey])) manualData[repeated.choiceKey] = saved[repeated.choiceKey];
+      if (repeated?.numberKey && saved?.[repeated.numberKey]) manualData[repeated.numberKey] = saved[repeated.numberKey];
       if (repeated?.groupKey && Array.isArray(saved?.[repeated.groupKey])) manualData[repeated.groupKey] = saved[repeated.groupKey];
       if (safetyParameters && !manualData.parameterStandardChoices && Array.isArray(saved?.parameterChoices)) {
         manualData.parameters = [...saved.parameterChoices, ...(saved.parameters ?? []), ...narrativeGroupEntries(saved.parameterGroups ?? [])]

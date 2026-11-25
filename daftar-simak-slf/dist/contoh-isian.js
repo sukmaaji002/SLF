@@ -105,7 +105,7 @@ const inputExamples = {
   "nama dan rujukan dokumen": "dokumen identitas badan usaha dan surat penunjukan pengelola",
   "jenis dokumen, nomor, dan tanggal": "jenis bukti penguasaan tanah, nomor dokumen, dan tanggal penerbitan",
   "hasil verifikasi": "nama pemilik dan alamat persil sesuai dengan dokumen yang ditelaah",
-  "jenis dokumen dan nomor": "PBG/IMB, nomor sesuai dokumen yang diperiksa",
+  [permitDocumentsToken]: "IMB/PBG (327813-22102024-001)",
   "gambar rencana, gambar terbangun, dan dokumen terkait": "gambar rencana arsitektur, gambar terbangun instalasi, dan laporan pemeliharaan",
   "ringkasan hasil telaah": "fungsi bangunan tercatat sama, sedangkan perubahan satu ruang memerlukan dokumen pendukung",
   "nomor / tanggal": "nomor dokumen dan tanggal penerbitannya",
@@ -263,6 +263,7 @@ const inputExamples = {
 const inputHints = {
   [technicalDocumentsToken]: "Centang dokumen yang dipakai atau tulis nama dan nomornya lewat Tambah isian.",
   [ownerDocumentsToken]: "Centang nama pemilik atau pengelola dan dokumen yang dipakai. Gunakan Tambah isian untuk menulis rujukan lain beserta nomornya.",
+  [permitDocumentsToken]: "Centang dokumen yang ditelaah dan isi nomornya jika tersedia. Gunakan Tambah isian untuk dokumen lain.",
   [technicalFieldCheckToken]: "Centang cara pengecekan yang dilakukan. Gunakan Tambah isian untuk cara lain.",
   "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan atau pilih Tambah isian pada jenis yang sesuai. Untuk jenis lain, pilih Tambah acuan keselamatan.",
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
@@ -339,6 +340,7 @@ const inputChoices = {
 };
 
 const inputChoiceGroups = new Map([
+  [permitDocumentsToken, [["Jenis dokumen perizinan", permitDocumentTypes]]],
   [technicalDocumentsToken, [
     ["Pilihan dokumen", [
       "PBG atau IMB",
