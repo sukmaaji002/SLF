@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Susun laporan kajian Sertifikat Laik Fungsi, lengkapi daftar simak, dan cetak laporan.">
-  <meta name="theme-color" content="#f6f8f4">
+  <meta name="theme-color" content="#f8f7f0">
   <title>Ruang Kajian SLF</title>
   <link rel="stylesheet" href="kajian.css?v=7">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="akun.css?v=3">
   <link rel="stylesheet" href="ponsel.css?v=3">
-  <link rel="stylesheet" href="beranda.css?v=2">
+  <link rel="stylesheet" href="beranda.css?v=3">
   <script src="format-teks.js?v=2" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js?v=2" defer></script>
@@ -31,89 +31,133 @@
   <script src="kajian.js?v=15" defer></script>
 </head>
 <body data-screen="kajian">
-  <div id="slf-public" class="landing">
-    <header class="landing-header" id="beranda">
-      <div class="landing-container landing-header-inner">
-        <a class="landing-brand" href="#beranda"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian SLF</a>
-        <nav class="landing-nav" aria-label="Navigasi publik">
+  <div id="slf-public" class="public-site">
+    <header class="public-header" id="beranda">
+      <div class="public-container public-nav">
+        <a class="public-brand" href="./" aria-label="Ruang Kajian SLF, beranda">
+          <span class="public-mark" aria-hidden="true">SLF</span>
+          <span>Ruang Kajian</span>
+        </a>
+        <nav aria-label="Informasi produk">
           <a href="#fitur">Fitur</a>
-          <a href="#pengumuman">Pengumuman</a>
-          <a href="#panduan">Panduan</a>
+          <a href="#contoh-laporan">Contoh laporan</a>
+          <a href="#harga">Harga</a>
         </nav>
-        <button id="landing-login" class="landing-button landing-button-outline" type="button" data-landing-auth="login" disabled>Masuk</button>
+        <button id="landing-login" class="public-login" type="button" data-landing-auth="login" disabled>Masuk <span aria-hidden="true">↗</span></button>
       </div>
     </header>
-
-    <div role="main" aria-labelledby="landing-title">
-      <section class="landing-container landing-hero">
-        <div class="landing-intro">
-          <p class="landing-kicker">Sertifikat Laik Fungsi Bangunan Gedung</p>
-          <h1 id="landing-title">Susun kajian SLF<br class="landing-hero-break"> <em>lebih teratur.</em></h1>
-          <p class="landing-lead">Siapkan laporan kajian, lengkapi daftar simak dan dokumentasi, lalu tinjau semuanya dalam satu ruang kerja.</p>
-          <div class="landing-actions">
-            <button id="start-trial" class="landing-button" type="button" disabled>Coba buat kajian</button>
-            <button class="landing-button landing-button-outline" type="button" data-landing-auth="signup" disabled>Buat akun</button>
+    <div role="main" class="public-main" aria-labelledby="public-title">
+      <section class="public-container public-hero" aria-labelledby="public-title">
+        <div class="public-hero-copy">
+          <p class="public-kicker">Editor kajian Sertifikat Laik Fungsi</p>
+          <h1 id="public-title">Susun laporan<br class="public-desktop-break"> SLF dengan <em>rapi.</em></h1>
+          <p class="public-lead">Kelola data bangunan, hasil pemeriksaan, dan foto lapangan dalam satu proyek. Saat isian berubah, bagian laporan yang tertaut ikut diperbarui.</p>
+          <div class="public-actions">
+            <button id="start-trial" class="public-button" type="button" disabled>Coba buat kajian <span aria-hidden="true">↗</span></button>
+            <a class="public-button public-button-outline" href="#contoh-laporan">Lihat contoh laporan</a>
           </div>
-          <p class="landing-trial-note">Coba Sampul, Pendahuluan, Intensitas dan Tata Ruang, Peta Tautan dan Acuan, Bab I, Bab II, serta 25% isian Daftar Simak tanpa akun.</p>
-          <p id="landing-auth-status" class="landing-auth-status" role="status"></p>
+          <p class="public-trial-note">Coba bagian awal, Bab I–II, dan sebagian daftar simak tanpa akun.</p>
+          <p id="landing-auth-status" class="public-auth-feedback" role="status"></p>
         </div>
-        <figure class="landing-photo">
-          <img src="gedung-slf.webp" alt="Ilustrasi gedung modern dengan fasad kaca dan sirip beton" width="1152" height="768" fetchpriority="high">
-          <figcaption>Dari pemeriksaan bangunan hingga laporan kajian.</figcaption>
+        <figure class="public-hero-visual">
+          <img src="arsitektur-slf.webp" width="1200" height="900" alt="" fetchpriority="high">
+          <figcaption aria-hidden="true">
+            <span class="public-caption-mark">SLF</span>
+            <span><strong>Laporan kajian teknis</strong><small>Templat 8 bab dan daftar simak</small></span>
+          </figcaption>
         </figure>
       </section>
 
-      <section id="fitur" class="landing-features" aria-labelledby="landing-features-title">
-        <div class="landing-container">
-          <div class="landing-section-heading">
-            <p class="landing-kicker">Fitur</p>
-            <h2 id="landing-features-title">Perlengkapan kajian Anda</h2>
-          </div>
-          <div class="landing-features-grid">
-            <article class="landing-feature">
-              <span class="landing-icon landing-icon-report" aria-hidden="true"></span>
-              <h3>Editor laporan</h3>
-              <p>Mulai dari templat kajian, susun bab dan dokumentasi, lalu pratinjau atau cetak laporan sebagai PDF.</p>
-            </article>
-            <article class="landing-feature">
-              <span class="landing-icon landing-icon-check" aria-hidden="true"></span>
-              <h3>Daftar simak</h3>
-              <p>Catat hasil pemeriksaan, temuan, dan bukti foto per butir.</p>
-            </article>
-            <article class="landing-feature">
-              <span class="landing-icon landing-icon-draft" aria-hidden="true"></span>
-              <h3>Draf tersinkron</h3>
-              <p>Simpan draf dan foto di akun Anda agar pekerjaan bisa dilanjutkan dari perangkat lain.</p>
-            </article>
-          </div>
+      <section class="public-container public-features" id="fitur" aria-labelledby="public-features-title">
+        <div class="public-section-heading">
+          <p class="public-kicker">Fitur</p>
+          <h2 id="public-features-title">Satu ruang kerja untuk data dan laporan.</h2>
+        </div>
+        <div class="public-feature-grid">
+          <article>
+            <span class="public-feature-icon" aria-hidden="true">≡</span>
+            <h3>Templat yang dapat diedit</h3>
+            <p>Mulai dari sampul, pengesahan, dan kata pengantar. Tambah atau susun ulang bab dan subbab. Daftar isi mengikuti susunan laporan.</p>
+          </article>
+          <article>
+            <span class="public-feature-icon" aria-hidden="true">✓</span>
+            <h3>Daftar simak tertaut</h3>
+            <p>Catat hasil ukur, temuan, acuan, dan tindak lanjut. Tautkan data yang sudah diisi ke bagian laporan yang relevan.</p>
+          </article>
+          <article>
+            <span class="public-feature-icon" aria-hidden="true">⇄</span>
+            <h3>Draf dan foto tersinkron</h3>
+            <p>Unggah dokumentasi ke bab dan subbab. Lanjutkan proyek di perangkat lain dengan akun yang sama.</p>
+          </article>
         </div>
       </section>
 
-      <div class="landing-container landing-information">
-        <section id="pengumuman" aria-labelledby="landing-news-title">
-          <p class="landing-kicker">Pengumuman</p>
-          <h2 id="landing-news-title">Kabar Ruang Kajian</h2>
-          <article class="landing-news">
-            <h3>Beranda publik kini tersedia</h3>
-            <p>Informasi produk dan panduan dapat dibaca sebelum masuk. Coba bagian awal kajian tanpa akun, atau masuk untuk membuka semua bagian.</p>
+      <section class="public-report-section" id="contoh-laporan" aria-labelledby="public-report-title">
+        <div class="public-container public-report-grid">
+          <div class="public-report-copy">
+            <p class="public-kicker">Contoh laporan</p>
+            <h2 id="public-report-title">Dari sampul hingga rekomendasi.</h2>
+            <p>Templat delapan bab membantu pengkaji menyusun dokumen dari data awal hingga rekomendasi teknis.</p>
+            <ol id="panduan" class="public-steps">
+              <li><strong>Buat proyek.</strong> Isi identitas bangunan, tujuan kajian, dan susunan tim.</li>
+              <li><strong>Catat pemeriksaan.</strong> Lengkapi butir daftar simak dan tambah foto lapangan.</li>
+              <li><strong>Periksa hasilnya.</strong> Buka pratinjau dan gunakan Cetak / PDF saat laporan siap.</li>
+            </ol>
+          </div>
+          <article class="public-report" aria-label="Contoh daftar isi laporan SLF">
+            <header><span class="public-report-logo" aria-hidden="true">SLF</span><div><p>Laporan kajian teknis</p><h3>Daftar isi</h3></div></header>
+            <p class="public-report-front">Sampul · Pengesahan · Kata pengantar</p>
+            <ol type="I">
+              <li>Pendahuluan</li>
+              <li>Metode dan landasan hukum</li>
+              <li>Gambaran umum bangunan</li>
+              <li>Tinjauan dokumen administrasi</li>
+              <li>Pengkajian teknis arsitektur</li>
+              <li>Pengkajian teknis struktur</li>
+              <li>Pengkajian teknis MEP</li>
+              <li>Kesimpulan dan rekomendasi</li>
+            </ol>
+            <p class="public-report-appendix">Lampiran <strong>Daftar simak kajian</strong></p>
           </article>
-        </section>
-        <section id="panduan" aria-labelledby="landing-guide-title">
-          <p class="landing-kicker">Panduan</p>
-          <h2 id="landing-guide-title">Cara memulai</h2>
-          <ol class="landing-steps">
-            <li>Masuk atau buat akun Ruang Kajian SLF.</li>
-            <li>Buat proyek dan pilih templat laporan.</li>
-            <li>Lengkapi kajian dan daftar simak, lalu buka pratinjau sebelum mencetak laporan.</li>
-          </ol>
-        </section>
-      </div>
-    </div>
+        </div>
+      </section>
 
-    <footer class="landing-footer">
-      <div class="landing-container landing-footer-inner">
-        <a class="landing-brand" href="#beranda"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian SLF</a>
-        <a href="#beranda">Kembali ke atas</a>
+      <section class="public-container public-purchase" aria-label="Harga dan pertanyaan umum">
+        <div class="public-pricing" id="harga">
+          <p class="public-kicker">Harga</p>
+          <h2>Harga akan diumumkan.</h2>
+          <p>Kenali fitur dan format laporan sebelum tarif ditetapkan.</p>
+          <button class="public-button" type="button" data-landing-auth="signup" disabled>Buat akun <span aria-hidden="true">↗</span></button>
+        </div>
+        <div class="public-faq" aria-labelledby="public-faq-title">
+          <h2 id="public-faq-title">Pertanyaan umum</h2>
+          <details>
+            <summary>Siapa yang dapat menggunakan Ruang Kajian?</summary>
+            <p>Pengkaji teknis dan tim konsultansi yang menyusun laporan kajian SLF untuk bangunan gedung.</p>
+          </details>
+          <details>
+            <summary>Apa yang tersedia dalam versi coba?</summary>
+            <p>Anda dapat mengisi Sampul, Bagian Awal, Intensitas dan Tata Ruang, Peta Tautan dan Acuan, Bab I, Bab II, serta 25% isian daftar simak. Draf coba berlaku selama tab tetap terbuka.</p>
+          </details>
+          <details>
+            <summary>Apakah laporan dapat disimpan sebagai PDF?</summary>
+            <p>Ya. Periksa pratinjau laporan, lalu pilih Cetak / PDF untuk menyimpan salinan sebagai PDF melalui browser.</p>
+          </details>
+          <details>
+            <summary>Bagaimana cara melanjutkan draf di perangkat lain?</summary>
+            <p>Masuk dengan akun yang sama untuk membuka draf beserta foto yang sudah tersinkron.</p>
+          </details>
+        </div>
+      </section>
+      <section class="public-container public-news" id="pengumuman" aria-labelledby="public-news-title">
+        <p class="public-kicker" id="public-news-title">Pengumuman</p>
+        <p><strong>Mode coba tersedia.</strong> Coba penyusunan bagian awal kajian, lalu masuk untuk membuka semua bagian dan menyimpan proyek ke akun Anda.</p>
+      </section>
+    </div>
+    <footer class="public-footer">
+      <div class="public-container">
+        <a class="public-brand" href="./"><span class="public-mark" aria-hidden="true">SLF</span><span>Ruang Kajian</span></a>
+        <a href="#pengumuman">Pengumuman</a>
       </div>
     </footer>
   </div>
