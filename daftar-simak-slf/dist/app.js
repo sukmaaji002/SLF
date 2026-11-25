@@ -166,10 +166,14 @@ function field([key, title, type], data, onChange, context, item) {
     output.replaceChildren(formattedText(control.value || "–", format));
   };
   const changed = () => { refreshOutput(); onChange(); };
-  control.addEventListener("input", () => {
+  const saveInput = () => {
     data[key] = control.value;
     label.classList.toggle("has-value", Boolean(control.value.trim()));
     changed();
+  };
+  control.addEventListener("input", saveInput);
+  if (type === "date") control.addEventListener("change", () => {
+    if ((data[key] || "") !== control.value) saveInput();
   });
   label.append(control, output);
   refreshOutput();
@@ -185,7 +189,9 @@ function renderIdentity() {
     const wrapper = byId(id);
     wrapper.replaceChildren();
     for (const definition of definitions) {
-      wrapper.append(field(definition, state.identity, save).label);
+      const { label, control } = field(definition, state.identity, save);
+      if (definition[0] === "date") control.id = "tanggal-pemeriksaan";
+      wrapper.append(label);
     }
   }
 }
@@ -586,6 +592,14 @@ if (requestedItem) {
   requestAnimationFrame(() => requestedItem.node.scrollIntoView({ block: "start" }));
 }
 renderIdentity();
+if (location.hash === "#tanggal-pemeriksaan") {
+  const date = byId("tanggal-pemeriksaan");
+  date.closest(".building-details").open = true;
+  requestAnimationFrame(() => {
+    date.scrollIntoView({ block: "center" });
+    date.focus({ preventScroll: true });
+  });
+}
 refresh();
 byId("search").addEventListener("input", refresh);
 byId("category").addEventListener("change", refresh);

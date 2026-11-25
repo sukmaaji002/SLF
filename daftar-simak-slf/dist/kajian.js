@@ -240,9 +240,14 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const format = getTextFormat(data, key);
     styleTextBlock(preview, format);
     preview.replaceChildren(text.trim() ? formattedText(text, format, (original, name) => {
-      const resolved = resolveReportLink(original, name, sources, getLinks());
-      return resolved.value === original ? { value: "Isi " + name,
-        node: button("Isi " + name.trim(), () => openField(tokenName(name)), "narrative-placeholder") } : resolved;
+      const links = getLinks();
+      const resolved = resolveReportLink(original, name, sources, links);
+      if (resolved.value !== original) return resolved;
+      const token = tokenName(name);
+      const link = Object.hasOwn(links, token) ? links[token] : undefined;
+      const fromChecklist = token === "tanggal pemeriksaan" && (!link || link.source === "identity:date");
+      const caption = fromChecklist ? "Isi tanggal pemeriksaan di Daftar Simak" : "Isi " + name.trim();
+      return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
   }
 
@@ -342,6 +347,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         save();
       }) : null;
       const sourceSummary = dom("summary");
+      const openDate = token === "tanggal pemeriksaan" ?
+        button("Buka Tanggal Pemeriksaan di Daftar Simak", openChecklistDate) : null;
       const updateValue = () => {
         const self = select.value === "manual";
         const linkedValue = select.value ? sources.get(select.value)?.value : automaticValue(token, sources);
@@ -353,6 +360,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         manual.hidden = !self;
         value.hidden = self;
         useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend);
+        if (openDate) openDate.hidden = self || (select.value || auto) !== "identity:date";
         if (choiceField) choiceField.hidden = !self && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");
         value.textContent = linkedValue || "Data dari sumber ini belum terisi.";
@@ -375,6 +383,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("strong", {}, name[0].toLocaleUpperCase("id") + name.slice(1)), badge));
       if (hint) entry.append(dom("p", { className: "hint" }, hint));
       if (token === "daftar dokumen") entry.append(documentReviewLinks(project));
+      if (openDate) entry.append(openDate);
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
       entry.append(manual, value, useManual, source);
@@ -704,13 +713,22 @@ function renderIntensity(project) {
 }
 
 
+function openChecklistDate() {
+  slfChecklistItem = "tanggal-pemeriksaan";
+  active = "checklist";
+  render();
+  if (narrowLayout.matches) $("section-navigation").open = false;
+  $("section-title").scrollIntoView({ block: "start" });
+}
+
 function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });
   if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
   if (embed) params.set("embed", "1");
   if (isTrial()) params.set("trial", "1");
   if (slfCloudOwner()) params.set("cloud", "1");
-  return "./daftar-simak.html?" + params + (item ? "#butir-" + item : "");
+  const anchor = item === "tanggal-pemeriksaan" ? "#tanggal-pemeriksaan" : item ? "#butir-" + item : "";
+  return "./daftar-simak.html?" + params + anchor;
 }
 
 function checklistEditorLink(project, item, label) {
