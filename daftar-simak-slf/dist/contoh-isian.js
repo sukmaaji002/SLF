@@ -78,7 +78,7 @@ const inputExamples = {
   "keterangan": "nomor foto, lokasi pengambilan, atau alasan data belum tersedia",
   "peraturan, standar teknis, dan dokumen rencana yang relevan": "standar teknis yang dipakai tim untuk parameter yang diperiksa, beserta nomor, edisi, dan rujukan dokumennya",
   "ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan": "dokumen perizinan bangunan dan gambar situasi yang disetujui",
-  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "acuan teknis untuk sistem yang benar-benar diperiksa, dengan nomor dan edisi yang digunakan tim",
+  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "SNI 2847:2019 untuk beton struktural dan SNI 03-3985-2000 untuk deteksi dan alarm kebakaran",
   "parameter dan rujukan": "dimensi jalur evakuasi berdasarkan gambar rencana dan acuan yang dicatat tim",
   "standar atau dokumen pembanding": "gambar sistem ventilasi terbangun dan acuan teknis yang digunakan tim",
   "ruang atau sistem": "ruang tunggu lantai dasar dan sistem ventilasinya",
@@ -261,6 +261,7 @@ const inputExamples = {
 };
 
 const inputHints = {
+  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan sesuai sistem yang diperiksa. Gunakan Tambah isian untuk mencatat acuan lain beserta nomor dan edisinya.",
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
   "daftar dokumen": "Diambil dari tabel Rekap Pemeriksaan Dokumen. Untuk baris bawaan, isi nomor/tanggal, keterangan, atau status seperti Tersedia atau Telah ditelaah.",
   "tanggal pemeriksaan": "Mengikuti Tanggal pemeriksaan di identitas daftar simak. Pilih Isi manual jika tanggal observasi berbeda.",
@@ -291,7 +292,6 @@ const inputChoices = {
   "daftar bahan dan dokumen": ["gambar situasi atau denah", "lembar ukur", "catatan pemeriksaan", "laporan uji", "dokumentasi foto"],
   "peraturan, standar teknis, dan dokumen rencana yang relevan": ["peraturan bangunan gedung yang digunakan", "standar teknis yang dipakai pada aspek pemeriksaan", "dokumen perizinan dan gambar rencana yang ditelaah"],
   "ketentuan tata ruang, dokumen perizinan, dan gambar rencana yang digunakan": ["dokumen tata ruang yang ditelaah", "PBG atau IMB yang tersedia", "gambar situasi dan denah rencana"],
-  "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": ["acuan struktur yang digunakan", "acuan proteksi kebakaran yang digunakan", "acuan instalasi listrik yang digunakan", "acuan proteksi petir yang digunakan"],
   "parameter dan rujukan": ["lebar jalur evakuasi sesuai rujukan yang dicatat", "temperatur ruang sesuai acuan yang digunakan", "dimensi elemen sesuai gambar rencana"],
   "standar atau dokumen pembanding": ["gambar ventilasi atau sanitasi", "standar pencahayaan yang digunakan", "dokumen instalasi air bersih"],
   "ruang atau sistem": ["ruang tunggu dan ventilasinya", "ruang pelayanan dan pencahayaan", "toilet dan sistem sanitasi"],
@@ -330,6 +330,39 @@ const inputChoices = {
   "waktu atau tahapan": ["setelah perbaikan selesai", "setelah bukti penyelesaian diterima", "pada pemeriksaan lanjutan yang dijadwalkan"],
   "pihak yang memverifikasi": ["pengkaji bidang terkait", "tim pengelola yang ditunjuk", "penanggung jawab verifikasi"],
 };
+
+const inputChoiceGroups = new Map([
+  ["standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan", [
+    ["Struktur", [
+      "SNI 1726:2019 – ketahanan gempa",
+      "SNI 9273:2025 – evaluasi dan rehabilitasi seismik gedung eksisting",
+      "SNI 1727:2020 – beban desain minimum",
+      "SNI 2847:2019 – beton struktural",
+      "SNI 1729:2020 – baja struktural",
+    ]],
+    ["Proteksi kebakaran", [
+      "Permen PU 26/PRT/M/2008 – persyaratan teknis sistem proteksi kebakaran",
+      "SNI 03-1736-2000 – proteksi pasif",
+      "SNI 03-1746-2000 – sarana jalan keluar untuk evakuasi",
+      "SNI 03-1745-2000 – sistem pipa tegak dan slang",
+      "SNI 03-3985-2000 – deteksi dan alarm kebakaran",
+      "SNI 03-3987-1995 – alat pemadam api ringan (APAR)",
+    ]],
+    ["Instalasi listrik", [
+      "Permen ESDM Nomor 7 Tahun 2021 – standardisasi ketenagalistrikan",
+      "SNI 0225-2:2020 (PUIL) – desain instalasi listrik",
+      "SNI 0225-4-41:2025 (PUIL) – proteksi terhadap kejut listrik",
+      "SNI 0225-5-52:2020 (PUIL) – sistem perkawatan",
+      "SNI 0225-5-53:2020 (PUIL) – gawai proteksi dan penyakelaran",
+      "SNI 0225-6:2020 (PUIL) – verifikasi instalasi",
+    ]],
+    ["Proteksi petir", [
+      "Permenaker PER.02/MEN/1989 sebagaimana diubah dengan Permenaker Nomor 31 Tahun 2015 – pengawasan instalasi penyalur petir di tempat kerja",
+      "SNI IEC 62305-1:2013 – prinsip umum proteksi petir",
+      "SNI IEC 62305-2:2009 – manajemen risiko petir",
+    ]],
+  ]],
+]);
 
 function choicesForInput(token) {
   if (Object.hasOwn(inputChoices, token)) return inputChoices[token];

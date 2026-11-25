@@ -198,7 +198,8 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function repeatedNarrativeField(spec, data, changed, choices = []) {
+function repeatedNarrativeField(spec, data, changed, groups = []) {
+  const choices = groups.flatMap(([, options]) => options);
   const choiceKeys = new Set(choices.map(tokenName));
   const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
   let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
@@ -206,8 +207,8 @@ function repeatedNarrativeField(spec, data, changed, choices = []) {
   const values = data[spec.key]?.length ? [...data[spec.key]] : [extra];
   const list = dom("div", { className: "repeated-narrative-list" });
   const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
-  if (choices.length) {
-    const { fieldset, sync } = narrativeChoiceCheckboxes("Pilih satu atau beberapa jenis acuan", choices, (choice, checked) => {
+  for (const [legend, options] of groups) {
+    const { fieldset, sync } = narrativeChoiceCheckboxes(legend, options, (choice, checked) => {
       selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
       if (checked) selected.push(choice);
       commit();
@@ -382,7 +383,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, repeated.choiceKey ? choicesForInput(token) : []) :
+      const groupsForChoices = repeated?.choiceKey ?
+        inputChoiceGroups.get(token) ?? [["Pilih satu atau beberapa jenis acuan", choicesForInput(token)]] : [];
+      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices) :
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
