@@ -100,8 +100,14 @@ function slfCreateDraftStore(client, owner, photos) {
 
   return {
     async list() {
-      return slfCheckCloudResult(await drafts().select("id,name,revision,updated_at")
-        .eq("owner_id", owner).order("updated_at", { ascending: false }));
+      const rows = [];
+      const pageSize = 500;
+      for (let start = 0; ; start += pageSize) {
+        const page = slfCheckCloudResult(await drafts().select("id,name,revision,updated_at,created_at:payload->project->>createdAt")
+          .eq("owner_id", owner).order("updated_at", { ascending: false }).order("id").range(start, start + pageSize - 1));
+        rows.push(...page);
+        if (page.length < pageSize) return rows;
+      }
     },
     async pull(id) {
       const row = slfCheckCloudResult(await drafts().select("id,name,revision,payload,updated_at")
@@ -123,7 +129,7 @@ function slfCreateDraftStore(client, owner, photos) {
       }
       const blobs = {};
       for (const key of checklistPhotos(checklist)) blobs[key] = await getFile(files?.[key]);
-      return { project, checklist, blobs, revision: row.revision, media };
+      return { project, checklist, blobs, revision: row.revision, media, updatedAt: row.updated_at };
     },
     async push(project, checklist, previous) {
       const payload = await pack(project, checklist, previous?.media);

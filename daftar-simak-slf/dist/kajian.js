@@ -714,13 +714,18 @@ function purposeField(project) {
 }
 
 function setCurrent(id, dirty = false) {
+  const fromDashboard = !$("slf-dashboard").hidden;
   workspace.current = id;
   active = "cover";
   const url = new URL(location.href);
   url.searchParams.set("proyek", id);
+  url.searchParams.delete("bagian");
+  url.searchParams.delete("butir");
+  url.hash = "";
   history.replaceState(null, "", url);
   save(dirty);
   render();
+  if (slfAccount) slfDashboardView(false, fromDashboard);
   slfUpdateAccountControls();
 }
 
@@ -1731,6 +1736,9 @@ function validateBackup(data) {
     frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },
     chapters,
   };
+  if (typeof source.createdAt === "string" && Number.isFinite(Date.parse(source.createdAt))) {
+    project.createdAt = new Date(source.createdAt).toISOString();
+  }
   if (["badan-usaha", "perorangan"].includes(source.front?.consultantType)) {
     project.front.consultantType = source.front.consultantType;
   }
@@ -1762,6 +1770,7 @@ async function importBackup(file) {
   try {
     const raw = JSON.parse(await file.text());
     const { project, checklist } = validateBackup(raw);
+    project.createdAt = new Date().toISOString();
     upgradeReportDraft(project);
     for (const key of checklistPhotos(checklist)) {
       const photo = raw.photos?.[key];
@@ -1885,6 +1894,7 @@ function start() {
     const name = form.elements.name.value.trim();
     if (!name) { form.elements.name.focus(); return; }
     const project = draft(name, templates.value);
+    project.createdAt = new Date().toISOString();
     workspace.projects.push(project);
     $("project-dialog").close();
     form.reset();
@@ -1921,6 +1931,7 @@ function start() {
     refreshChecklistViews();
   });
   render();
+  initSlfDashboard();
   initSlfCloud();
 }
 

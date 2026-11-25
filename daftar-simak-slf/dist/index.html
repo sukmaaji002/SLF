@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="akun.css?v=3">
   <link rel="stylesheet" href="ponsel.css?v=3">
   <link rel="stylesheet" href="beranda.css?v=3">
+  <link rel="stylesheet" href="dashboard.css?v=1">
   <script src="format-teks.js?v=2" defer></script>
   <script src="catalog.js" defer></script>
   <script src="templates.js?v=8" defer></script>
@@ -26,9 +27,10 @@
   <script src="pagination.js?v=5" defer></script>
   <script src="vendor/supabase-2.119.2.min.js" defer></script>
   <script src="cloud-config.js" defer></script>
-  <script src="cloud.js" defer></script>
-  <script src="cloud-workspace.js?v=4" defer></script>
-  <script src="kajian.js?v=37" defer></script>
+  <script src="cloud.js?v=1" defer></script>
+  <script src="cloud-workspace.js?v=5" defer></script>
+  <script src="dashboard.js?v=1" defer></script>
+  <script src="kajian.js?v=38" defer></script>
 </head>
 <body data-screen="kajian">
   <div id="slf-public" class="public-site">
@@ -165,6 +167,7 @@
     <header class="mast">
       <div class="mast-inner">
         <a class="app-brand" href="./index.html" aria-label="Ruang Kajian SLF"><span class="app-monogram" aria-hidden="true">SLF</span> Ruang Kajian</a>
+        <button id="dashboard-back" class="quiet" type="button" hidden>← Dashboard</button>
         <div id="trial-controls" class="button-row" hidden>
           <button id="exit-trial" type="button">Beranda</button>
           <button class="primary" type="button" data-landing-auth="login" disabled>Masuk</button>
@@ -184,6 +187,53 @@
       </div>
     </header>
     <main>
+      <section id="slf-dashboard" aria-labelledby="dashboard-title" hidden>
+        <div class="dashboard-heading">
+          <div>
+            <h1 id="dashboard-title" tabindex="-1">Dashboard</h1>
+            <p>Kelola dan lanjutkan kajian SLF Anda.</p>
+          </div>
+          <button class="dashboard-add" id="dashboard-add" type="button"><span aria-hidden="true">+</span> Tambah kajian</button>
+        </div>
+        <div class="dashboard-summary">
+          <div class="dashboard-summary-content">
+            <h2>Total kajian</h2>
+            <strong id="dashboard-total">0</strong>
+            <a href="#dashboard-projects">Lihat daftar kajian <span aria-hidden="true">↓</span></a>
+          </div>
+        </div>
+        <section class="dashboard-card dashboard-activity" aria-labelledby="dashboard-activity-title">
+          <div class="dashboard-card-head">
+            <div>
+              <h2 id="dashboard-activity-title">Aktivitas kajian</h2>
+              <p id="dashboard-period"></p>
+            </div>
+            <div class="dashboard-filters">
+              <div class="dashboard-toggle" role="group" aria-label="Tampilan grafik">
+                <button id="dashboard-monthly" type="button" aria-pressed="true">Bulanan</button>
+                <button id="dashboard-yearly" type="button" aria-pressed="false">Tahunan</button>
+              </div>
+              <select id="dashboard-year" aria-label="Tahun grafik"></select>
+            </div>
+          </div>
+          <div id="dashboard-chart"></div>
+          <p id="dashboard-estimate" class="dashboard-note" hidden>Grafik memakai tanggal pembaruan sebagai perkiraan untuk kajian lama yang belum memiliki tanggal dibuat.</p>
+        </section>
+        <section class="dashboard-card dashboard-projects" id="dashboard-projects" aria-labelledby="dashboard-projects-title">
+          <div class="dashboard-card-head">
+            <h2 id="dashboard-projects-title">Daftar kajian</h2>
+            <span id="dashboard-list-count"></span>
+          </div>
+          <p id="dashboard-action-status" role="status" hidden></p>
+          <ul id="dashboard-list"></ul>
+          <div class="dashboard-empty" id="dashboard-empty" hidden>
+            <strong>Belum ada kajian</strong>
+            <p>Buat kajian SLF untuk mulai menyusun laporan.</p>
+            <button id="dashboard-add-first" type="button">Tambah kajian pertama</button>
+          </div>
+        </section>
+      </section>
+      <div id="slf-editor-view">
       <section class="overview" aria-labelledby="page-title">
         <h1 id="page-title" tabindex="-1">Editor kajian</h1>
         <div class="project-controls">
@@ -222,6 +272,7 @@
           <div id="editor" class="editor"></div>
         </section>
       </div>
+      </div>
     </main>
   </div>
   <dialog id="cloud-dialog" aria-labelledby="cloud-dialog-title" aria-describedby="cloud-dialog-description">
@@ -254,9 +305,27 @@
       </form>
     </div>
   </dialog>
-  <dialog id="project-dialog">
+  <dialog id="dashboard-type-dialog" class="dashboard-dialog" aria-labelledby="dashboard-type-title">
+    <h2 id="dashboard-type-title">Pilih jenis kajian</h2>
+    <button id="dashboard-type-slf" class="dashboard-type" type="button">
+      <span class="dashboard-document" aria-hidden="true"></span>
+      <span><strong>Kajian SLF</strong><small>Sertifikat Laik Fungsi Bangunan Gedung</small></span>
+      <span aria-hidden="true">→</span>
+    </button>
+    <form method="dialog"><button class="quiet" type="submit">Batal</button></form>
+  </dialog>
+  <dialog id="dashboard-copy-dialog" class="dashboard-dialog" aria-labelledby="dashboard-copy-title">
+    <form id="dashboard-copy-form">
+      <h2 id="dashboard-copy-title">Salin kajian</h2>
+      <p id="dashboard-copy-original"></p>
+      <label>Nama proyek salinan<input name="name" required maxlength="120" autocomplete="off" autofocus></label>
+      <p id="dashboard-copy-status" role="status" hidden></p>
+      <div class="button-row"><button id="dashboard-copy-cancel" type="button">Batal</button><button class="primary" type="submit">Buat salinan</button></div>
+    </form>
+  </dialog>
+  <dialog id="project-dialog" aria-labelledby="project-dialog-title">
     <form id="project-form">
-      <h2>Proyek kajian baru</h2>
+      <h2 id="project-dialog-title">Proyek kajian baru</h2>
       <label>Nama proyek<input name="name" required maxlength="120" autocomplete="off"></label>
       <label>Templat laporan<select name="template" required></select></label>
       <p id="template-description"></p>

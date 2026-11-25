@@ -112,7 +112,7 @@ async function slfInstallRemote(snapshot, id, state, store) {
   const index = state.projects.findIndex((entry) => entry.id === id);
   if (index < 0) state.projects.push(project);
   else state.projects[index] = project;
-  state.cloud[id] = { revision: snapshot.revision, media: snapshot.media };
+  state.cloud[id] = { revision: snapshot.revision, media: snapshot.media, updatedAt: snapshot.updatedAt };
   return true;
 }
 
@@ -134,7 +134,8 @@ async function slfSyncCloud({ pull = true } = {}) {
     try {
       const upload = await store.push(structuredClone(local), readChecklist(id), pending);
       const latest = state.cloud[id];
-      state.cloud[id] = { ...upload, ...(latest.dirty !== pending.dirty ? { dirty: latest.dirty } : {}) };
+      state.cloud[id] = { ...upload, updatedAt: new Date().toISOString(),
+        ...(latest.dirty !== pending.dirty ? { dirty: latest.dirty } : {}) };
     } catch (error) {
       if (error instanceof SlfSyncConflict) state.cloud[id] = { ...state.cloud[id], conflict: true };
       else failed = error;
@@ -159,26 +160,31 @@ async function slfSyncCloud({ pull = true } = {}) {
     $("projects").value = state.current;
   }
   slfUpdateAccountControls();
+  slfRenderDashboard();
   if (Object.values(state.cloud).some((entry) => entry.conflict)) {
     slfCloudStatus("Draf berubah di perangkat lain. Simpan perubahan sebagai salinan saat membuka draf yang konflik.");
   } else if (failed) {
     slfCloudStatus(slfCloudError(failed));
   } else if (Object.values(state.cloud).some((entry) => entry.dirty)) {
     slfCloudStatus("Perubahan menunggu sinkronisasi.");
+  } else if (!$("slf-dashboard").hidden) {
+    slfCloudStatus("Kajian tersinkron.");
   } else {
     slfCloudStatus(state.cloud[state.current]?.revision ? "Draf tersinkron." : "Draf baru akan disinkronkan setelah diisi.");
   }
 }
 
 async function slfOpenDraft(id) {
-  if (!slfAccount || !slfCloudRows.some((row) => row.id === id)) return;
+  if (!slfAccount || !slfCloudRows.some((row) => row.id === id)) return false;
   const state = workspace;
   const store = slfDraftStore;
   const surface = document.querySelector(".workspace");
   surface.inert = true;
   $("projects").disabled = true;
   try {
-    if (await slfInstallRemote(await store.pull(id), id, state, store)) setCurrent(id);
+    if (!(await slfInstallRemote(await store.pull(id), id, state, store))) return false;
+    setCurrent(id);
+    return true;
   } finally {
     surface.inert = false;
     $("projects").disabled = false;
@@ -210,14 +216,20 @@ async function slfChangeAccount(user) {
   const leaveWorkspace = previousUser?.id !== user?.id && !workspacePage.hidden;
   main.inert = true;
   if (leaveWorkspace) {
-    for (const id of ["project-dialog", "chapter-dialog", "preview-dialog"]) {
+    for (const id of ["project-dialog", "chapter-dialog", "preview-dialog", "dashboard-type-dialog", "dashboard-copy-dialog"]) {
       const dialog = $(id);
       if (dialog.open) dialog.close();
     }
     workspacePage.hidden = true;
     publicPage.hidden = false;
+    slfDashboardView(false);
     window.scrollTo(0, 0);
-    if (!user) $("landing-login").focus({ preventScroll: true });
+    if (!user) {
+      const url = new URL(location.href);
+      for (const key of ["proyek", "bagian", "butir"]) url.searchParams.delete(key);
+      history.replaceState(null, "", url);
+      $("landing-login").focus({ preventScroll: true });
+    }
   }
   try {
     if (slfAccount) {
@@ -240,25 +252,25 @@ async function slfChangeAccount(user) {
     for (const project of workspace.projects) upgradeReportDraft(project);
     const query = new URLSearchParams(location.search);
     const requested = query.get("proyek");
+    let openRequested = false;
     active = "cover";
     if (slfAccount) {
       try {
         slfCloudRows = await slfDraftStore.list();
-        const cached = workspace.projects.find((project) => project.id === workspace.current);
-        const id = slfCloudRows.some((item) => item.id === requested) ? requested :
-          slfCloudRows.some((item) => item.id === cached?.id) || workspace.cloud[cached?.id]?.dirty ? cached.id : slfCloudRows[0]?.id;
+        const id = slfCloudRows.some((item) => item.id === requested) ? requested : undefined;
         if (id && (!workspace.cloud[id]?.dirty)) {
           const row = slfCloudRows.find((item) => item.id === id);
           if (row?.revision !== workspace.cloud[id]?.revision) await slfInstallRemote(await slfDraftStore.pull(id), id, workspace, slfDraftStore);
         }
-        if (workspace.projects.some((project) => project.id === id)) {
-          workspace.current = id;
-          if (starter && starter !== id) workspace.projects = workspace.projects.filter((project) => project.id !== starter);
-        }
       } catch (error) {
         slfCloudStatus(slfCloudError(error));
       }
-      if (query.get("bagian") === "simak" && workspace.current === requested) {
+      openRequested = Boolean(requested && workspace.projects.some((project) => project.id === requested));
+      if (openRequested) {
+        workspace.current = requested;
+        if (starter && starter !== requested) workspace.projects = workspace.projects.filter((project) => project.id !== starter);
+      }
+      if (openRequested && query.get("bagian") === "simak") {
         active = "checklist";
         slfChecklistItem = checklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
       }
@@ -270,14 +282,21 @@ async function slfChangeAccount(user) {
     if (slfAccount) await save(false);
     slfUpdateAccountControls();
     $("landing-auth-status").textContent = "";
-    if (user && workspacePage.hidden) {
+    if (user) {
       const moveFocus = publicPage.contains(document.activeElement);
       publicPage.hidden = true;
       workspacePage.hidden = false;
+      if (previousUser?.id !== user.id) {
+        dashboardPeriod = "monthly";
+        dashboardYear = undefined;
+      }
+      $("dashboard-action-status").hidden = true;
+      slfDashboardView(Boolean(slfAccount && !openRequested));
       window.scrollTo(0, 0);
       main.inert = !slfAccount;
       if (moveFocus) {
-        const target = slfAccount ? $("page-title") : $("cloud-account").querySelector("summary");
+        const target = slfAccount ? $(openRequested ? "page-title" : "dashboard-title") :
+          $("cloud-account").querySelector("summary");
         target.focus({ preventScroll: true });
       }
     }
@@ -292,12 +311,41 @@ async function slfChangeAccount(user) {
   }
 }
 
+async function slfDuplicateDraft(id, name, owner) {
+  if (!owner || owner !== slfCloudOwner()) throw Error("Akun tidak tersedia.");
+  const state = workspace;
+  const cached = state.projects.find((project) => project.id === id);
+  const row = slfCloudRows.find((entry) => entry.id === id);
+  const status = state.cloud[id];
+  const useRemote = !cached || (row && !status?.dirty && row.revision !== status?.revision);
+  const remote = useRemote ? await slfDraftStore.pull(id) : undefined;
+  const snapshot = remote ? validateBackup({ version: 1, project: remote.project, checklist: remote.checklist }) :
+    { project: structuredClone(cached), checklist: readChecklist(id, owner) };
+  const project = snapshot.project;
+  project.id = crypto.randomUUID();
+  project.name = name;
+  project.createdAt = new Date().toISOString();
+  upgradeReportDraft(project);
+  const photos = {};
+  for (const key of checklistPhotos(snapshot.checklist)) {
+    const photo = remote ? remote.blobs[key] : await checklistPhoto(id, key, undefined, owner);
+    if (!photo) throw Error("Ada foto Daftar Simak yang belum tersimpan di perangkat ini.");
+    photos[key] = photo;
+  }
+  if (state !== workspace || owner !== slfCloudOwner()) throw Error("Akun tidak tersedia.");
+  await storeChecklistPhotos(project.id, photos, owner);
+  localStorage.setItem(slfChecklistKey(project.id, owner), JSON.stringify(snapshot.checklist));
+  state.projects.push(project);
+  setCurrent(project.id, true);
+}
+
 async function slfCopyConflict() {
   const original = current();
   if (!slfAccount || !workspace.cloud[original.id]?.conflict) return;
   const project = structuredClone(original);
   project.id = crypto.randomUUID();
   project.name = original.name.slice(0, 96) + " (salinan perangkat ini)";
+  project.createdAt = new Date().toISOString();
   const checklist = readChecklist(original.id);
   for (const key of checklistPhotos(checklist)) {
     const photo = await checklistPhoto(original.id, key);
