@@ -199,7 +199,7 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function priorRoomSources(project, sources, beforeBlock) {
+function priorRoomSources(project, sources, beforeBlock, tokens = [sampleLocationToken]) {
   const names = new Set([sources.get("cover:building")?.value].filter(Boolean));
   const links = dom("div", { className: "button-row" }, button("Buka Nama bangunan di Sampul", () => {
     active = "cover";
@@ -211,21 +211,24 @@ function priorRoomSources(project, sources, beforeBlock) {
     for (const [blockIndex, block] of chapter.blocks.entries()) {
       if (block === beforeBlock) return { names, links };
       const text = block.type === "heading" ? block.body : block.type === "text" ? block.text : "";
-      if (!reportTokens(text ?? "").has(sampleLocationToken)) continue;
-      const sampleLink = block.links?.[sampleLocationToken];
-      const sourceId = sampleLink?.source ?? automaticSource(sampleLocationToken, sources);
-      const selectedSource = !sampleLink || sampleLink.source ? sources.get(sourceId) : undefined;
-      const recorded = selectedSource?.locations ?? sampleLink?.locations ?? [selectedSource?.value ?? sampleLink?.value];
-      for (const name of recorded) {
-        const value = cleanValue(name);
-        if (value) names.add(value);
+      const fields = reportTokens(text ?? "");
+      for (const token of tokens) {
+        if (!fields.has(token)) continue;
+        const link = block.links?.[token];
+        const sourceId = link?.source ?? automaticSource(token, sources);
+        const selectedSource = !link || link.source ? sources.get(sourceId) : undefined;
+        const recorded = (selectedSource?.locations ?? link?.locations ?? [selectedSource?.value ?? link?.value])
+          .map(cleanValue).filter(Boolean);
+        for (const name of recorded) names.add(name);
+        if (token !== sampleLocationToken && !recorded.length) continue;
+        const label = token[0].toLocaleUpperCase("id") + token.slice(1);
+        links.append(button("Buka " + label + " · Bab " + roman(chapterIndex + 1), () => {
+          active = chapterIndex;
+          render();
+          if (narrowLayout.matches) $("section-navigation").open = false;
+          $("edit-block-" + blockIndex)?.querySelector(".guided-narrative")?.openNarrativeField(token);
+        }, "quiet"));
       }
-      links.append(button("Buka Area atau posisi sampel · Bab " + roman(chapterIndex + 1), () => {
-        active = chapterIndex;
-        render();
-        if (narrowLayout.matches) $("section-navigation").open = false;
-        $("edit-block-" + blockIndex)?.querySelector(".guided-narrative")?.openNarrativeField(sampleLocationToken);
-      }, "quiet"));
     }
   }
   return { names, links };
@@ -439,7 +442,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const spec = repeatedNarrativeFields.get(token);
       const otherParameters = token === parameterReferenceToken && !safetyParameters && !comfortParameters;
       const repeated = otherParameters || (spec?.method && !methods[spec.method]) ? undefined : spec;
-      const roomField = repeated && (token === healthRoomToken || token === comfortRoomToken);
+      const roomField = repeated && (token === healthRoomToken || token === comfortRoomToken || token === existingAreaToken);
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
       const fieldTitle = repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
@@ -497,9 +500,12 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const presetGroups = comfortParameters ? comfortParameterGroups : inputChoiceGroups.get(token);
       const choicesLegend = token === comfortRoomToken ? "Pilihan fungsi ruang" :
-        roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
+        token === existingAreaToken ? "Pilihan area atau unit" :
+          roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
       const groupsForChoices = repeated?.choiceKey ? [...(presetGroups ?? [[choicesLegend, choicesForInput(token)]])] : [];
-      const roomSources = roomField ? priorRoomSources(project, sources, data) : undefined;
+      const roomTokens = token === existingAreaToken ?
+        [sampleLocationToken, "nama gedung atau blok", "lantai atau area", "nama unit"] : undefined;
+      const roomSources = roomField ? priorRoomSources(project, sources, data, roomTokens) : undefined;
       const fromOtherFields = roomSources?.names ?? (technicalDocuments ? sources.get("project:reviewed-documents")?.documents ?? [] : undefined);
       if (fromOtherFields) {
         const used = new Set(groupsForChoices.flatMap(([, options]) => options.map(tokenName)));

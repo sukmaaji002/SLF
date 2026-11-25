@@ -12,10 +12,12 @@ const comfortRoomToken = "fungsi ruang";
 const easeReferenceToken = "acuan aksesibilitas atau dokumen teknis";
 const easeParameterToken = "parameter jalur, fasilitas, atau peralatan yang berlaku";
 const sampleLocationToken = "area atau posisi sampel";
+const existingAreaToken = "area atau unit";
 const technicalDocumentsToken = "sumber dokumen";
 const technicalFieldCheckToken = "sumber verifikasi lapangan";
 const repeatedNarrativeFields = new Map([
   [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
+  [existingAreaToken, { key: "existingAreas", choiceKey: "existingAreaChoices", item: "Area atau unit tambahan", minimumRows: 0 }],
   [technicalDocumentsToken,
     { key: "technicalDocuments", choiceKey: "technicalDocumentChoices", item: "Dokumen tambahan", minimumRows: 0,
       label: "Dokumen apa yang dipakai?", previewLabel: "Pilih dokumen yang dipakai" }],
