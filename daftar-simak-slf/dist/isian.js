@@ -4,8 +4,15 @@ const tokenPattern = /\[([^\[\]\r\n]+)\]/g;
 const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("id");
 const safetyReferenceToken = "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan";
 const parameterReferenceToken = "parameter dan rujukan";
+const healthReferenceToken = "standar atau dokumen pembanding";
+const healthParameterToken = "parameter, satuan, dan rujukan";
+const healthRoomToken = "ruang atau sistem";
+const sampleLocationToken = "area atau posisi sampel";
 const repeatedNarrativeFields = new Map([
-  ["area atau posisi sampel", { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
+  [sampleLocationToken, { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
+  [healthReferenceToken, { key: "healthReferences", choiceKey: "healthReferenceChoices", item: "Acuan tambahan", minimumRows: 0, healthOnly: true }],
+  [healthParameterToken, { key: "healthParameters", choiceKey: "healthParameterChoices", item: "Isian tambahan", minimumRows: 0, healthOnly: true }],
+  [healthRoomToken, { key: "healthRooms", choiceKey: "healthRoomChoices", item: "Ruang atau sistem tambahan", minimumRows: 0, healthOnly: true }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
   ["peraturan, standar teknis, dan dokumen rencana yang relevan",
     { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],
@@ -303,7 +310,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   }
   const leads = hasDesignation ? designatedLeads : teamLeads;
   add("project:team-lead", "Data kajian", "Penanggung jawab dari tabel tim pengkaji", leads.size === 1 ? [...leads][0] : "");
-  add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format([...locations]));
+  const sampleLocations = [...locations];
+  add("project:sample-locations", "Data kajian", "Lokasi sampel yang dicatat di daftar simak", scopeList.format(sampleLocations));
+  sources.get("project:sample-locations").locations = sampleLocations;
   const evidence = [hasResults ? "daftar simak kajian" : "", hasPhotos ? "dokumentasi foto pemeriksaan" : ""].filter(Boolean);
   add("project:checklist-evidence", "Data kajian", "Bukti yang dicatat di daftar simak", scopeList.format(evidence));
   add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format([...availableDocuments]));

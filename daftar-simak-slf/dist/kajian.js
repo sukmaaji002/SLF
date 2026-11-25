@@ -198,6 +198,38 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
+function healthRoomSources(project, sources, beforeBlock) {
+  const names = new Set([sources.get("cover:building")?.value].filter(Boolean));
+  const links = dom("div", { className: "button-row" }, button("Buka Nama bangunan di Sampul", () => {
+    active = "cover";
+    render();
+    if (narrowLayout.matches) $("section-navigation").open = false;
+    focusTextField($("cover-building"));
+  }, "quiet"));
+  for (const [chapterIndex, chapter] of project.chapters.entries()) {
+    for (const [blockIndex, block] of chapter.blocks.entries()) {
+      if (block === beforeBlock) return { names, links };
+      const text = block.type === "heading" ? block.body : block.type === "text" ? block.text : "";
+      if (!reportTokens(text ?? "").has(sampleLocationToken)) continue;
+      const sampleLink = block.links?.[sampleLocationToken];
+      const sourceId = sampleLink?.source ?? automaticSource(sampleLocationToken, sources);
+      const selectedSource = !sampleLink || sampleLink.source ? sources.get(sourceId) : undefined;
+      const recorded = selectedSource?.locations ?? sampleLink?.locations ?? [selectedSource?.value ?? sampleLink?.value];
+      for (const name of recorded) {
+        const value = cleanValue(name);
+        if (value) names.add(value);
+      }
+      links.append(button("Buka Area atau posisi sampel · Bab " + roman(chapterIndex + 1), () => {
+        active = chapterIndex;
+        render();
+        if (narrowLayout.matches) $("section-navigation").open = false;
+        $("edit-block-" + blockIndex)?.querySelector(".guided-narrative")?.openNarrativeField(sampleLocationToken);
+      }, "quiet"));
+    }
+  }
+  return { names, links };
+}
+
 function narrativeEntryList(values, item, changed, minimumRows = 1) {
   const list = dom("div", { className: "repeated-narrative-list" });
   const appendEntry = button("Tambah isian", () => {
@@ -326,6 +358,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     }));
   const wrapper = dom("div", { className: "wide guided-narrative" },
     dom("div", { className: "narrative-preview" }, dom("h4", {}, "Tampilan di laporan"), preview), details, textEditor);
+  wrapper.openNarrativeField = openField;
   const control = textEditor.querySelector("textarea");
   const insertPurpose = button("Tambahkan isian Tujuan Kajian", () => {
     if (reportTokens(control.value).has("tujuan kajian")) return;
@@ -388,14 +421,18 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       groups.get(source.group).push([id, source.label]);
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
+    const healthMethod = fields.has(healthParameterToken) ||
+      (key === "body" && tokenName(data.text ?? "") === "kesehatan" && fields.has(healthReferenceToken));
     for (const [token, name] of fields) {
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
       const safetyParameters = token === parameterReferenceToken &&
         (fields.has(safetyReferenceToken) || (key === "body" && tokenName(data.text ?? "") === "keselamatan"));
-      const repeated = token === parameterReferenceToken && !safetyParameters ? undefined : repeatedNarrativeFields.get(token);
-      const sampleLocation = token === "area atau posisi sampel";
+      const spec = repeatedNarrativeFields.get(token);
+      const repeated = (token === parameterReferenceToken && !safetyParameters) || (spec?.healthOnly && !healthMethod) ? undefined : spec;
+      const healthRoom = token === healthRoomToken && Boolean(repeated);
+      const sampleLocation = token === sampleLocationToken;
       const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
@@ -421,8 +458,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         select.dispatchEvent(new Event("change"));
         focusManual();
       }, "quiet");
-      const example = safetyParameters ? "" : inputExample(token);
-      const hint = safetyParameters || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
+      const simpleChoices = safetyParameters || repeated?.healthOnly;
+      const example = simpleChoices ? "" : inputExample(token);
+      const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
@@ -448,7 +486,18 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const groupsForChoices = repeated?.choiceKey ?
-        inputChoiceGroups.get(token) ?? [["Pilih satu atau beberapa jenis acuan", choicesForInput(token)]] : [];
+        inputChoiceGroups.get(token) ?? [[healthRoom ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan", choicesForInput(token)]] : [];
+      const roomSources = healthRoom ? healthRoomSources(project, sources, data) : undefined;
+      if (roomSources) {
+        const used = new Set(groupsForChoices.flatMap(([, options]) => options.map(tokenName)));
+        const names = [...roomSources.names, ...(manualData.healthRoomChoices ?? [])].filter((name) => {
+          const key = tokenName(name);
+          if (used.has(key)) return false;
+          used.add(key);
+          return true;
+        });
+        if (names.length) groupsForChoices.unshift(["Dari isian sebelumnya", names]);
+      }
       const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices) :
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
@@ -527,6 +576,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (openDate) entry.append(openDate);
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
+      if (roomSources) entry.append(roomSources.links);
       entry.append(manual);
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
@@ -969,8 +1019,11 @@ function title(type, label) {
 function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
   editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
-    dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) =>
-      guidedField(project.cover, key, label, type))),
+    dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) => {
+      const control = guidedField(project.cover, key, label, type);
+      if (key === "building") control.querySelector("input").id = "cover-building";
+      return control;
+    })),
     dom("hr"), pictureEditor(project.cover, "foto sampul", () => workspace.projects.includes(project)));
   editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
     project.name = value;

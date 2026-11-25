@@ -362,6 +362,33 @@ const inputChoiceGroups = new Map([
       "SNI IEC 62305-2:2009 – manajemen risiko petir",
     ]],
   ]],
+  [healthReferenceToken, [
+    ["Ketentuan umum", [
+      "PP Nomor 16 Tahun 2021 – persyaratan kesehatan bangunan gedung",
+      "Permenkes Nomor 2 Tahun 2023 (lampiran yang masih berlaku) – baku mutu kesehatan lingkungan",
+    ]],
+    ["Penghawaan", [
+      "SNI 6572-1:2024 – ventilasi gedung nonresidensial",
+      "SNI 6572-2:2024 – ventilasi gedung residensial",
+      "SNI 6572-3:2024 – ventilasi fasilitas pelayanan kesehatan",
+    ]],
+    ["Pencahayaan", [
+      "SNI 03-2396-2001 – pencahayaan alami",
+      "SNI 03-6575-2001 – pencahayaan buatan",
+      "SNI 7062:2019/Ralat 1:2020 – pengukuran pencahayaan di tempat kerja",
+    ]],
+    ["Air bersih dan sanitasi", [
+      "SNI 8153:2025 – sistem plambing pada bangunan gedung",
+    ]],
+  ]],
+  [healthParameterToken, [
+    ["Pilih rujukan", [
+      "sesuai dengan standar teknis penghawaan",
+      "sesuai dengan standar teknis pencahayaan",
+      "sesuai dengan standar teknis penyediaan air bersih",
+      "sesuai dengan standar teknis sanitasi",
+    ]],
+  ]],
   [parameterReferenceToken, [
     ["Pilih rujukan", [
       "sesuai dengan standar teknis struktur",
