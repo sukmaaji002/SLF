@@ -103,6 +103,17 @@ function load(key) {
   }
 }
 
+let savedProjectCover;
+if (projectMode && !trialMode && !cloudChecklist && window.parent === window) {
+  try {
+    const drafts = await storeValue(openStore("ruang-kajian-slf", "workspace"), "workspace", "drafts");
+    savedProjectCover = drafts?.projects.find(({ id }) => id === projectId)?.cover;
+  } catch { /* The checklist can still be used without a saved cover. */ }
+}
+function projectCover() {
+  return (projectMode && window.parent !== window ? window.parent.slfChecklistCover?.(projectId) : undefined) ?? savedProjectCover;
+}
+
 const previous = projectMode || trialMode ? null : load(legacyKey);
 let state = (trialData ? structuredClone(trialData.checklist) : load(storageKey)) ?? { identity: { ...previous?.building }, checks: {} };
 
@@ -183,6 +194,7 @@ function field([key, title, type], data, onChange, context, item) {
 }
 
 function renderIdentity() {
+  const defaults = effectiveChecklistIdentity(projectCover());
   for (const [id, definitions] of [
     ["owner-fields", ownerFields], ["condition-fields", conditionFields], ["building-fields", buildingFields],
   ]) {
@@ -190,7 +202,9 @@ function renderIdentity() {
     wrapper.replaceChildren();
     for (const definition of definitions) {
       const { label, control } = field(definition, state.identity, save);
-      if (definition[0] === "date") control.id = "tanggal-pemeriksaan";
+      const key = definition[0];
+      if (defaults[key]) control.placeholder = "Dari Sampul: " + defaults[key];
+      if (key === "date") control.id = "tanggal-pemeriksaan";
       wrapper.append(label);
     }
   }
@@ -548,6 +562,7 @@ function downloadCsv(filename, lines) {
 
 function exportCsv() {
   const identity = [...ownerFields, ...conditionFields, ...buildingFields];
+  const values = effectiveChecklistIdentity(projectCover(), state.identity);
   const rowFields = [
     ["location", "Lokasi atau identitas sampel"],
     ...Object.values(fields),
@@ -560,7 +575,7 @@ function exportCsv() {
     ...items.filter((item) => !item.locked).flatMap((item) => {
       const check = getCheck(item);
       return check.rows.map((row) => [
-        ...identity.map(([key]) => state.identity[key]),
+        ...identity.map(([key]) => values[key]),
         item.category.title, item.group.code + " " + item.group.title, item.no, item.title, item.page, row.label,
         check.na ? "Ya" : "",
         ...uniqueFields.map(([key]) => check.na ? "" : row[key]),
@@ -622,7 +637,8 @@ async function prepareSimakPaper() {
   const urls = simakPhotoUrls;
   const draft = dom("div");
   simakPaper.append(draft);
-  await renderSimakForm(draft, structuredClone(state), {
+  const snapshot = { ...structuredClone(state), identity: effectiveChecklistIdentity(projectCover(), state.identity) };
+  await renderSimakForm(draft, snapshot, {
     tegal: tegalReference, photoUrls: urls, loadPhoto: trialMode ? undefined : (key) => photoStore("get", key),
     items: trialMode ? trialChecklistItems : checklistItems,
   });

@@ -39,6 +39,8 @@ const linkedMethodNarratives = {
 };
 
 const contextualNarratives = {
+  "Kemudahan": { marker: "lokasi", replacement: "lokasi fasilitas yang diperiksa", previous: "Sarana dan peralatan terkait kemudahan penggunaan gedung yang ditinjau meliputi [fasilitas atau peralatan]. Kondisi dan fungsi yang terverifikasi pada [lokasi] adalah [hasil pemeriksaan] berdasarkan [rujukan bukti]." },
+  "Persampahan dan utilitas khusus": { marker: "lokasi", replacement: "lokasi sarana pengumpulan sampah", previous: "Sarana pengumpulan sampah yang diperiksa berada di [lokasi] dengan mekanisme [pemilahan, penyimpanan, atau pengangkutan]. Utilitas khusus yang sesuai dengan fungsi bangunan adalah [jenis sistem atau status tidak relevan]. Temuan yang didukung bukti adalah [temuan]." },
   "Kondisi eksisting": { marker: "tanggal", replacement: "tanggal pemeriksaan", previous: "Pada saat observasi [tanggal], bangunan berada dalam kondisi [ringkasan kondisi umum]. Pemanfaatan utama teridentifikasi pada [area atau unit]. Dokumentasi berupa [denah, foto, atau catatan lapangan] digunakan untuk menunjukkan kondisi yang dapat diverifikasi." },
   "Proteksi kebakaran": { marker: "lokasi", replacement: "lokasi komponen proteksi kebakaran", previous: "Sarana proteksi kebakaran yang ditinjau meliputi [sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia]. Hasil verifikasi pada [lokasi] adalah [kondisi, fungsi terverifikasi, atau temuan]. Bukti pemeriksaan berupa [daftar simak, hasil uji, atau foto]." },
 };
@@ -175,10 +177,10 @@ const reportTemplates = {
           {"body":"Pemeriksaan utilitas kesehatan mencakup [penghawaan, pencahayaan, air bersih, sanitasi, atau sistem terkait]. Hasil observasi dan pengukuran dirinci menurut sistem yang diperiksa dan sumber bukti yang tersedia.","previous":"[Ringkas hasil pemeriksaan utilitas kesehatan.]"},
           ["Penghawaan dan pencahayaan", {"body":"Pada [lokasi sampel], penghawaan disediakan melalui [sistem atau bukaan], sedangkan pencahayaan berasal dari [sumber]. Hasil pengamatan atau pengukuran adalah [hasil dan satuan], dengan metode [metode] serta acuan [acuan].","previous":"[Masukkan lokasi sampel, metode, hasil ukur, dan satuan.]"}],
           ["Air bersih, air limbah, dan air hujan", {"body":"Air bersih berasal dari [sumber] dan disalurkan melalui [sistem distribusi]. Air limbah dialirkan atau diolah melalui [sistem], sedangkan air hujan ditangani oleh [sistem drainase atau penampungan]. Kondisi terverifikasi dan keterbatasannya adalah [hasil verifikasi].","previous":"[Catat sumber, jaringan distribusi, pengolahan, dan kondisi aktual.]"}],
-          ["Persampahan dan utilitas khusus", {"body":"Sarana pengumpulan sampah yang diperiksa berada di [lokasi] dengan mekanisme [pemilahan, penyimpanan, atau pengangkutan]. Utilitas khusus yang sesuai dengan fungsi bangunan adalah [jenis sistem atau status tidak relevan]. Temuan yang didukung bukti adalah [temuan].","previous":"[Catat sistem yang ada dan yang relevan dengan fungsi bangunan.]"}],
+          ["Persampahan dan utilitas khusus", {"body":contextualNarrative("Persampahan dan utilitas khusus"),"previous":"[Catat sistem yang ada dan yang relevan dengan fungsi bangunan.]"}],
         ],
         ["Kenyamanan", {"body":"Kondisi udara ruang serta getaran atau kebisingan ditinjau pada [lokasi sampel]. Parameter yang diperoleh adalah [hasil dan satuan] berdasarkan [metode atau sumber data]. Penilaian terhadap hasil tersebut adalah [hasil telaah dan keterbatasan].","previous":"[Catat kondisi udara ruang serta pengukuran getaran atau kebisingan bila dilakukan.]"}],
-        ["Kemudahan", {"body":"Sarana dan peralatan terkait kemudahan penggunaan gedung yang ditinjau meliputi [fasilitas atau peralatan]. Kondisi dan fungsi yang terverifikasi pada [lokasi] adalah [hasil pemeriksaan] berdasarkan [rujukan bukti].","previous":"[Catat sarana, peralatan, dan fasilitas yang diperiksa.]"}],
+        ["Kemudahan", {"body":contextualNarrative("Kemudahan"),"previous":"[Catat sarana, peralatan, dan fasilitas yang diperiksa.]"}],
         ["Kesimpulan bidang MEP", {"body":"Pemeriksaan bidang MEP menghasilkan [kesimpulan pengkaji] berdasarkan [bukti atau rujukan bagian laporan]. Prioritas tindak lanjut berada pada [sistem dan lokasi], dengan mempertimbangkan [dampak temuan dan kebutuhan verifikasi].","previous":"[Ringkas temuan utama, rujukan bukti, dan prioritas tindak lanjut.]"}],
       ],
       [
@@ -437,7 +439,9 @@ function upgradeReportDraft(project) {
         if (Object.hasOwn(contextualNarratives, block.text)) {
           const { marker, replacement, previous } = contextualNarratives[block.text];
           if (block.body !== previous) continue;
-          block.body = contextualNarrative(block.text);
+          const updated = contextualNarrative(block.text);
+          updateTextFormat(block, "body", block.body, updated);
+          block.body = updated;
           if (block.links?.[marker] && !block.links[replacement]) block.links[replacement] = block.links[marker];
         }
       }

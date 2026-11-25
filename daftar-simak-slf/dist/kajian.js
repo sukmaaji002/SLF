@@ -17,6 +17,7 @@ let trial;
 
 const isTrial = () => Boolean(trial && workspace === trial.workspace);
 globalThis.slfTrialData = (id) => isTrial() && trial.workspace.current === id ? trial : undefined;
+globalThis.slfChecklistCover = (id) => current()?.id === id ? current().cover : undefined;
 
 function setTrialView(visible) {
   if (visible && slfAuthUser) return;
@@ -618,7 +619,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
 
 function refreshLinkedFields(except) {
   const narratives = [...editor.querySelectorAll(".linked-fields")];
-  const tableFields = [...editor.querySelectorAll(".table-link[data-linked]")];
+  const tableFields = [...editor.querySelectorAll(".table-link[data-linked], .table-link[data-automatic]")];
   const leadFields = [...editor.querySelectorAll(".team-lead")];
   if (narratives.length || tableFields.length || leadFields.length) {
     const sources = reportSources(current());
@@ -1323,12 +1324,15 @@ function tableCellField(block, row, column, sources, options) {
   const link = dom("details", { className: "table-link" }, summary, pick);
   function refreshValue(registry) {
     const source = block.cellLinks?.[key];
-    const entry = registry.get(source);
+    const automatic = automaticTableCellSource(block, row, column);
+    const entry = registry.get(source ?? automatic);
     link.toggleAttribute("data-linked", Boolean(source));
+    link.toggleAttribute("data-automatic", Boolean(automatic) || tokenName(block.text) === "data umum bangunan gedung");
     input.readOnly = Boolean(source);
     input.value = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
-    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" : example ? "Contoh: " + example : token ?? "";
-    summary.textContent = source ? "Data tertaut" : "Ambil data";
+    input.placeholder = source && !entry?.value ? "Sumber belum tersedia" :
+      automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
+    summary.textContent = source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
     control.syncTextFormat();
   }
   link.refreshValue = refreshValue;

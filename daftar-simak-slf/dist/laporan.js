@@ -131,14 +131,21 @@ function reportFormatted(element, text, format, prefix = "") {
   return styleTextBlock(element, format);
 }
 
-async function renderChecklist(target, project, urls, checklist, summaryAnchors, primary, items) {
-  const identity = structuredClone(checklist.identity);
+function effectiveChecklistIdentity(cover = {}, stored = {}) {
+  const identity = structuredClone(stored);
   for (const [key, coverKey] of Object.entries({ building: "building", location: "address", use: "use", ownerName: "owner" })) {
-    if (!cleanValue(identity[key]) && cleanValue(project.cover[coverKey])) {
-      identity[key] = project.cover[coverKey];
-      setTextFormat(identity, key, getTextFormat(project.cover, coverKey));
+    const current = identity[key]?.trim();
+    const fallback = cover[coverKey]?.trim();
+    if ((!current || /^\[[^\[\]]+\]$/.test(current)) && fallback && !/^\[[^\[\]]+\]$/.test(fallback)) {
+      identity[key] = cover[coverKey];
+      setTextFormat(identity, key, getTextFormat(cover, coverKey));
     }
   }
+  return identity;
+}
+
+async function renderChecklist(target, project, urls, checklist, summaryAnchors, primary, items) {
+  const identity = effectiveChecklistIdentity(project.cover, checklist.identity);
   await renderSimakForm(target, { identity, checks: checklist.checks }, {
     tegal: project.intensity?.region === "tegal",
     anchors: primary, summaryAnchors, photoUrls: urls, items, figurePrefix: target.id,

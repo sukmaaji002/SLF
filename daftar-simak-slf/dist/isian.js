@@ -50,6 +50,8 @@ const repeatedNarrativeFields = new Map([
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
   "luas persil": ["project:land-area"],
+  "luas total lantai": ["project:measurement-klb"],
+  "jumlah lantai bangunan": ["project:measurement-kbg"],
   "gsb": ["project:gsb"], "garis sempadan bangunan": ["project:gsb"],
   "garis sempadan saluran": ["project:saluran"], "garis sempadan sungai": ["project:sungai"],
   "kdb": ["project:kdb"], "klb": ["project:klb"], "kdh": ["project:kdh"], "ktb": ["project:ktb"], "kbg": ["project:kbg"],
@@ -148,9 +150,26 @@ function tableCellKey(block, row, column) {
   return block.rowIds?.[row] + ":" + block.columnIds?.[column];
 }
 
+const technicalActualSources = new Map([
+  ["luas persil", "project:land-area"],
+  ["luas lantai", "project:measurement-klb"],
+  ["luas total lantai", "project:measurement-klb"],
+  ["jumlah lantai", "project:measurement-kbg"],
+  ["jumlah lantai bangunan", "project:measurement-kbg"],
+]);
+
+function automaticTableCellSource(block, row, column) {
+  if (tokenName(block.text) !== "data umum bangunan gedung" || tokenName(block.headers[column]) !== "data eksisting") return undefined;
+  if (cleanValue(block.rows[row][column])) return undefined;
+  const parameterColumn = block.headers.findIndex((header) => tokenName(header) === "parameter");
+  return technicalActualSources.get(tokenName(block.rows[row][parameterColumn] ?? ""));
+}
+
 function tableCellValue(block, row, column, sources) {
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
-  return source ? sources.get(source)?.value || "" : block.rows[row][column];
+  if (source) return sources.get(source)?.value || "";
+  const automatic = sources.get(automaticTableCellSource(block, row, column));
+  return automatic?.value || block.rows[row][column];
 }
 
 function tableSourceAvailable(id) {
@@ -218,7 +237,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const metric of intensity.metrics) {
     if (metric.custom) continue;
     const unit = metric.direct || metric.unit === "lantai" ? intensityUnit(metric) : " m²";
-    if (metric.measurement.value !== null) add("project:measurement-" + metric.key, "Data awal intensitas", metric.areaLabel,
+    if (metric.status !== "Tidak berlaku" && metric.measurement.value !== null) add("project:measurement-" + metric.key, "Data awal intensitas", metric.areaLabel,
       intensityValue(metric.measurement.value, unit));
     if (metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
       intensityValue(metric.value, intensityUnit(metric)));
@@ -244,9 +263,10 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const [key, label] of frontFields.slice(0, 2)) {
     addNarrativeSources(add, key, project.front[key] ?? "", project.frontLinks?.[key], label);
   }
+  const identity = effectiveChecklistIdentity(project.cover, checklist.identity);
   for (const [key, label] of Object.entries(checklistIdentityLabels)) {
-    const value = checklist.identity[key];
-    add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value, getTextFormat(checklist.identity, key));
+    const value = identity[key];
+    add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value, getTextFormat(identity, key));
   }
   for (const item of checklistItems) {
     const check = checklist.checks[item.id];
@@ -273,9 +293,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       if (block.sourceId || isDocumentReviewTable(block)) tables.push(block);
       if (!block.sourceId) continue;
       for (const [ri, row] of block.rows.entries()) {
-        for (const [ci, value] of row.entries()) {
+        for (const ci of row.keys()) {
           const key = tableCellKey(block, ri, ci);
-          if (!cleanValue(value) || block.cellLinks?.[key]) continue;
+          if (block.cellLinks?.[key]) continue;
+          const value = tableCellValue(block, ri, ci, sources);
+          if (!cleanValue(value)) continue;
           const rowName = cleanValue(row[0]) || "Baris " + (ri + 1);
           const name = [chapterLabel(project, index), block.text || "Tabel", rowName, block.headers[ci]].join(" · ");
           add("cell:" + block.sourceId + ":" + key, "Tabel kajian", name, value, getTextFormat(block, "cell:" + key));
@@ -347,7 +369,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const documents = [...availableDocuments];
   add("project:reviewed-documents", "Data kajian", "Daftar dokumen dari Rekap Pemeriksaan Dokumen", scopeList.format(documents));
   sources.get("project:reviewed-documents").documents = documents;
-  add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", permits.size === 1 ? [...permits][0] : "");
+  add("project:reviewed-permit", "Data kajian", "Dokumen PBG atau IMB yang sudah ditelaah", scopeList.format([...permits]));
   for (const [role, id] of [["arsitektur", "architecture"], ["struktur", "structure"], ["mep", "mep"]]) {
     const names = reviewers.get(role);
     add("project:reviewer-" + id, "Data kajian", "Pengkaji " + role + " dari tabel tim", names.size === 1 ? [...names][0] : "");
