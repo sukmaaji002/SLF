@@ -7,7 +7,7 @@ const reportLayoutStyle = `
   .report-print .report-cover h1 { font-size: 27pt; margin: 14px 0; text-transform: uppercase; }
   .report-print .paper-kicker { font-size: 11pt; font-weight: 700; }
   .report-print .cover-building { font-size: 17pt; font-weight: 700; }
-  .report-print .cover-photo { width: auto; height: auto; max-width: min(100%, 126mm); max-height: 76mm; margin: 12px auto; }
+  .report-print .cover-photo { width: auto; height: auto; max-width: calc(min(100%, 126mm) * var(--report-image-scale, 1)); max-height: calc(76mm * var(--report-image-scale, 1)); margin: 12px auto; }
   .report-print > .report-section { break-before: page; }
   .report-print h2 { font-size: 18pt; margin: 0 0 15px; break-after: avoid; }
   .report-print h3 { margin: 11px 0 6px; break-after: avoid; }
@@ -39,13 +39,14 @@ const reportLayoutStyle = `
   .report-print .report-table-fit { break-inside: avoid; }
   .report-print .simak-item.fit:not(.report-table-fit) { break-inside: auto; }
   .report-print figure { margin: 12px 0; }
-  .report-print img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; margin: 4px 0; }
+  .report-print img { display: block; max-width: calc(100% * var(--report-image-scale, 1)); max-height: calc(420px * var(--report-image-scale, 1)); object-fit: contain; margin: 4px 0; break-inside: avoid; }
+  .report-print .site-diagram img { margin-inline: auto; }
   .report-print .caption, .report-print figcaption { font-size: 10pt; font-weight: 650; break-after: avoid; }
   .report-print .report-photo-row { display: flex; justify-content: center; align-items: flex-start; gap: 6mm; margin: 3mm 0; break-inside: avoid; }
   .report-print .report-photo-row > .report-photo { flex: 0 1 calc((100% - 6mm) / 2); min-width: 0; margin: 0; }
-  .report-print .report-photo-row > .report-photo:only-child { flex-basis: 126mm; max-width: 100%; }
-  .report-print .report-photo img { width: auto; height: auto; max-height: 62mm; margin: 0 auto 2mm; }
-  .report-print .report-photo:only-child img { max-height: 76mm; }
+  .report-print .report-photo-row:not([data-report-photo-pair]) > .report-photo { flex-basis: 126mm; max-width: 100%; }
+  .report-print .report-photo img { width: auto; height: auto; max-height: calc(62mm * var(--report-image-scale, 1)); margin: 0 auto 2mm; }
+  .report-print .report-photo-row:not([data-report-photo-pair]) .report-photo img { max-height: calc(76mm * var(--report-image-scale, 1)); }
   .report-print [data-report-figure] > figcaption { text-align: center !important; break-after: auto; }
   .report-print .result-values { margin: 3px 0 6px; }
   .report-print .result-values dt { font-weight: 650; }
@@ -93,6 +94,12 @@ async function measureReportTables(source, staging) {
   }
 }
 
+function overflowElement(range) {
+  const container = range.startContainer;
+  const node = container.nodeType === Node.ELEMENT_NODE ? container.childNodes[range.startOffset] ?? container : container;
+  return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+}
+
 function connectTablePagination(chunker) {
   let continuedTable;
   chunker.hooks.onPageLayout.register((_rendered, token) => {
@@ -113,9 +120,7 @@ function connectTablePagination(chunker) {
   });
   chunker.hooks.onOverflow.register((range, rendered, bounds) => {
     if (!range) return;
-    const container = range.startContainer;
-    const node = container.nodeType === Node.ELEMENT_NODE ? container.childNodes[range.startOffset] ?? container : container;
-    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const element = overflowElement(range);
     const table = element?.closest("table");
     if (!table?.tHead) return;
     const firstRow = table.tBodies[0]?.rows[0];
@@ -124,6 +129,52 @@ function connectTablePagination(chunker) {
     const block = reportTableBlock(table);
     if (block.getBoundingClientRect().top > bounds.top + 2 && rendered.contains(block)) range.setStartBefore(block);
     return range;
+  });
+}
+
+function imageBlock(element) {
+  return element?.closest(".report-photo-row") ?? element?.closest("figure, img.cover-photo");
+}
+
+function imageBlockTop(block, bounds) {
+  const box = block.getBoundingClientRect();
+  if (box.left < bounds.right - 1) return box.top;
+  // The layout engine can put a whole figure in the next column before testing overflow.
+  const previous = block.previousElementSibling;
+  const last = [...(previous?.getClientRects() ?? [])].at(-1);
+  if (!last || last.left >= bounds.right - 1) return Infinity;
+  return last.bottom + Math.max(parseFloat(getComputedStyle(previous).marginBottom) || 0,
+    parseFloat(getComputedStyle(block).marginTop) || 0);
+}
+
+function connectImagePagination(chunker) {
+  chunker.hooks.onOverflow.register((range, rendered, bounds, layout) => {
+    if (!range) return;
+    const block = imageBlock(overflowElement(range));
+    if (!block || !rendered.contains(block) || block.closest("table")) return;
+    const figures = block.matches(".report-photo-row") ? [...block.children] : [block];
+    const images = figures.map((figure) => {
+      const image = figure.matches("img") ? figure : figure.querySelector("img");
+      if (!image?.naturalWidth) return null;
+      return { height: image.getBoundingClientRect().height, figureHeight: figure.getBoundingClientRect().height };
+    });
+    if (images.some((entry) => !entry || !entry.height)) return;
+    const top = imageBlockTop(block, bounds);
+    const space = bounds.bottom - top - 2;
+    const ratio = Math.min(...images.map(({ height, figureHeight }) => (space - figureHeight + height) / height));
+    const previous = block.style.getPropertyValue("--report-image-scale");
+    const scale = ratio * (Number(previous) || 1);
+    if (scale >= 0.9 && ratio < 1) {
+      block.style.setProperty("--report-image-scale", scale);
+      const next = layout.findOverflow(rendered, bounds);
+      if (!next || imageBlock(overflowElement(next)) !== block) return next ?? null;
+      if (previous) block.style.setProperty("--report-image-scale", previous);
+      else block.style.removeProperty("--report-image-scale");
+    }
+    if (top > bounds.top + 2 && block.getBoundingClientRect().top > bounds.top + 2) {
+      range.setStartBefore(block);
+      return range;
+    }
   });
 }
 
@@ -162,11 +213,15 @@ async function paginateReport(source, target) {
   const staging = dom("div", { className: "pagination-stage", ariaHidden: "true" });
   const previewer = new PagedModule.Previewer();
   connectTablePagination(previewer.chunker);
+  connectImagePagination(previewer.chunker);
   const dispose = () => previewer.polisher.destroy();
   document.body.append(staging);
   const fragment = document.createDocumentFragment();
   try {
     await document.fonts.ready;
+    for (const row of source.querySelectorAll(".report-photo-row")) {
+      row.toggleAttribute("data-report-photo-pair", row.children.length > 1);
+    }
     await measureReportTables(source, staging);
     fragment.append(source);
     await previewer.preview(fragment, [{ [location.href]: reportPrintStyle + simakFormStyle }], staging);
