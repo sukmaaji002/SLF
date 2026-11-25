@@ -199,13 +199,13 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function priorRoomSources(project, sources, beforeBlock, tokens = [sampleLocationToken]) {
-  const names = new Set([sources.get("cover:building")?.value].filter(Boolean));
-  const links = dom("div", { className: "button-row" }, button("Buka Nama bangunan di Sampul", () => {
+function priorNarrativeChoices(project, sources, beforeBlock, tokens, coverKey, coverLabel) {
+  const names = new Set([sources.get("cover:" + coverKey)?.value].filter(Boolean));
+  const links = dom("div", { className: "button-row" }, button("Buka " + coverLabel + " di Sampul", () => {
     active = "cover";
     render();
     if (narrowLayout.matches) $("section-navigation").open = false;
-    focusTextField($("cover-building"));
+    focusTextField($("cover-" + coverKey));
   }, "quiet"));
   for (const [chapterIndex, chapter] of project.chapters.entries()) {
     for (const [blockIndex, block] of chapter.blocks.entries()) {
@@ -220,7 +220,7 @@ function priorRoomSources(project, sources, beforeBlock, tokens = [sampleLocatio
         const recorded = (selectedSource?.locations ?? link?.locations ?? [selectedSource?.value ?? link?.value])
           .map(cleanValue).filter(Boolean);
         for (const name of recorded) names.add(name);
-        if (token !== sampleLocationToken && !recorded.length) continue;
+        if (coverKey === "building" && token !== sampleLocationToken && !recorded.length) continue;
         const label = token[0].toLocaleUpperCase("id") + token.slice(1);
         links.append(button("Buka " + label + " · Bab " + roman(chapterIndex + 1), () => {
           active = chapterIndex;
@@ -443,6 +443,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const otherParameters = token === parameterReferenceToken && !safetyParameters && !comfortParameters;
       const repeated = otherParameters || (spec?.method && !methods[spec.method]) ? undefined : spec;
       const roomField = repeated && (token === healthRoomToken || token === comfortRoomToken || token === existingAreaToken);
+      const ownerDocuments = token === ownerDocumentsToken;
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
       const fieldTitle = repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
@@ -502,11 +503,14 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choicesLegend = token === comfortRoomToken ? "Pilihan fungsi ruang" :
         token === existingAreaToken ? "Pilihan area atau unit" :
           roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
-      const groupsForChoices = repeated?.choiceKey ? [...(presetGroups ?? [[choicesLegend, choicesForInput(token)]])] : [];
+      const presets = choicesForInput(token);
+      const groupsForChoices = repeated?.choiceKey ? [...(presetGroups ?? (ownerDocuments ? [] : [[choicesLegend, presets]]))] : [];
       const roomTokens = token === existingAreaToken ?
-        [sampleLocationToken, "nama gedung atau blok", "lantai atau area", "nama unit"] : undefined;
-      const roomSources = roomField ? priorRoomSources(project, sources, data, roomTokens) : undefined;
-      const fromOtherFields = roomSources?.names ?? (technicalDocuments ? sources.get("project:reviewed-documents")?.documents ?? [] : undefined);
+        [sampleLocationToken, "nama gedung atau blok", "lantai atau area", "nama unit"] : [sampleLocationToken];
+      const priorChoices = ownerDocuments ?
+        priorNarrativeChoices(project, sources, data, ["nama pemilik/pengelola", "dokumen"], "owner", "Pemilik / pemberi tugas") :
+        roomField ? priorNarrativeChoices(project, sources, data, roomTokens, "building", "Nama bangunan") : undefined;
+      const fromOtherFields = priorChoices?.names ?? (technicalDocuments ? sources.get("project:reviewed-documents")?.documents ?? [] : undefined);
       if (fromOtherFields) {
         const used = new Set(groupsForChoices.flatMap(([, options]) => options.map(tokenName)));
         const names = [...fromOtherFields, ...(manualData[repeated.choiceKey] ?? [])].filter((name) => {
@@ -521,8 +525,12 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
-      const focusManual = () => focusTextField(manual.querySelector("input"));
-      const choices = repeated || token === "tanggal pemeriksaan" ? [] : choicesForInput(token);
+      const focusManual = () => {
+        const input = manual.querySelector("input");
+        if (input) focusTextField(input);
+        else manual.querySelector("button")?.focus();
+      };
+      const choices = repeated || token === "tanggal pemeriksaan" ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -540,7 +548,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         pick.addEventListener("change", () => {
           if (!pick.value) return;
           const previousValue = manualInput.value.trim();
-          const replace = token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
+          const replace = token === "hasil verifikasi" || token === "jenis uji, metode, dan acuan atau keterangan tidak dilakukan";
           const next = replace || isExample || !previousValue ? pick.value :
             previousValue.split(", ").includes(pick.value) ? previousValue : previousValue + ", " + pick.value;
           pick.value = "";
@@ -595,7 +603,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (openDate) entry.append(openDate);
       if (scope) entry.append(scope);
       if (choiceField) entry.append(choiceField);
-      if (roomSources) entry.append(roomSources.links);
+      if (priorChoices) entry.append(priorChoices.links);
       entry.append(manual);
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
@@ -1041,7 +1049,7 @@ function renderCover(project) {
     dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) => {
       const [owner, fieldKey] = key === "consultant" ? consultantNameField(project) : [project.cover, key];
       const control = guidedField(owner, fieldKey, fieldKey === "individualName" ? "Nama pengkaji teknis" : label, type);
-      if (key === "building") control.querySelector("input").id = "cover-building";
+      if (key === "building" || key === "owner") control.querySelector("input").id = "cover-" + key;
       return control;
     })),
     dom("hr"), pictureEditor(project.cover, "foto sampul", () => workspace.projects.includes(project)));

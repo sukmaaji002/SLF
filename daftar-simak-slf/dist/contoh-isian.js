@@ -262,6 +262,7 @@ const inputExamples = {
 
 const inputHints = {
   [technicalDocumentsToken]: "Centang dokumen yang dipakai atau tulis nama dan nomornya lewat Tambah isian.",
+  [ownerDocumentsToken]: "Centang nama pemilik atau pengelola dan dokumen yang dipakai. Gunakan Tambah isian untuk menulis rujukan lain beserta nomornya.",
   [technicalFieldCheckToken]: "Centang cara pengecekan yang dilakukan. Gunakan Tambah isian untuk cara lain.",
   "standar struktur, proteksi kebakaran, kelistrikan, dan proteksi petir yang relevan": "Centang acuan yang digunakan atau pilih Tambah isian pada jenis yang sesuai. Untuk jenis lain, pilih Tambah acuan keselamatan.",
   "metode pemeriksaan yang digunakan": "Tambahkan hanya metode yang benar-benar digunakan.",
@@ -308,6 +309,10 @@ const inputChoices = {
   "prasarana tapak yang diperiksa": ["area parkir", "jalur pedestrian", "saluran drainase"],
   "jalan atau arah masuk": ["akses utama dari jalan lingkungan", "akses dari sisi utara tapak", "akses dari sisi timur tapak"],
   "area atau unit": ["ruang utama", "area servis", "area luar bangunan"],
+  "hasil verifikasi": [
+    inputExamples["hasil verifikasi"],
+    "bangunan digunakan oleh penyewa berdasarkan perjanjian sewa yang telah ditelaah. Identitas para pihak dan alamat persil sesuai dengan keterangan dalam perjanjian sewa",
+  ],
   "ruang terbuka, sirkulasi, atau parkir": ["ruang terbuka tapak", "sirkulasi kendaraan", "jalur pedestrian", "area parkir"],
   "sisi atau area": ["fasad depan", "sisi belakang bangunan", "teras masuk", "area servis"],
   "bentuk, fasad, atap, atau elemen arsitektural yang diperiksa": ["fasad bangunan", "penutup atap", "elemen pintu dan jendela", "dinding dan teras"],
