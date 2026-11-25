@@ -267,7 +267,7 @@ const inputHints = {
   "area atau posisi sampel": "Isi satu ruang, gedung, atau titik pemeriksaan per kolom. Pakai Tambah isian jika lokasinya lebih dari satu.",
   "daftar alat pemeriksaan": "Isi satu nama alat per kolom. Pakai Tambah isian jika alatnya lebih dari satu.",
   "daftar bahan dan dokumen": "Isian dapat mengikuti sumber data yang dicatat di Lingkup Materi Pelaporan pada Bab I.",
-  "peraturan, standar teknis, dan dokumen rencana yang relevan": "Pilih jenis acuan, lalu lengkapi judul, nomor, tahun atau edisi, dan bagian yang benar-benar dipakai.",
+  "peraturan, standar teknis, dan dokumen rencana yang relevan": "Centang jenis acuan yang digunakan. Isi judul, nomor, tahun atau edisi pada kolom acuan tambahan.",
   "disiplin atau sistem yang diperiksa": "Pilih bidang atau sistem yang benar-benar masuk lingkup pemeriksaan proyek ini.",
   "sistem utama dalam lingkup kajian": "Gunakan pilihan bidang pemeriksaan yang sama, atau pilih sumber lain jika cakupan sasaran berbeda.",
   "lantai atau area": "Sebutkan lantai dan ruang yang benar-benar diperiksa.",

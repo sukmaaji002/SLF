@@ -129,11 +129,9 @@ const multipleChoiceLegends = new Map([
   ["gambar terbangun atau data lapangan", "Pilih satu atau beberapa data pembanding"],
 ]);
 
-function multipleChoiceField(legend, choices, input, applyValue) {
-  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
-  const choiceKeys = new Set(choices.map(tokenName));
+function narrativeChoiceParts(value, choiceKeys) {
   const known = (part) => choiceKeys.has(tokenName(part));
-  const parts = () => input.value.trim().split(/\s*,\s*/).filter(Boolean).flatMap((part) => {
+  return value.trim().split(/\s*,\s*/).filter(Boolean).flatMap((part) => {
     const tail = part.replace(/^dan\s+/i, "");
     if (known(tail)) return [tail];
     for (const match of part.matchAll(/\s+dan\s+/gi)) {
@@ -143,23 +141,33 @@ function multipleChoiceField(legend, choices, input, applyValue) {
     }
     return [part];
   });
+}
+
+function narrativeChoiceCheckboxes(legend, choices, changed) {
+  const fieldset = dom("fieldset", { className: "scope-options" }, dom("legend", {}, legend));
   const controls = choices.map((choice) => {
-    const choiceKey = tokenName(choice);
     const control = dom("input", { type: "checkbox" });
-    control.addEventListener("change", () => {
-      const values = parts().filter((part) => tokenName(part) !== choiceKey);
-      if (control.checked) values.push(choice);
-      applyValue(values.every(known) ? scopeList.format(values) : values.join(", "));
-    });
+    control.addEventListener("change", () => changed(choice, control.checked));
     fieldset.append(dom("label", { className: "scope-choice" }, control, choice));
-    return [choiceKey, control];
+    return [tokenName(choice), control];
   });
-  const sync = () => {
-    const selected = new Set(parts().map(tokenName));
+  const sync = (values) => {
+    const selected = new Set(values.map(tokenName));
     for (const [choice, control] of controls) control.checked = selected.has(choice);
   };
-  input.addEventListener("input", sync);
-  sync();
+  return { fieldset, sync };
+}
+
+function multipleChoiceField(legend, choices, input, applyValue) {
+  const choiceKeys = new Set(choices.map(tokenName));
+  const parts = () => narrativeChoiceParts(input.value, choiceKeys);
+  const { fieldset, sync } = narrativeChoiceCheckboxes(legend, choices, (choice, checked) => {
+    const values = parts().filter((part) => tokenName(part) !== tokenName(choice));
+    if (checked) values.push(choice);
+    applyValue(values.every((part) => choiceKeys.has(tokenName(part))) ? scopeList.format(values) : values.join(", "));
+  });
+  input.addEventListener("input", () => sync(parts()));
+  sync(parts());
   return fieldset;
 }
 
@@ -190,20 +198,34 @@ function documentReviewLinks(project) {
   return dom("p", { className: "hint" }, "Tabel " + label + " belum ada pada kajian ini.");
 }
 
-function repeatedNarrativeField(spec, data, changed) {
-  const values = data[spec.key]?.length ? [...data[spec.key]] : [data.value];
+function repeatedNarrativeField(spec, data, changed, choices = []) {
+  const choiceKeys = new Set(choices.map(tokenName));
+  const parts = choices.length ? narrativeChoiceParts(data.value, choiceKeys) : [];
+  let selected = data[spec.choiceKey] ?? parts.filter((part) => choiceKeys.has(tokenName(part)));
+  const extra = selected.length ? parts.filter((part) => !choiceKeys.has(tokenName(part))).join(", ") : data.value;
+  const values = data[spec.key]?.length ? [...data[spec.key]] : [extra];
   const list = dom("div", { className: "repeated-narrative-list" });
-  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend), list,
-    button("Tambah isian", () => {
-      values.push("");
-      renderRows();
+  const form = dom("fieldset", { className: "scope-options" }, dom("legend", {}, spec.legend));
+  if (choices.length) {
+    const { fieldset, sync } = narrativeChoiceCheckboxes("Pilih satu atau beberapa jenis acuan", choices, (choice, checked) => {
+      selected = selected.filter((part) => tokenName(part) !== tokenName(choice));
+      if (checked) selected.push(choice);
       commit();
-      list.lastElementChild.querySelector("input").focus();
-    }));
+    });
+    sync(selected);
+    form.append(fieldset);
+  }
+  form.append(list, button("Tambah isian", () => {
+    values.push("");
+    renderRows();
+    commit();
+    list.lastElementChild.querySelector("input").focus();
+  }));
   function commit() {
-    const value = scopeList.format(values.map((entry) => entry.trim()).filter(Boolean));
+    const value = scopeList.format([...selected, ...values].map((entry) => entry.trim()).filter(Boolean));
     updateTextFormat(data, "value", data.value, value);
     data[spec.key] = [...values];
+    if (spec.choiceKey) data[spec.choiceKey] = [...selected];
     data.value = value;
     changed();
   }
@@ -345,6 +367,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const previousValue = manualOnly ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
       if (repeated && Array.isArray(saved?.[repeated.key])) manualData[repeated.key] = saved[repeated.key];
+      if (repeated?.choiceKey && Array.isArray(saved?.[repeated.choiceKey])) manualData[repeated.choiceKey] = saved[repeated.choiceKey];
       const saveManual = () => {
         setLinks({ ...getLinks(), [token]: manualData });
         if (sources.has(ownSource)) {
@@ -359,7 +382,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual) :
+      const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, repeated.choiceKey ? choicesForInput(token) : []) :
         field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
@@ -409,7 +432,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
-        useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend && !sampleLocation);
+        useManual.hidden = self || (Boolean(linkedValue) && !choiceLegend && !repeated);
         if (openDate) openDate.hidden = self || (select.value || auto) !== "identity:date";
         if (choiceField) choiceField.hidden = !self && (Boolean(select.value) || Boolean(automaticValue(token, sources)));
         if (scope) scope.hidden = Boolean(select.value && select.value !== "project:scope");

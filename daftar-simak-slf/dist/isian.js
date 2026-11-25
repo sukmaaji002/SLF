@@ -5,6 +5,8 @@ const tokenName = (text) => text.trim().replace(/\s+/g, " ").toLocaleLowerCase("
 const repeatedNarrativeFields = new Map([
   ["area atau posisi sampel", { key: "locations", legend: "Lokasi pemeriksaan", item: "Ruang atau gedung" }],
   ["daftar alat pemeriksaan", { key: "tools", legend: "Alat pemeriksaan", item: "Nama alat" }],
+  ["peraturan, standar teknis, dan dokumen rencana yang relevan",
+    { key: "references", choiceKey: "referenceChoices", legend: "Acuan penilaian", item: "Acuan tambahan" }],
 ]);
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
@@ -350,9 +352,11 @@ function importLinks(links) {
       const data = importTextFormats({ value: link.value }, link, ["value"]);
       const field = repeatedNarrativeFields.get(key);
       const entries = field && link[field.key];
-      if (Array.isArray(entries) && entries.every((entry) => typeof entry === "string") &&
-        scopeList.format(entries.map((entry) => entry.trim()).filter(Boolean)) === link.value) {
+      const choices = field?.choiceKey ? link[field.choiceKey] : [];
+      if (Array.isArray(entries) && Array.isArray(choices) && [...choices, ...entries].every((entry) => typeof entry === "string") &&
+        scopeList.format([...choices, ...entries].map((entry) => entry.trim()).filter(Boolean)) === link.value) {
         data[field.key] = [...entries];
+        if (field.choiceKey) data[field.choiceKey] = [...choices];
       }
       pairs.push([key, data]);
     }
