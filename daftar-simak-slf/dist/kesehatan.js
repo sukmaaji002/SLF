@@ -7,7 +7,8 @@ const healthSources = {
   indoor: ["Permenkes 2/2023 · Lampiran Bab II B", "https://peraturan.bpk.go.id/Details/245563/permenkes-no-2-tahun-2023"],
   sanitation: ["Permenaker 5/2018 · Pasal 34", "https://jdih.kemnaker.go.id/peraturan/detail/1546/peraturan-menteri-nomor-5-tahun-2018"],
   ventilation: ["SNI 6572-1:2024 · ventilasi gedung nonresidensial", "https://pesta.bsn.go.id/produk/detail/14965-sni6572-12024"],
-  naturalVentilation: ["PP 16/2021", "https://peraturan.bpk.go.id/Download/244292/PP%20Nomor%2016%20Tahun%202021-dikompresi.pdf"],
+  building: ["PP 16/2021", "https://peraturan.bpk.go.id/Download/244292/PP%20Nomor%2016%20Tahun%202021-dikompresi.pdf"],
+  liftingEquipment: ["Permenaker 8/2020", "https://jdih.kemnaker.go.id/asset/data_puu/Permen_8_Tahun_2020.pdf"],
   plumbing: ["SNI 8153:2025 · sistem plambing", "https://pesta.bsn.go.id/produk/by_ics/629"],
   accessibility: ["Permen PUPR 14/PRT/M/2017", "https://peraturan.bpk.go.id/Details/104477/permen-pupr-no-14prtm2017-tahun-2017"],
 };
@@ -74,7 +75,7 @@ const healthParameters = {
   openings: {
     label: "Luas bukaan ventilasi", unit: "% luas lantai", source: "office",
     categories: [
-      { id: "pp-natural", label: "Ventilasi alami · batas umum PP 16/2021", min: 5, source: "naturalVentilation",
+      { id: "pp-natural", label: "Ventilasi alami · batas umum PP 16/2021", min: 5, source: "building",
         section: "Standar Teknis Ventilasi Alami, butir III.a, hlm. 583",
         guidance: "Hasil ukur (%) = luas bukaan ÷ luas lantai yang membutuhkan ventilasi × 100." },
       { id: "office-natural", label: "Khusus ruang kerja kantor tanpa AC · ventilasi silang", min: 15,
@@ -154,9 +155,36 @@ const healthParameters = {
     above: "Redam kebisingan pada sumbernya dengan perawatan alat, dudukan isolasi getaran, atau penutup akustik. Bila suara masuk dari luar, rapatkan celah atau perbaiki pemisah antar-ruang.",
   },
   circulation: {
-    label: "Lebar ruang gerak", unit: "cm", source: "accessibility",
-    categories: [{ id: "layout", label: "Area sekitar perabot · isi batas sesuai fungsi", manual: true }],
+    label: "Lebar ruang gerak", unit: "cm", source: "building",
+    categories: [
+      { id: "furniture-near-door", label: "Jarak perabot dari bukaan daun pintu", min: 75,
+        section: "Ketentuan pintu, hlm. 680 dan Gambar II.94",
+        guidance: "Ukur jarak dari bukaan daun pintu ke perabot terdekat. Pastikan area ayunan pintu bebas hambatan." },
+      { id: "gallery", label: "Selasar · kursi roda atau dua orang berpapasan", min: 140,
+        section: "Ketentuan selasar, hlm. 690", guidance: "Ukur lebar efektif di bagian selasar yang paling sempit." },
+      ...[
+        ["corridor-one", "Koridor · 1 pengguna kursi roda", 92],
+        ["corridor-pedestrian", "Koridor · 1 penyandang disabilitas dan 1 pejalan kaki", 152],
+        ["corridor-two", "Koridor · 2 pengguna kursi roda", 184],
+        ["corridor-railing-one", "Koridor dengan pegangan rambat · 1 pengguna kursi roda", 112],
+        ["corridor-railing-two", "Koridor dengan pegangan rambat · 2 pengguna kursi roda", 204],
+      ].map(([id, label, min]) => ({ id, label, min, section: "Ketentuan koridor, hlm. 692",
+        guidance: "Ukur lebar bebas di titik tersempit dengan memperhitungkan penghalang dan pegangan rambat." })),
+      { id: "layout", label: "Area sekitar perabot/rak · sesuai fungsi dan tata letak", manual: true,
+        section: "Pasal 42", pending: "Batas mengikuti fungsi dan tata letak ruang",
+        guidance: "Untuk jarak antarrak atau perabot, masukkan batas dari denah, standar teknis, atau ketentuan operasional yang berlaku untuk area tersebut." },
+    ],
     below: "Atur ulang perabot dan pindahkan barang dari jalur gerak agar lebar efektif memenuhi acuan dari awal hingga akhir jalur.",
+  },
+  forkliftClearance: {
+    label: "Jarak bebas lintasan forklift", unit: "cm", source: "liftingEquipment",
+    categories: [
+      { id: "one-way", label: "Forklift satu arah · jarak bebas sisi lintasan", min: 60, section: "Pasal 84 huruf a",
+        guidance: "Ukur jarak bebas sisi lintasan dari sisi terluar alat atau muatan yang paling lebar." },
+      { id: "two-way", label: "Forklift dua arah · jarak bebas antarkendaraan", min: 90, section: "Pasal 84 huruf b",
+        guidance: "Ukur jarak bebas di antara sisi terluar kedua alat atau muatan terlebar pada kedua alat." },
+    ],
+    below: "Tambah jarak bebas dengan mengatur ulang rak, barang, atau lintasan. Sesuaikan pengaturan arah lalu lintas alat angkut sebelum lintasan digunakan.",
   },
   glare: {
     label: "Silau di area pengguna", unit: "status",
@@ -210,7 +238,7 @@ const healthParameters = {
 };
 const inspectionParameters = {
   health: ["lighting", "temperature", "humidity", "airSpeed", "openings", "ventilationPerPerson", "outdoorAir", "ph", "turbidity", "tds", "ecoli", "sanitation", "plumbing", "noise", "custom"],
-  comfort: ["circulation", "temperature", "humidity", "airSpeed", "lighting", "glare", "noise", "vibration", "custom"],
+  comfort: ["circulation", "forkliftClearance", "temperature", "humidity", "airSpeed", "lighting", "glare", "noise", "vibration", "custom"],
   ease: ["doorClear", "rampSlope", "rampWidth", "circulation", "accessibleToilet", "guidance", "custom"],
 };
 const defaultInspectionParameters = {
@@ -377,7 +405,7 @@ function healthMeasurementCells(row, locations, kind) {
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
     threshold.textContent = result.threshold ||
       (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
-        ventilationDesign ? "Batas mengikuti perhitungan desain" : "Acuan belum lengkap");
+        ventilationDesign ? "Batas mengikuti perhitungan desain" : result.category?.pending ?? "Acuan belum lengkap");
     source.replaceChildren(...(result.source ? [dom("a", { href: result.source[1], target: "_blank", rel: "noopener",
       title: [result.source[0], result.category?.section].filter(Boolean).join(" · ") },
       [result.source[0].split(" · ")[0], result.category?.section].filter(Boolean).join(" · "))] : []));
