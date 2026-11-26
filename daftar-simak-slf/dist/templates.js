@@ -114,6 +114,27 @@ const architectureHealthIntro = [
 const architectureHealthTableTitle = "Hasil pemeriksaan aspek kesehatan";
 const architectureHealthColumns = ["Parameter pemeriksaan", "Ruang / sistem", "Acuan", "Hasil / temuan", "Keterangan / rekomendasi"];
 const architectureHealthTokens = ["parameter yang diperiksa", "ruang atau sistem", "acuan yang digunakan", "temuan kesehatan", "tabel, gambar, atau lampiran"];
+const architectureComfort = {
+  heading: "Kenyamanan",
+  title: "Hasil pemeriksaan aspek kenyamanan",
+  previous: "[Jelaskan ruang gerak, tata perabot, dan pandangan dari atau ke bangunan.]",
+  narrative: "Pemeriksaan kenyamanan mencakup [parameter yang diperiksa] pada [area sampel]. Hasil pengamatan atau pengukuran menunjukkan [hasil terverifikasi], dengan acuan [standar atau dokumen pembanding] dan keterbatasan [batasan yang relevan].",
+  intro: "Pemeriksaan kenyamanan meninjau apakah kondisi ruang mendukung kegiatan penggunanya. Pengamatan mencakup ruang gerak dan tata perabot, kenyamanan termal, pandangan dan silau, serta kebisingan atau getaran yang relevan dengan fungsi ruang. Hasil dapat berbeda antarruang atau menurut waktu dan kondisi penggunaan, sehingga lokasi dan keadaan saat pemeriksaan dicatat pada baris terkait.\n\nTabel berikut mencatat hasil ukur atau pengamatan, acuan pembanding, dan penyesuaian teknis yang diperlukan untuk setiap temuan.",
+  tokens: ["parameter yang diperiksa", "area sampel", "standar atau dokumen pembanding", "hasil terverifikasi", "batasan yang relevan"],
+};
+const architectureEase = {
+  heading: "Kemudahan",
+  title: "Hasil pemeriksaan aspek kemudahan",
+  previous: "[Catat akses horizontal, vertikal, fasilitas sanitasi, dan aksesibilitas.]",
+  narrative: "Pemeriksaan kemudahan mencakup [jalur akses, fasilitas, atau peralatan yang diperiksa] untuk pengguna [kelompok pengguna]. Kondisi yang tercatat adalah [temuan], didukung oleh [hasil ukur, foto, atau daftar simak] dan dibandingkan dengan [acuan].",
+  intro: "Pemeriksaan kemudahan mengikuti jalur yang digunakan untuk mencapai, memasuki, dan bergerak di dalam bangunan. Penelaahan mencakup hubungan horizontal dan vertikal, serta fasilitas pendukung seperti toilet, penunjuk arah, dan tempat parkir sesuai fungsi bangunan dan kebutuhan penggunanya. Pemeriksaan mencatat dimensi efektif dan hambatan yang ditemukan saat fasilitas digunakan.\n\nTabel berikut merangkum acuan, hasil pemeriksaan, dan usulan penyesuaian per lokasi, disertai dokumentasi bila tersedia.",
+  tokens: ["jalur akses, fasilitas, atau peralatan yang diperiksa", "kelompok pengguna", "acuan", "temuan", "hasil ukur, foto, atau daftar simak"],
+};
+const inspectionIntroductions = new Map([
+  [architectureHealthIntro, previousArchitectureHealth],
+  [architectureComfort.intro, architectureComfort.narrative],
+  [architectureEase.intro, architectureEase.narrative],
+]);
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -198,8 +219,10 @@ const reportTemplates = {
         ],
         ["Kesehatan", { body: architectureHealthIntro, previous: "[Catat hasil pemeriksaan pencahayaan atau aspek kesehatan yang dibahas dalam disiplin arsitektur.]" }],
         { table: architectureHealthTableTitle, columns: architectureHealthColumns },
-        ["Kenyamanan", {"body":"Pemeriksaan kenyamanan mencakup [parameter yang diperiksa] pada [area sampel]. Hasil pengamatan atau pengukuran menunjukkan [hasil terverifikasi], dengan acuan [standar atau dokumen pembanding] dan keterbatasan [batasan yang relevan].","previous":"[Jelaskan ruang gerak, tata perabot, dan pandangan dari atau ke bangunan.]"}],
-        ["Kemudahan", {"body":"Pemeriksaan kemudahan mencakup [jalur akses, fasilitas, atau peralatan yang diperiksa] untuk pengguna [kelompok pengguna]. Kondisi yang tercatat adalah [temuan], didukung oleh [hasil ukur, foto, atau daftar simak] dan dibandingkan dengan [acuan].","previous":"[Catat akses horizontal, vertikal, fasilitas sanitasi, dan aksesibilitas.]"}],
+        [architectureComfort.heading, { body: architectureComfort.intro, previous: architectureComfort.previous }],
+        { table: architectureComfort.title, columns: architectureHealthColumns },
+        [architectureEase.heading, { body: architectureEase.intro, previous: architectureEase.previous }],
+        { table: architectureEase.title, columns: architectureHealthColumns },
         ["Kesimpulan bidang arsitektur", {"body":"Berdasarkan ruang lingkup dan bukti yang tersedia, hasil penilaian arsitektur adalah [kesimpulan pengkaji]. Ketidaksesuaian atau bagian yang masih memerlukan verifikasi meliputi [temuan]. Rekomendasi terkait dirujuk pada [nomor rekomendasi].","previous":"[Ringkas bukti, ketidaksesuaian, dan rujukan tindak lanjut.]"}],
       ],
       [
@@ -419,6 +442,7 @@ function templateBlocks(sections, depth = 1, previous = false) {
 
 const disciplineNarrativeRevision = 1;
 const architectureHealthTableRevision = 2;
+const architectureInspectionRevision = 3;
 
 function upgradeDisciplineDraft(project) {
   if (project.template !== "disiplin" || project.narrativeRevision >= disciplineNarrativeRevision) return;
@@ -482,9 +506,44 @@ function upgradeArchitectureHealthDraft(project) {
   project.narrativeRevision = architectureHealthTableRevision;
 }
 
+function upgradeArchitectureInspectionDraft(project) {
+  if (project.template !== "disiplin" || project.narrativeRevision >= architectureInspectionRevision) return;
+  const chapter = project.chapters.find((entry) => entry.title === architectureChapterTitle ||
+    entry.blocks.some(isArchitectureHealthTable));
+  if (chapter) for (const spec of [architectureComfort, architectureEase]) {
+    const index = chapter.blocks.findIndex((block) => block.type === "heading" &&
+      (block.text === spec.heading || block.body === spec.narrative || block.body === spec.intro));
+    if (index < 0) continue;
+    const heading = chapter.blocks[index];
+    const useIntro = [spec.previous, spec.narrative, spec.intro, ""].includes(heading.body);
+    const links = useIntro ? spec.tokens.map((token) => heading.links?.[token]) : [];
+    let table = chapter.blocks[index + 1];
+    if (table?.type !== "table" || table.text !== spec.title) {
+      table = { type: "table", text: spec.title, headers: [...architectureHealthColumns], rows: [] };
+      chapter.blocks.splice(index + 1, 0, table);
+    }
+    if (useIntro) {
+      updateTextFormat(heading, "body", heading.body, spec.intro);
+      heading.body = spec.intro;
+    }
+    if (!links.some((link) => link?.source || link?.value?.trim())) continue;
+    const row = table.rows.length;
+    table.rows.push(table.headers.map((_, column) => links[column]?.value ?? ""));
+    ensureReportReferences({ chapters: [{ blocks: [table] }] });
+    for (const [column, link] of links.entries()) {
+      if (!link || column >= table.headers.length) continue;
+      const cell = tableCellKey(table, row, column);
+      if (link.source) (table.cellLinks ??= {})[cell] = link.source;
+      else setTextFormat(table, "cell:" + cell, getTextFormat(link, "value"));
+    }
+  }
+  project.narrativeRevision = architectureInspectionRevision;
+}
+
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   upgradeArchitectureHealthDraft(project);
+  upgradeArchitectureInspectionDraft(project);
   initializeHealthMeasurements(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
     let revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;

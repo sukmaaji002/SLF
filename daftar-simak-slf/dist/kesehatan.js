@@ -8,6 +8,7 @@ const healthSources = {
   sanitation: ["Permenaker 5/2018 · Pasal 34", "https://jdih.kemnaker.go.id/peraturan/detail/1546/peraturan-menteri-nomor-5-tahun-2018"],
   ventilation: ["SNI 6572-1:2024 · ventilasi gedung nonresidensial", "https://pesta.bsn.go.id/produk/detail/14965-sni6572-12024"],
   plumbing: ["SNI 8153:2025 · sistem plambing", "https://pesta.bsn.go.id/produk/by_ics/629"],
+  accessibility: ["Permen PUPR 14/PRT/M/2017", "https://peraturan.bpk.go.id/Details/104477/permen-pupr-no-14prtm2017-tahun-2017"],
 };
 const roomLightingLevels = [
   ["office-work", "Perkantoran · ruang kerja", 350],
@@ -48,22 +49,26 @@ const healthParameters = {
       { id: "office-drafting", label: "Perkantoran · ruang gambar (K3)", min: 750, source: "office", section: "Tabel 6" },
       { id: "office-dining", label: "Perkantoran · ruang makan (K3)", min: 250, source: "office", section: "Tabel 6" },
     ],
-    action: "Periksa sebaran cahaya, kondisi lampu dan penghalang cahaya, lalu ukur ulang rata-rata pencahayaan.",
+    below: "Bersihkan armatur, ganti lampu yang redup atau mati, dan tambah atau atur ulang posisi armatur pada area yang gelap agar pencahayaan lebih merata.",
+    above: "Kurangi keluaran lampu dengan pengatur intensitas atau pembagian zona. Pasang peneduh atau diffuser pada sumber cahaya yang menyilaukan.",
   },
   temperature: {
     label: "Suhu udara", unit: "°C", source: "office",
     categories: [...officeRange([[23, 26], [23, 28]]), indoorRange(18, 30)],
-    action: "Tinjau pengaturan tata udara dan sumber panas, lalu ukur ulang pada kondisi penggunaan ruang yang mewakili.",
+    below: "Pada ruang ber-AC, naikkan setelan suhu secara bertahap dan arahkan hembusan menjauh dari pengguna. Pada ruang tanpa AC, lindungi area pengguna dari hembusan dingin sambil mempertahankan ventilasi minimum.",
+    above: "Kurangi panas matahari dengan peneduh. Pada ruang ber-AC, bersihkan filter atau koil dan seimbangkan distribusi udara dingin. Pada ruang tanpa AC, tingkatkan ventilasi silang jika udara luar lebih sejuk.",
   },
   humidity: {
     label: "Kelembapan relatif", unit: "% RH", source: "office",
     categories: [...officeRange([[40, 60], [30, 70]]), indoorRange(40, 60)],
-    action: "Periksa sumber kelembapan serta pengaturan ventilasi atau tata udara, lalu ukur ulang.",
+    below: "Kurangi pengeringan berlebih dari sistem tata udara. Jika diperlukan, tambahkan humidifikasi yang dapat dikendalikan dan dirawat agar tidak terjadi kondensasi.",
+    above: "Perbaiki kebocoran dan kondensasi, gunakan exhaust pada ruang basah, dan tingkatkan pengendalian kelembapan melalui AC atau dehumidifier sesuai beban ruang.",
   },
   airSpeed: {
     label: "Kecepatan udara", unit: "m/detik", source: "office",
     categories: [{ id: "office", label: "Perkantoran · udara dalam ruang", min: 0.15, max: 0.5 }, indoorRange(0.15, 0.25)],
-    action: "Periksa aliran udara di area pengguna dan pengaturan sistem ventilasi, lalu ukur ulang.",
+    below: "Bebaskan jalur aliran udara, bersihkan kisi dan filter, lalu atur bukaan atau kecepatan kipas agar aliran mencapai zona pengguna.",
+    above: "Kurangi kecepatan kipas atau atur ulang arah diffuser agar aliran tidak langsung mengenai pengguna. Jaga debit udara segar sesuai kebutuhan ruang.",
   },
   openings: {
     label: "Luas bukaan ventilasi", unit: "% luas lantai", source: "office",
@@ -71,7 +76,8 @@ const healthParameters = {
       { id: "office-natural", label: "Ruang kerja kantor tanpa AC · ventilasi silang", min: 15 },
       { id: "nonresidential", label: "Ventilasi alami gedung nonresidensial · isi batas", manual: true, source: "ventilation" },
     ],
-    action: "Periksa luas bukaan efektif dan jalur ventilasi silang, lalu telaah kebutuhan penyesuaian bukaan.",
+    below: "Singkirkan penghalang pada bukaan, pulihkan bukaan yang macet, dan tambah luas bebas bukaan pada sisi masuk dan keluar udara. Jika bukaan terbatas, rancang ventilasi mekanis sesuai kebutuhan ruang.",
+    above: "Jika acuan menetapkan batas maksimum, gunakan kisi atau bukaan yang dapat diatur untuk mengendalikan luas efektif. Pertahankan kebutuhan udara segar.",
   },
   ventilationPerPerson: {
     label: "Pertukaran udara per orang", unit: "m³/menit/orang", source: "office",
@@ -79,12 +85,14 @@ const healthParameters = {
       { id: "office-work", label: "Perkantoran · ruang kerja", min: 0.57, section: "Ventilasi udara" },
       { id: "office-meeting", label: "Perkantoran · ruang pertemuan", min: 1.05, section: "Ventilasi udara" },
     ],
-    action: "Tinjau pertukaran udara dengan memperhitungkan jumlah pengguna ruang, lalu periksa ulang kinerja ventilasi.",
+    below: "Naikkan suplai udara segar dan seimbangkan suplai dengan pembuangan. Bila kapasitas sistem belum cukup, batasi hunian sementara sesuai debit yang tersedia.",
+    above: "Setel damper atau kecepatan kipas sesuai jumlah pengguna dan acuan yang dipakai. Pertahankan kebutuhan minimum udara segar.",
   },
   outdoorAir: {
     label: "Debit udara luar", unit: "L/detik", source: "ventilation",
     categories: [{ id: "nonresidential", label: "Gedung nonresidensial · sesuai fungsi dan hunian", manual: true }],
-    action: "Periksa penyediaan udara luar, kondisi sistem, dan kebutuhan menurut fungsi serta jumlah pengguna, lalu ukur ulang.",
+    below: "Bersihkan filter dan intake, buka atau setel damper udara luar, lalu seimbangkan debit tiap zona. Evaluasi kapasitas kipas bila debit tetap kurang.",
+    above: "Setel damper atau kendali kipas untuk mengurangi kelebihan debit sambil mempertahankan suplai minimum udara luar dan tekanan ruang yang disyaratkan.",
   },
   ph: {
     label: "pH air", unit: "pH", source: "water",
@@ -93,23 +101,24 @@ const healthParameters = {
       { id: "pool-chlorine", label: "Kolam renang · disinfeksi klorin", min: 7, max: 7.8, section: "Tabel 6" },
       { id: "pool-bromine", label: "Kolam renang · disinfeksi bromin", min: 7, max: 8, section: "Tabel 6" },
     ],
-    action: "Periksa sumber dan pengolahan air, lalu lakukan uji ulang pada titik sampel yang sama.",
+    below: "Untuk air minum atau higiene, evaluasi pengolahan untuk menaikkan pH secara terkendali. Untuk kolam, sesuaikan pengatur pH dan alkalinitas melalui operator pengolahan air.",
+    above: "Periksa kemungkinan kelebihan bahan alkali pada sistem pengolahan. Sesuaikan proses atau pengatur pH secara bertahap melalui operator pengolahan air.",
   },
   turbidity: {
     label: "Kekeruhan air", unit: "NTU", source: "water",
     categories: [...waterCategories({ max: 3, exclusiveMax: true }),
       { id: "pool", label: "Kolam renang", max: 0.5, section: "Tabel 4" }],
-    action: "Periksa kondisi sumber air, filtrasi dan penampung, lalu lakukan uji ulang.",
+    above: "Cegah masuknya sedimen, bersihkan tangki penampung, dan cuci balik atau ganti media filter. Untuk kolam, periksa juga debit sirkulasi melalui filter.",
   },
   tds: {
     label: "Zat padat terlarut (TDS)", unit: "mg/L", source: "water",
     categories: waterCategories({ max: 300, exclusiveMax: true }),
-    action: "Tinjau sumber air dan sistem pengolahan, lalu lakukan uji ulang.",
+    above: "Telusuri sumber zat terlarut dan evaluasi penggunaan sumber alternatif atau unit pengolahan pengurang TDS berdasarkan hasil uji kualitas air.",
   },
   ecoli: {
     label: "E. coli dalam air", unit: "CFU/100 mL", source: "water",
     categories: waterCategories({ max: 0 }),
-    action: "Telusuri kemungkinan kontaminasi, koordinasikan tindak lanjut kualitas air, dan lakukan uji ulang laboratorium.",
+    above: "Jika digunakan untuk konsumsi, hentikan pemakaian untuk minum sementara. Lindungi sumber air, perbaiki jalur masuk kontaminasi, lalu bersihkan dan disinfeksi tandon serta pipa terdampak. Verifikasi mutu air sebelum digunakan kembali.",
   },
   sanitation: {
     label: "Kelengkapan sanitasi toilet", unit: "status", source: "sanitation",
@@ -120,12 +129,12 @@ const healthParameters = {
       ["drain", "Toilet tempat kerja · saluran pembuangan mengalir baik"],
       ["clean", "Toilet tempat kerja · bersih dan tidak berbau"],
     ].map(([id, label]) => ({ id, label, min: 1 })),
-    action: "Lengkapi fasilitas atau perbaiki kondisi sanitasi yang belum terpenuhi, lalu periksa kembali.",
+    below: "Sediakan kembali perlengkapan yang kurang. Bila aliran air atau drainase bermasalah, perbaiki sambungan atau bersihkan sumbatan. Untuk temuan kebersihan, jadwalkan pembersihan rutin.",
   },
   plumbing: {
     label: "Plambing dan pembuangan air", unit: "status", source: "plumbing",
     categories: [{ id: "building", label: "Instalasi gedung · sesuai kriteria yang diperiksa", manual: true }],
-    action: "Periksa kondisi instalasi dan lakukan verifikasi ulang terhadap kriteria yang dipakai.",
+    below: "Perbaiki komponen yang tidak memenuhi kriteria, seperti sambungan bocor, saluran tersumbat, atau perangkap bau yang tidak berfungsi. Uji fungsi bagian yang diperbaiki.",
   },
   noise: {
     label: "Kebisingan ruang", unit: "dBA", source: "office",
@@ -135,15 +144,75 @@ const healthParameters = {
       ["canteen", "Perkantoran · ruang umum atau kantin", 65, 75],
       ["meeting", "Perkantoran · ruang rapat", 65, 75],
     ].map(([id, label, min, max]) => ({ id, label, min, max, section: "Tabel 6" })),
-    action: "Tinjau sumber kebisingan dan kondisi pengukuran, lalu verifikasi kembali terhadap acuan ruang.",
+    below: "Identifikasi kebutuhan keterdengaran alarm atau pengumuman. Jika tingkat suara minimum memang disyaratkan untuk fungsi ruang, sesuaikan sistem pengumuman atau tata akustik sesuai kebutuhan pengguna.",
+    above: "Redam kebisingan pada sumbernya dengan perawatan alat, dudukan isolasi getaran, atau penutup akustik. Bila suara masuk dari luar, rapatkan celah atau perbaiki pemisah antar-ruang.",
+  },
+  circulation: {
+    label: "Lebar ruang gerak", unit: "cm", source: "accessibility",
+    categories: [{ id: "layout", label: "Area sekitar perabot · isi batas sesuai fungsi", manual: true }],
+    below: "Atur ulang perabot dan pindahkan barang dari jalur gerak agar lebar efektif memenuhi acuan dari awal hingga akhir jalur.",
+  },
+  glare: {
+    label: "Silau di area pengguna", unit: "status",
+    categories: [{ id: "work", label: "Area kerja · isi kriteria", manual: true }],
+    below: "Pasang peneduh pada jendela, gunakan diffuser pada armatur, atau ubah posisi meja agar pantulan cahaya tidak mengenai bidang kerja dan layar.",
+  },
+  vibration: {
+    label: "Getaran ruang", unit: "mm/s",
+    categories: [{ id: "occupied", label: "Ruang yang digunakan · isi kriteria dan metode", manual: true }],
+    above: "Pisahkan sumber getaran dengan dudukan isolasi, periksa keseimbangan dan pengikat mesin, atau pindahkan peralatan agar getaran tidak merambat ke ruang pengguna.",
+  },
+  doorClear: {
+    label: "Lebar efektif bukaan pintu", unit: "cm", source: "accessibility",
+    categories: [
+      { id: "main", label: "Gedung umum · pintu masuk/keluar utama", min: 90, section: "Lampiran II A.1" },
+      { id: "other", label: "Gedung umum · pintu lain", min: 80, section: "Lampiran II A.1" },
+    ],
+    below: "Singkirkan penghalang pada bukaan dan atur arah serta sudut bukaan daun pintu. Jika celah efektif masih kurang, sesuaikan posisi kusen atau ganti rakitan pintu sesuai lebar minimum.",
+  },
+  rampSlope: {
+    label: "Kelandaian ram aksesibel", unit: "°", source: "accessibility",
+    categories: [
+      { id: "indoor", label: "Ram di dalam bangunan", max: 6, section: "Lampiran II B.2" },
+      { id: "outdoor", label: "Ram di luar bangunan", max: 5, section: "Lampiran II B.2" },
+    ],
+    above: "Perpanjang lintasan ram atau gunakan lintasan balik untuk mengurangi kemiringan. Rancang bordes datar dan sediakan ruang manuver serta pegangan rambat sesuai acuan.",
+  },
+  rampWidth: {
+    label: "Lebar efektif ram aksesibel", unit: "cm", source: "accessibility",
+    categories: [
+      { id: "without-curb", label: "Ram tanpa tepi pengaman", min: 95, section: "Lampiran II B.2" },
+      { id: "with-curb", label: "Ram dengan tepi pengaman", min: 120, section: "Lampiran II B.2" },
+    ],
+    below: "Singkirkan penghalang pada lintasan ram dan lebarkan permukaan yang dapat digunakan sesuai konfigurasi tepi pengaman serta pegangan rambat.",
+  },
+  accessibleToilet: {
+    label: "Fasilitas toilet aksesibel", unit: "status", source: "accessibility",
+    categories: [{ id: "features", label: "Toilet aksesibel · isi kriteria fasilitas", manual: true }],
+    below: "Bebaskan ruang manuver, sesuaikan arah bukaan pintu, dan lengkapi pegangan rambat serta perlengkapan pada posisi yang dapat dijangkau sesuai kriteria.",
+  },
+  guidance: {
+    label: "Jalur pemandu dan penunjuk arah", unit: "status", source: "accessibility",
+    categories: [{ id: "route", label: "Jalur akses · isi kriteria", manual: true }],
+    below: "Bebaskan jalur dari penghalang, sambungkan jalur pemandu yang terputus, dan letakkan rambu berkontras pada akses utama serta titik perubahan arah.",
   },
   custom: {
     label: "Aspek lain · isi sendiri", unit: "", categories: [],
-    action: "Tinjau penyebab selisih dan periksa kembali terhadap acuan yang digunakan.",
+    below: "Tingkatkan hasil hingga batas minimum acuan. Isi tindakan teknis sesuai komponen yang diperiksa.",
+    above: "Kurangi hasil hingga batas maksimum acuan. Isi tindakan teknis sesuai komponen yang diperiksa.",
   },
 };
-const defaultHealthParameters = ["lighting", "temperature", "humidity", "openings", "ph", "turbidity", "sanitation"];
-const healthMeasurementFields = ["parameter", "location", "category", "measured", "minimum", "maximum", "reference", "name", "unit"];
+const inspectionParameters = {
+  health: ["lighting", "temperature", "humidity", "airSpeed", "openings", "ventilationPerPerson", "outdoorAir", "ph", "turbidity", "tds", "ecoli", "sanitation", "plumbing", "noise", "custom"],
+  comfort: ["circulation", "temperature", "humidity", "airSpeed", "lighting", "glare", "noise", "vibration", "custom"],
+  ease: ["doorClear", "rampSlope", "rampWidth", "circulation", "accessibleToilet", "guidance", "custom"],
+};
+const defaultInspectionParameters = {
+  health: ["lighting", "temperature", "humidity", "openings", "ph", "turbidity", "sanitation"],
+  comfort: ["circulation", "temperature", "humidity", "noise", "glare"],
+  ease: ["doorClear", "rampSlope", "accessibleToilet", "guidance"],
+};
+const healthMeasurementFields = ["parameter", "location", "category", "measured", "minimum", "maximum", "reference", "name", "unit", "recommendationMode"];
 const healthNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 6 });
 
 function healthNumber(raw) {
@@ -184,34 +253,41 @@ function healthMeasurement(row) {
     !comparable ? "Lengkapi acuan pembanding" :
       !row.measured?.trim() ? "Belum diukur atau diperiksa" :
         !valid ? "Periksa kembali hasil ukur" : below || above ? "Di luar acuan" : "Memenuhi parameter ini";
-  const recommendation = comparable && valid ? below || above ? parameter.action :
-    "Pertahankan kondisi dan catat bukti pemeriksaan." : "";
+  const recommendation = !comparable || !valid ? "" :
+    below ? parameter.below ?? healthParameters.custom.below :
+      above ? parameter.above ?? healthParameters.custom.above :
+        "Pertahankan kondisi dan jadwal pemeliharaan. Catat hasil dan bukti pemeriksaan.";
   return { parameter, category, manual, source, reference, threshold, measured, status, recommendation, unit };
 }
 
 function healthMeasurementValues(row) {
   const result = healthMeasurement(row);
   if (!result.parameter || ![row.location, row.name, row.measured, row.reference, row.parameter !== "custom" ? row.category : ""]
-    .some((value) => value?.trim())) return ["", "", "", "", ""];
+    .some((value) => value?.trim())) return ["", "", "", ""];
   return [row.parameter === "custom" ? row.name?.trim() || "Aspek lain" : result.parameter.label,
     [row.location, result.category?.label || (result.manual ? "Acuan lain" : "")].filter(Boolean).join(" · "),
     [result.threshold, result.reference].filter(Boolean).join(" · "),
-    [result.measured || row.measured?.trim(), result.status].filter(Boolean).join(" · "),
-    result.recommendation ? "Rekomendasi · " + result.recommendation : ""];
+    [result.measured || row.measured?.trim(), result.status].filter(Boolean).join(" · ")];
+}
+
+function inspectionRecommendation(row, value) {
+  return row.recommendationMode === "manual" || value.trim() ? value : healthMeasurement(row).recommendation;
 }
 
 function initializeHealthMeasurements(project) {
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
-    if (!isArchitectureHealthTable(block) && !block.healthMeasurements) continue;
+    const kind = architectureInspectionKind(block);
+    if (!kind && !block.healthMeasurements) continue;
     if (block.headers[4] === "Bukti / gambar") block.headers[4] = architectureHealthColumns[4];
-    if (block.healthMeasurements ||
-        JSON.stringify(block.headers) !== JSON.stringify(architectureHealthColumns)) continue;
+    if (!block.healthMeasurements && JSON.stringify(block.headers) !== JSON.stringify(architectureHealthColumns)) continue;
+    block.inspectionKind = kind || "health";
+    if (block.healthMeasurements) continue;
     ensureReportReferences({ chapters: [{ blocks: [block] }] });
     const blank = block.rows.findIndex((row, index) => !row.some((cell, column) =>
       cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)] ||
       getTextFormat(block, "cell:" + tableCellKey(block, index, column))) && !block.rowImages?.[block.rowIds[index]]);
     block.healthMeasurements = {};
-    for (const [index, parameter] of defaultHealthParameters.entries()) {
+    for (const [index, parameter] of defaultInspectionParameters[kind || "health"].entries()) {
       const reused = index === 0 && blank >= 0;
       const id = reused ? block.rowIds[blank] : crypto.randomUUID();
       if (!reused) {
@@ -223,9 +299,10 @@ function initializeHealthMeasurements(project) {
   }
 }
 
-function healthMeasurementCells(row, locations, recommendation) {
-  const parameterSelect = dom("select", { ariaLabel: "Parameter kesehatan" },
-    ...Object.entries(healthParameters).map(([id, parameter]) => new Option(parameter.label, id)));
+function healthMeasurementCells(row, locations, kind) {
+  const choices = [...new Set([...inspectionParameters[kind], row.parameter])];
+  const parameterSelect = dom("select", { ariaLabel: "Parameter pemeriksaan" },
+    ...choices.map((id) => new Option(healthParameters[id].label, id)));
   parameterSelect.value = row.parameter;
   const categorySelect = dom("select", { ariaLabel: "Kategori ruang atau sistem" });
   const categoryField = dom("label", {}, "Kategori atau acuan", categorySelect);
@@ -274,8 +351,6 @@ function healthMeasurementCells(row, locations, recommendation) {
     resultLabel.textContent = result.unit ? "Hasil ukur (" + result.unit + ")" : "Hasil ukur";
     status.textContent = result.status;
     status.dataset.status = result.status === "Memenuhi parameter ini" ? "pass" : result.status === "Di luar acuan" ? "fail" : "";
-    recommendation.textContent = result.recommendation ? "Rekomendasi · " + result.recommendation : "";
-    recommendation.hidden = !result.recommendation;
   }
   function makeNumberField(key, label) {
     const control = field(label, row[key], (value) => { row[key] = value; commit(); });
@@ -307,7 +382,7 @@ function healthMeasurementCells(row, locations, recommendation) {
       return;
     }
     for (const key of healthMeasurementFields) {
-      if (key !== "location" && key !== "parameter") delete row[key];
+      if (!["location", "parameter", "recommendationMode"].includes(key)) delete row[key];
     }
     row.parameter = parameterSelect.value;
     updateParameter();

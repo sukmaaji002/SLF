@@ -181,7 +181,7 @@ function tableCellValue(block, row, column, sources) {
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
   const automatic = sources.get(automaticTableCellSource(block, row, column));
   const value = source ? sources.get(source)?.value || "" : automatic?.value || block.rows[row][column];
-  if (measurement && column === 4) return [value, healthMeasurementValues(measurement)[4]].filter(Boolean).join(" · ");
+  if (measurement && column === 4 && !source) return inspectionRecommendation(measurement, value);
   if (source) return value;
   return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
 }
@@ -190,13 +190,22 @@ function isArchitectureHealthTable(block) {
   return block?.type === "table" && tokenName(block.text) === tokenName(architectureHealthTableTitle);
 }
 
+function architectureInspectionKind(block) {
+  if (block?.type !== "table") return undefined;
+  if (Object.hasOwn(inspectionParameters, block.inspectionKind)) return block.inspectionKind;
+  const title = tokenName(block.text);
+  if (title === tokenName(architectureHealthTableTitle)) return "health";
+  if (title === tokenName(architectureComfort.title)) return "comfort";
+  if (title === tokenName(architectureEase.title)) return "ease";
+}
+
 function tableImageColumn(block) {
-  return (block.healthMeasurements || isArchitectureHealthTable(block)) && block.headers.length >= 5 ?
+  return (block.healthMeasurements || architectureInspectionKind(block)) && block.headers.length >= 5 ?
     4 : block.headers.length - 1;
 }
 
 function tableSourceAvailable(id, block) {
-  if (isArchitectureHealthTable(block)) return true;
+  if (block.healthMeasurements || architectureInspectionKind(block)) return true;
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
     ["project:purpose", "project:scope", "project:application", "project:chapter-order",
       "project:land-area", "project:kdb", "project:klb", "project:kdh", "project:ktb", "project:kbg", "project:gsb", "project:saluran", "project:sungai"].includes(id) || comparisonMetrics.some(({ key }) => id === "project:measurement-" + key));
@@ -353,8 +362,8 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const [index, chapter] of project.chapters.entries()) {
     for (const block of chapter.blocks) {
       if ((block.type === "heading" || block.type === "text") && block.sourceId) {
-        const text = block.body === architectureHealthIntro ? previousArchitectureHealth :
-          block.type === "heading" ? block.body : block.text;
+        const text = inspectionIntroductions.get(block.body) ??
+          (block.type === "heading" ? block.body : block.text);
         addNarrativeSources(add, block.sourceId, text, block.links,
           chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
       }

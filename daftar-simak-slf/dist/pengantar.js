@@ -108,7 +108,7 @@ function introductionText(chapter, block) {
   const owner = block ?? chapter;
   if (Object.hasOwn(owner, "introduction")) return owner.introduction;
   if (!block) return Object.hasOwn(chapterIntroductions, chapter.title.trim()) ? chapterIntroductions[chapter.title.trim()] : "";
-  if (block.body === architectureHealthIntro) return "";
+  if (inspectionIntroductions.has(block.body)) return "";
   const title = block.text.trim();
   if (chapter.title.trim() === "Metode dan landasan hukum" && Object.hasOwn(standardsIntroductions, title)) return standardsIntroductions[title];
   return Object.hasOwn(sectionIntroductions, title) ? sectionIntroductions[title] : "";

@@ -46,7 +46,7 @@ function heading(text) {
 function draft(name, template) {
   const project = {
     id: crypto.randomUUID(), name, template,
-    ...(template === "disiplin" ? { narrativeRevision: architectureHealthTableRevision } : {}),
+    ...(template === "disiplin" ? { narrativeRevision: architectureInspectionRevision } : {}),
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
     front: { ...frontDefaults },
     chapters: reportTemplates[template].chapters.map(([title, ...sections]) => ({
@@ -431,6 +431,10 @@ function healthRoomChoices(project, table, sources) {
         const name = cleanValue(entry.area);
         if (entry.selected && name) names.add(name);
       }
+      for (const entry of Object.values(block.healthMeasurements ?? {})) {
+        const name = cleanValue(entry.location);
+        if (name) names.add(name);
+      }
     }
   }
   return [...names];
@@ -615,7 +619,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   function update(nextSources = reportSources(project)) {
     sources = nextSources;
     updatePreview();
-    details.hidden = key === "body" && data[key] === architectureHealthIntro;
+    details.hidden = key === "body" && inspectionIntroductions.has(data[key]);
     if (!details.open) return;
     entries.clear();
     const fields = reportTokens(data[key] || "");
@@ -1506,8 +1510,8 @@ function renderChapter(project) {
   for (const [bi, block] of chapter.blocks.entries()) {
     editor.append(blockEditor(chapter, block, bi, headings.get(bi), sources));
     if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
-    if (isArchitectureHealthTable(block) && chapter.blocks[bi - 1]?.type === "heading") appendChecklist(bi - 1);
-    if (block.type !== "heading" || !isArchitectureHealthTable(chapter.blocks[bi + 1])) appendChecklist(bi);
+    if (architectureInspectionKind(block) && chapter.blocks[bi - 1]?.type === "heading") appendChecklist(bi - 1);
+    if (block.type !== "heading" || !architectureInspectionKind(chapter.blocks[bi + 1])) appendChecklist(bi);
   }
   const actions = dom("div", { className: "button-row add-block" });
   for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
@@ -1530,6 +1534,7 @@ function renderChapter(project) {
 function tableEditor(block) {
   const team = isTeamTable(block);
   const guidedHealth = Boolean(block.healthMeasurements);
+  const inspectionKind = architectureInspectionKind(block) || "health";
   const matrix = dom("div", { className: team ? "matrix team-matrix" : guidedHealth ? "matrix health-matrix" : "matrix" });
   const table = dom("table");
   const header = dom("tr");
@@ -1563,18 +1568,17 @@ function tableEditor(block) {
   for (const [index, row] of block.rows.entries()) {
     const rowId = block.rowIds[index];
     const measurement = block.healthMeasurements?.[rowId];
-    const recommendation = measurement ? dom("p", { className: "hint health-recommendation" }) : undefined;
-    const cells = measurement ? healthMeasurementCells(measurement, locations, recommendation) : [];
+    const cells = measurement ? healthMeasurementCells(measurement, locations, inspectionKind) : [];
     const firstManualColumn = cells.length;
     cells.push(...row.slice(firstManualColumn).map((_, offset) => {
       const column = offset + firstManualColumn;
       return dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Tersedia", "Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
-          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []));
+          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : [],
+        column === 4 ? measurement : undefined));
     }));
     if (measurement) {
       cells[0].append(button("＋ Ruang lain", () => addRow(measurement.parameter, index + 1, measurement), "quiet"));
-      cells[4].prepend(recommendation);
     }
     cells[imageColumn].append(tableRowImageEditor(current(), block, rowId, index));
     const rowElement = dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
@@ -1615,7 +1619,8 @@ function tableEditor(block) {
     if (parameter) document.querySelector('tr[data-row-id="' + id + '"] td:nth-child(2) input')?.focus();
   };
   const actions = dom("div", { className: "button-row" },
-    button(guidedHealth ? "＋ Baris pengukuran" : "＋ Baris", () => addRow(guidedHealth ? "lighting" : undefined)),
+    button(guidedHealth ? "＋ Baris pengukuran" : "＋ Baris",
+      () => addRow(guidedHealth ? defaultInspectionParameters[inspectionKind][0] : undefined)),
     ...(guidedHealth ? [button("＋ Baris manual", () => addRow())] : []),
     button("＋ Kolom", () => change(() => {
       block.headers.push("Kolom baru");
@@ -1672,7 +1677,7 @@ function tableEditor(block) {
   return editor;
 }
 
-function tableCellField(block, row, column, sources, options) {
+function tableCellField(block, row, column, sources, options, measurement) {
   const label = block.headers[column].trim() || "Kolom " + (column + 1);
   const key = tableCellKey(block, row, column);
   const value = block.rows[row][column];
@@ -1680,24 +1685,35 @@ function tableCellField(block, row, column, sources, options) {
   const fieldToken = tokenName(token ?? block.headers[column]);
   const example = inputExample(fieldToken);
   const control = field(label, token ? "" : value, (text) => {
+    if (measurement) measurement.recommendationMode = "manual";
     block.rows[row][column] = text;
     refreshLinkedFields();
     save();
-  }, "text", block, "cell:" + key, () => { refreshLinkedFields(); save(); });
-  const input = control.querySelector("input");
+  }, measurement ? "area" : "text", block, "cell:" + key, () => { refreshLinkedFields(); save(); });
+  const input = control.querySelector("input, textarea");
   const choices = options.length ? options : choicesForInput(fieldToken);
   if (choices.length) control.setTextChoices(choices);
   const summary = dom("summary");
   const pick = dom("select", { ariaLabel: "Sumber data " + label.toLocaleLowerCase("id") });
   const link = dom("details", { className: "table-link" }, summary, pick);
+  const mode = measurement ? dom("span", { className: "hint" }) : undefined;
+  const reset = measurement ? button("Gunakan saran otomatis", () => {
+    delete measurement.recommendationMode;
+    block.rows[row][column] = "";
+    updateTextFormat(block, "cell:" + key, input.value, inspectionRecommendation(measurement, ""));
+    refreshLinkedFields();
+    save();
+  }, "quiet") : undefined;
   function refreshValue(registry) {
     const source = block.cellLinks?.[key];
     const automatic = automaticTableCellSource(block, row, column);
     const entry = registry.get(source ?? automatic);
     link.toggleAttribute("data-linked", Boolean(source));
-    link.toggleAttribute("data-automatic", Boolean(automatic) || tokenName(block.text) === "data umum bangunan gedung");
+    link.toggleAttribute("data-automatic", Boolean(measurement || automatic) || tokenName(block.text) === "data umum bangunan gedung");
     const readOnly = Boolean(source);
-    const nextValue = source ? entry?.value || "" : token && block.rows[row][column] === value ? "" : block.rows[row][column];
+    const savedValue = block.rows[row][column];
+    const nextValue = source ? entry?.value || "" : measurement ? inspectionRecommendation(measurement, savedValue) :
+      token && savedValue === value ? "" : savedValue;
     const placeholder = source && !entry?.value ? "Sumber belum tersedia" :
       automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
     const changed = input.value !== nextValue || input.readOnly !== readOnly || input.placeholder !== placeholder;
@@ -1705,6 +1721,12 @@ function tableCellField(block, row, column, sources, options) {
     if (input.readOnly !== readOnly) input.readOnly = readOnly;
     input.placeholder = placeholder;
     summary.textContent = source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
+    if (measurement) {
+      const manual = measurement.recommendationMode === "manual" || Boolean(savedValue.trim());
+      mode.textContent = manual ? "Isian pengkaji" : nextValue ? "Otomatis · bisa diedit" : "Saran muncul setelah acuan dan hasil diisi.";
+      mode.hidden = readOnly;
+      reset.hidden = readOnly || !manual || !healthMeasurement(measurement).recommendation;
+    }
     if (changed) control.syncTextFormat();
   }
   link.refreshValue = refreshValue;
@@ -1736,7 +1758,7 @@ function tableCellField(block, row, column, sources, options) {
     save();
   });
   refreshValue(sources);
-  return dom("div", {}, control, link);
+  return dom("div", {}, control, ...(measurement ? [dom("div", { className: "recommendation-controls" }, mode, reset)] : []), link);
 }
 
 const tableRowImageUploads = new WeakMap();
@@ -1934,7 +1956,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
   const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; }, sources);
   if (block.type === "heading") {
     wrapper.append(boundField(block, "text", "Judul subbab"));
-    if (block.body !== architectureHealthIntro || Object.hasOwn(block, "introduction")) {
+    if (!inspectionIntroductions.has(block.body) || Object.hasOwn(block, "introduction")) {
       wrapper.append(introductionEditor(block, introductionText(chapter, block), "Pengantar subbab"));
     }
     const project = current();
@@ -2041,6 +2063,7 @@ function validateBackup(data) {
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
         clean.rowIds = importIds(block.rowIds, block.rows.length);
         clean.columnIds = importIds(block.columnIds, block.headers.length);
+        if (Object.hasOwn(inspectionParameters, block.inspectionKind)) clean.inspectionKind = block.inspectionKind;
         if (clean.rowIds && block.headers.length >= architectureHealthColumns.length &&
             block.healthMeasurements && typeof block.healthMeasurements === "object" && !Array.isArray(block.healthMeasurements)) {
           clean.healthMeasurements = Object.fromEntries(clean.rowIds.flatMap((id) => {
@@ -2076,7 +2099,7 @@ function validateBackup(data) {
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
-    ...([disciplineNarrativeRevision, architectureHealthTableRevision].includes(source.narrativeRevision) ?
+    ...([disciplineNarrativeRevision, architectureHealthTableRevision, architectureInspectionRevision].includes(source.narrativeRevision) ?
       { narrativeRevision: source.narrativeRevision } : {}),
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
     front: pickText(source.front, frontFields.map(([key]) => key)),
