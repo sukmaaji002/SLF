@@ -403,7 +403,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     reportTokens(data[key] || "").has("dokumen yang kurang atau perbedaan data"));
   const useGuide = key === "body" && (tokenName(data.text ?? "") === "peruntukan bangunan" ||
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
-  const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields : undefined;
+  const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
+  const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
+    intensityGuide ? intensityGuideFields : undefined;
 
   function openField(token) {
     if (!details.open) {
@@ -452,6 +454,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       groups.get(source.group).push([id, source.label]);
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
+    const intensityDetails = intensityGuide ? dom("div", { className: "form-grid narrative-fields" }) : undefined;
     const useSteps = useGuide ? [
       ["Menurut dokumen", "Catat dokumen yang dipakai dan fungsi yang tertulis di dalamnya."],
       ["Di lapangan", "Catat bagian yang diperiksa dan penggunaannya saat ini."],
@@ -653,18 +656,21 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (choiceField && !showDocumentChoices) entry.append(choiceField);
       if (priorChoices) entry.append(priorChoices.links);
       entry.append(manual);
-      if (guideField) entry.append(dom("p", { className: "hint" }, "Contoh jawaban · " + guideField[2]));
+      if (guideField?.[2]) entry.append(dom("p", { className: "hint" }, "Contoh jawaban · " + guideField[2]));
       if (choiceField && showDocumentChoices) entry.append(choiceField);
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
+        const extra = entry.closest(".intensity-narrative-details");
+        if (extra) extra.open = true;
         entry.scrollIntoView({ block: "nearest" });
         if (!manual.hidden) focusManual();
         else if (!useManual.hidden) useManual.focus();
         else source.querySelector("summary").focus();
       });
-      (useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
+      const isIntensityDetail = intensityGuide && guideField && token !== intensityFinding;
+      (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
     }
     if (followUp) {
       const instructions = dom("div", { className: "link-entry" },
@@ -672,6 +678,24 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("p", { className: "hint" }, "Jika tidak ada temuan, buka Ubah teks dan format lalu ganti narasi dengan kalimat “Tidak ditemukan kekurangan atau perbedaan pada dokumen yang ditelaah.”"),
         documentReviewLinks(project));
       content.replaceChildren(instructions, grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else if (intensityGuide) {
+      const lookUp = button("Lihat tabel perbandingan", () => {
+        const table = $("intensity-analysis");
+        if (!table) return;
+        table.open = true;
+        table.querySelector("summary").focus({ preventScroll: true });
+        table.scrollIntoView({ block: "start" });
+      }, "quiet");
+      const instructions = dom("div", { className: "link-entry" },
+        dom("p", {}, "Data ukur dan batas acuan sudah ditampilkan di tabel perbandingan. Catat hasil penting, data yang masih kurang, atau bagian yang perlu dicek ulang."),
+        dom("div", { className: "button-row" }, lookUp,
+          button("Ubah data ukur dan acuan", openIntensityEditor, "quiet")));
+      const extra = intensityDetails.childElementCount ? [
+        dom("details", { className: "narrative-source intensity-narrative-details" },
+          dom("summary", {}, "Rincian yang sudah pernah dicatat"), intensityDetails),
+      ] : [];
+      if (grid.childElementCount === 1) grid.firstElementChild.classList.add("wide");
+      content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (useGuide) {
       const sections = useSteps.flatMap(({ title, tip, fields }, index) => {
         if (!fields.childElementCount) return [];
@@ -1200,10 +1224,16 @@ function renderChecklistEditor(project) {
   editor.append(head, dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
 
+function openIntensityEditor() {
+  active = "intensity";
+  render();
+  $("section-title").focus();
+}
+
 function renderIntensityAnalysis(project, checklist) {
   const data = importIntensity(project.intensity);
   const table = dom("div", { className: "auto-checklist", id: "intensity-analysis-table" }, intensityTable(calculateIntensity(project, checklist), true));
-  const edit = button("Ubah data awal intensitas", () => { active = "intensity"; render(); $("section-title").focus(); }, "quiet");
+  const edit = button("Ubah data awal intensitas", openIntensityEditor, "quiet");
   const diagram = dom("input", { type: "checkbox", checked: data.diagram });
   diagram.addEventListener("change", () => {
     project.intensity = { ...importIntensity(project.intensity), diagram: diagram.checked };

@@ -81,6 +81,14 @@ const previousDocumentFollowUp = "Dari penelaahan dokumen, tercatat [dokumen yan
 const documentFollowUp = "Pemeriksaan dokumen menemukan [dokumen yang kurang atau perbedaan data]. Hal yang perlu dikonfirmasi adalah [aspek yang terdampak]. Tindak lanjut dilakukan oleh [penanggung jawab] dengan menyiapkan [bukti atau dokumen].";
 const previousBuildingUse = "Fungsi atau peruntukan bangunan menurut [dokumen rujukan] adalah [fungsi yang tercatat]. Pemanfaatan aktual di [area sampel] adalah [fungsi teramati]. Hasil perbandingannya adalah [kesesuaian atau perbedaan beserta rujukan bukti].";
 const buildingUse = "Menurut [dokumen rujukan], fungsi bangunan adalah [fungsi yang tercatat]. Saat diperiksa, [area sampel] digunakan untuk [fungsi teramati]. Hasil perbandingannya adalah [kesesuaian atau perbedaan beserta rujukan bukti].";
+const intensityFinding = "temuan atau keterbatasan";
+const intensityDetailFields = [
+  ["luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan", "Parameter yang ditinjau"],
+  ["nilai dan satuan", "Data ukur tambahan"],
+  ["nilai dan sumber pembanding", "Batas atau acuan tambahan"],
+];
+const previousIntensityNarrative = "Parameter intensitas yang ditelaah meliputi [luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan]. Data aktual [nilai dan satuan] dibandingkan dengan [nilai dan sumber pembanding]. Hasil telaah dicatat sebagai [temuan atau keterbatasan].";
+const intensityNarrative = "Pemeriksaan intensitas dan sempadan menggunakan data ukur dan batas acuan yang tersedia. Catatan pemeriksaan adalah [temuan atau keterbatasan].";
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -157,7 +165,7 @@ const reportTemplates = {
           "Pemeriksaan persyaratan tata bangunan gedung",
           {"body":"Kondisi tata bangunan dibandingkan dengan [dokumen pembanding] untuk menilai peruntukan, intensitas, penampilan, tata ruang dalam, dan hubungan dengan lingkungan. Hasil penilaian disajikan menurut ruang lingkup dan bukti yang tersedia pada bagian berikut.","previous":"[Ringkas hasil perbandingan desain dengan kondisi bangunan.]"},
           ["Peruntukan bangunan", { body: buildingUse, previous: "[Catat fungsi yang diizinkan dan pemanfaatan aktual per ruang atau unit.]" }],
-          ["Intensitas bangunan", {"body":"Parameter intensitas yang ditelaah meliputi [luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan]. Data aktual [nilai dan satuan] dibandingkan dengan [nilai dan sumber pembanding]. Hasil telaah dicatat sebagai [temuan atau keterbatasan].","previous":"[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]"}],
+          ["Intensitas bangunan", { body: intensityNarrative, previous: "[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]" }],
           ["Penampilan bangunan", {"body":"Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].","previous":"[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]"}],
           ["Tata ruang dalam", {"body":"Penataan ruang pada [lantai atau zona] diperiksa terhadap [denah atau gambar rujukan]. Hasil pemeriksaan menunjukkan [susunan, fungsi, luasan, atau perubahan yang teramati]. Area yang belum dicakup adalah [batasan pemeriksaan].","previous":"[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]"}],
           ["Keselarasan dengan lingkungan", {"body":"Kondisi area luar ditinjau pada [ruang terbuka, sirkulasi, atau parkir]. Hubungan tapak dengan area sekitarnya tercatat sebagai [hasil observasi] berdasarkan [denah situasi, foto, atau pengukuran].","previous":"[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]"}],
@@ -413,7 +421,14 @@ function upgradeDisciplineDraft(project) {
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
-    const revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
+    let revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
+    if (block.type === "heading" && block.body === previousIntensityNarrative) {
+      const savedDetails = intensityDetailFields.flatMap(([token, label]) => {
+        const link = block.links?.[token];
+        return link?.source || link?.value?.trim() ? [label + " — [" + token + "]."] : [];
+      });
+      revisedNarrative = [...savedDetails, intensityNarrative].join(" ");
+    }
     if (revisedNarrative) {
       updateTextFormat(block, "body", block.body, revisedNarrative);
       block.body = revisedNarrative;

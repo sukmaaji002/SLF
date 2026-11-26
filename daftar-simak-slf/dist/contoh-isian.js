@@ -15,6 +15,12 @@ const buildingUseFields = new Map([
   ["kesesuaian atau perbedaan beserta rujukan bukti", ["Apakah penggunaannya sesuai?", "Hasil dan bukti", "sesuai dengan fungsi pada PBG, sebagaimana terlihat pada Foto 5.1", 2]],
 ]);
 
+const intensityGuideFields = new Map([
+  [intensityFinding, ["Apa yang perlu dicatat dari tabel?", "Catatan hasil pemeriksaan",
+    "jarak bangunan dari as jalan masih perlu diukur ulang karena titik ukurnya belum pasti"]],
+  ...intensityDetailFields.map(([token, label]) => [token, [label, label, ""]]),
+]);
+
 const inputExamples = {
   "aspek": "tata bangunan atau keselamatan, sesuai butir yang dibahas",
   "sampel / sumber bukti": "titik P-01 di koridor dan Foto 2.1",
