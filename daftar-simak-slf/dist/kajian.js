@@ -247,9 +247,9 @@ function priorNarrativeChoices(project, sources, beforeBlock, tokens, coverKey, 
   return { names, links };
 }
 
-function narrativeEntryList(values, item, changed, minimumRows = 1) {
+function narrativeEntryList(values, item, changed, minimumRows = 1, addLabel = "Tambah isian") {
   const list = dom("div", { className: "repeated-narrative-list" });
-  const appendEntry = button("Tambah isian", () => {
+  const appendEntry = button(addLabel, () => {
     values.push("");
     renderRows();
     changed();
@@ -356,7 +356,7 @@ function repeatedNarrativeField(spec, data, changed, groups = [], suggestedNumbe
       return name.querySelector("input");
     }
   } else {
-    form.append(...narrativeEntryList(values, spec.item, commit, minimumRows));
+    form.append(...narrativeEntryList(values, spec.item, commit, minimumRows, spec.addLabel));
   }
   function commit() {
     const value = narrativeEntryValue(selected, values, referenceGroups, numbers);
@@ -641,6 +641,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const methods = {
       health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
       comfort: fields.has(comfortReferenceToken) || (methodHeading === "kenyamanan" && fields.has(parameterReferenceToken)),
+      comfortAssessment: methodHeading === "kenyamanan" && fields.has("hasil terverifikasi"),
       ease: fields.has(easeParameterToken) || (methodHeading === "kemudahan" && fields.has(easeReferenceToken)),
     };
     for (const [token, name] of fields) {
@@ -722,7 +723,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const choiceLegend = multipleChoiceLegends.get(token);
       const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
-      const presetGroups = comfortParameters ? comfortParameterGroups : inputChoiceGroups.get(token);
+      const presetGroups = comfortParameters ? comfortParameterGroups :
+        repeated?.method === "comfortAssessment" ? comfortAspectGroups : inputChoiceGroups.get(token);
       const choicesLegend = token === comfortRoomToken ? "Pilihan fungsi ruang" :
         token === existingAreaToken ? "Pilihan area atau unit" :
           roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
@@ -1531,12 +1533,22 @@ function tableEditor(block) {
   const matrix = dom("div", { className: team ? "matrix team-matrix" : guidedHealth ? "matrix health-matrix" : "matrix" });
   const table = dom("table");
   const header = dom("tr");
+  const columnFields = [];
   for (const [index, value] of block.headers.entries()) {
-    header.append(dom("th", { scope: "col" }, field("Kolom " + (index + 1), value, (text) => {
+    const heading = dom("th", { scope: "col" });
+    const editor = field("Kolom " + (index + 1), value, (text) => {
       block.headers[index] = text;
+      if (guidedHealth) heading.textContent = text;
       refreshLinkedFields();
       save();
-    }, "text", block, "header:" + block.columnIds[index])));
+    }, "text", block, "header:" + block.columnIds[index]);
+    if (guidedHealth) {
+      heading.textContent = value;
+      columnFields.push(editor);
+    } else {
+      heading.append(editor);
+    }
+    header.append(heading);
   }
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
@@ -1561,7 +1573,7 @@ function tableEditor(block) {
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []));
     }));
     if (measurement) {
-      cells[0].append(button("＋ Tambah baris aspek ini", () => addRow(measurement.parameter, index + 1), "quiet"));
+      cells[0].append(button("＋ Ruang lain", () => addRow(measurement.parameter, index + 1, measurement), "quiet"));
       cells[4].prepend(recommendation);
     }
     cells[imageColumn].append(tableRowImageEditor(current(), block, rowId, index));
@@ -1583,18 +1595,22 @@ function tableEditor(block) {
       save();
       render();
     }, "danger")));
+    if (guidedHealth) rowElement.lastElementChild.className = "health-row-actions";
     rowElement.dataset.rowId = rowId;
     rows.append(rowElement);
   }
   table.append(dom("thead", {}, header), rows);
   matrix.append(table);
   const change = (edit) => { edit(); save(); render(); };
-  const addRow = (parameter, position = block.rows.length) => {
+  const addRow = (parameter, position = block.rows.length, measurement) => {
     const id = crypto.randomUUID();
     change(() => {
       block.rows.splice(position, 0, block.headers.map(() => ""));
       block.rowIds.splice(position, 0, id);
-      if (parameter) block.healthMeasurements[id] = { parameter };
+      if (parameter) {
+        block.healthMeasurements[id] = parameter === "custom" && measurement ?
+          { parameter, name: measurement.name || "", unit: measurement.unit || "" } : { parameter };
+      }
     });
     if (parameter) document.querySelector('tr[data-row-id="' + id + '"] td:nth-child(2) input')?.focus();
   };
@@ -1623,7 +1639,9 @@ function tableEditor(block) {
     });
   }));
   const editor = dom("div", {}, ...(guidedHealth ? [dom("p", { className: "hint" },
-    "Pilih nama ruang dari isian sebelumnya atau ketik sendiri, lalu pilih kategori dan isi hasil ukur. Gunakan Tambah baris aspek ini untuk memeriksa ruang lain dengan parameter yang sama.")] : []), matrix, actions);
+    "Pilih atau ketik nama ruang, tentukan acuan, lalu isi hasil ukur. Gunakan ＋ Ruang lain untuk menambah pemeriksaan pada aspek yang sama."),
+    dom("details", { className: "health-column-settings" }, dom("summary", {}, "Sunting judul kolom"),
+      dom("div", { className: "form-grid" }, ...columnFields))] : []), matrix, actions);
   if (team) {
     const select = dom("select");
     const hint = dom("p", { className: "hint" });

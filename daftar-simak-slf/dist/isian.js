@@ -40,6 +40,8 @@ const repeatedNarrativeFields = new Map([
       addGroupLabel: "Tambah acuan kenyamanan", method: "comfort" }],
   [comfortRoomToken, { key: "comfortRooms", choiceKey: "comfortRoomChoices", item: "Fungsi atau nama ruang tambahan",
     minimumRows: 0, method: "comfort" }],
+  ["parameter yang diperiksa", { key: "comfortAspects", choiceKey: "comfortAspectChoices", item: "Jenis aspek kenyamanan",
+    label: "Aspek kenyamanan yang diperiksa", addLabel: "Tambah aspek sendiri", minimumRows: 0, method: "comfortAssessment" }],
   [easeReferenceToken,
     { key: "easeReferences", choiceKey: "easeReferenceChoices", groupKey: "easeReferenceGroups", item: "Acuan tambahan",
       addGroupLabel: "Tambah acuan kemudahan", method: "ease" }],

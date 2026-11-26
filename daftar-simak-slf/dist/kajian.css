@@ -88,11 +88,51 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .matrix th, .matrix td { min-width: 135px; padding: 4px; text-align: left; }
 .matrix th:last-child, .matrix td:last-child { min-width: auto; }
 .matrix label { font-size: .8125rem; }
-.health-matrix td { vertical-align: top; }
+.health-matrix { container-type: inline-size; }
+.health-matrix thead th { background: var(--panel); font-size: .8125rem; }
+.health-matrix :is(th, td) { padding: 9px 7px; overflow-wrap: anywhere; }
+.health-matrix td { vertical-align: top; border-bottom: 1px solid var(--line); }
+.health-matrix :is(td, th):nth-child(5) { min-width: 180px; }
+.health-matrix select, .health-matrix input { min-width: 0; max-width: 100%; }
+.health-matrix .table-row-image-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.health-matrix .table-row-image { max-width: min(100%, 88px); max-height: 64px; }
+.health-matrix .health-row-actions button { white-space: nowrap; }
+.health-column-settings { margin-block: 8px 12px; }
+.health-column-settings > .form-grid { margin-top: 8px; }
 .health-measurement { display: grid; gap: 6px; min-width: 0; }
+.health-measurement p { margin: 0; }
+.health-field-label { font-size: .8125rem; }
+.health-recommendation { margin: 0 0 6px; }
 .health-threshold, .health-status { font-size: .875rem; font-weight: 700; }
 .health-status[data-status="pass"] { color: #286047; }
 .health-status[data-status="fail"] { color: #8b3729; }
+@container (max-width: 900px) {
+  .health-matrix table, .health-matrix tbody { display: block; width: 100%; }
+  .health-matrix table > thead { display: none; }
+  .health-matrix tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    margin-block-end: 10px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .health-matrix tbody > tr::before {
+    content: attr(aria-label);
+    grid-column: 1 / -1;
+    font-size: .875rem;
+    font-weight: 700;
+  }
+  .health-matrix tbody > tr > td { min-width: 0; padding: 0; border: 0; }
+  .health-matrix tbody > tr > td:nth-child(n+5) { grid-column: 1 / -1; min-width: 0; }
+  .health-matrix tbody > tr > td:nth-child(5) { padding-top: 8px; border-top: 1px solid var(--line); }
+  .health-matrix tbody > tr > .health-row-actions { justify-self: end; }
+}
+@container (max-width: 440px) {
+  .health-matrix tbody > tr { grid-template-columns: minmax(0, 1fr); }
+}
 .team-matrix td, .team-matrix th { vertical-align: top; }
 .team-lead { margin-block: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
 .team-lead select { max-width: min(100%, 420px); }

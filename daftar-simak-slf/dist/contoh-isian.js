@@ -497,6 +497,12 @@ const inputChoiceGroups = new Map([
   ]],
 ]);
 
+const comfortAspectGroups = [
+  ["Ruang", ["ruang gerak pengguna", "hubungan antarruang", "kepadatan pengguna"]],
+  ["Termal", ["suhu udara", "kelembapan udara", "aliran udara"]],
+  ["Pandangan", ["pandangan dari ruang", "silau pada area kerja"]],
+  ["Suara dan getaran", ["kebisingan dalam ruang", "kebisingan dari luar", "waktu dengung", "getaran"]],
+];
 const comfortParameterGroups = [
   ["Pilih rujukan", [
     "sesuai dengan standar teknis ruang gerak",
