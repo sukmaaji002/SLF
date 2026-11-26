@@ -246,7 +246,7 @@ const defaultInspectionParameters = {
   comfort: ["circulation", "temperature", "humidity", "noise", "glare"],
   ease: ["doorClear", "rampSlope", "accessibleToilet", "guidance"],
 };
-const healthMeasurementFields = ["parameter", "location", "category", "measured", "minimum", "maximum", "reference", "name", "unit", "recommendationMode"];
+const healthMeasurementFields = ["parameter", "location", "category", "measured", "minimum", "maximum", "reference", "name", "unit", "recommendationMode", "healthSource"];
 const healthNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 6 });
 
 function healthNumber(raw) {
@@ -315,6 +315,70 @@ function healthMeasurementValues(row) {
 
 function inspectionRecommendation(row, value) {
   return row.recommendationMode === "manual" || value.trim() ? value : healthMeasurement(row).recommendation;
+}
+
+function reusableHealthParameter(parameter) {
+  return parameter !== "custom" && inspectionParameters.health.includes(parameter) && inspectionParameters.comfort.includes(parameter);
+}
+
+function healthMeasurementReferences(project) {
+  const references = new Map();
+  for (const [ci, chapter] of project.chapters.entries()) for (const [bi, block] of chapter.blocks.entries()) {
+    if (!block.sourceId || architectureInspectionKind(block) !== "health") continue;
+    for (const [index, id] of (block.rowIds ?? []).entries()) {
+      const row = block.healthMeasurements?.[id];
+      if (!row || !reusableHealthParameter(row.parameter)) continue;
+      references.set(block.sourceId + ":" + id, { row, chapter, anchor: "report-chapter-" + ci + "-block-" + bi, number: index + 1 });
+    }
+  }
+  return references;
+}
+
+function getHealthMeasurementReference(row, sources) {
+  const reference = sources.healthRows?.get(row.healthSource);
+  return reference?.row.parameter === row.parameter ? reference : undefined;
+}
+
+function resolvedHealthMeasurement(row, sources) {
+  if (!row.healthSource) return row;
+  const source = getHealthMeasurementReference(row, sources)?.row;
+  return { ...source, parameter: row.parameter, recommendationMode: row.recommendationMode };
+}
+
+function linkedHealthMeasurementValues(row, sources) {
+  const values = healthMeasurementValues(resolvedHealthMeasurement(row, sources));
+  if (row.healthSource && !values[3]) {
+    values[0] = healthParameters[row.parameter].label;
+    values[3] = getHealthMeasurementReference(row, sources) ? "Hasil ukur di Kesehatan belum diisi" : "Sumber hasil ukur Kesehatan tidak tersedia";
+  }
+  return values;
+}
+
+function healthMeasurementSourceField(row, chapter, cells, sources, onChange) {
+  const select = dom("select", { ariaLabel: "Ambil hasil ukur dari Kesehatan" });
+  const control = dom("label", { className: "health-source-field" }, "Ambil hasil ukur dari Kesehatan", select);
+  select.addEventListener("change", () => onChange(select.value));
+  control.refreshValue = (registry) => {
+    const choices = [...registry.healthRows].flatMap(([id, reference]) => {
+      if (reference.chapter !== chapter || reference.row.parameter !== row.parameter) return [];
+      const result = healthMeasurement(reference.row);
+      if ((id !== row.healthSource && !result.measured)) return [];
+      const label = [reference.row.location || "Lokasi belum diisi", result.measured || "Belum diukur", "Baris " + reference.number];
+      return [new Option(label.join(" · "), id)];
+    });
+    if (row.healthSource && !choices.some((option) => option.value === row.healthSource)) {
+      choices.push(new Option("Sumber hasil ukur tidak tersedia", row.healthSource));
+    }
+    select.replaceChildren(new Option("Isi sendiri", ""), ...choices);
+    select.value = row.healthSource || "";
+    control.hidden = !choices.length;
+    if (row.healthSource) {
+      const values = linkedHealthMeasurementValues(row, registry);
+      for (const [index, output] of cells.entries()) output.textContent = values[index] || "—";
+    }
+  };
+  control.refreshValue(sources);
+  return control;
 }
 
 function initializeHealthMeasurements(project) {

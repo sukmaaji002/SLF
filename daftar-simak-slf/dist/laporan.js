@@ -351,6 +351,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         const documentReview = isDocumentReviewTable(block);
         const rows = block.rows.flatMap((row, ri) => {
           const values = row.map((_, ci) => tableCellValue(block, ri, ci, sources));
+          const measurement = block.healthMeasurements?.[block.rowIds?.[ri]];
+          const reference = measurement?.healthSource && getHealthMeasurementReference(measurement, sources);
           const image = block.rowImages?.[block.rowIds?.[ri]];
           const hasImage = imageSource.test(image || "");
           if ((documentReview || block.healthMeasurements?.[block.rowIds?.[ri]]) &&
@@ -362,7 +364,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
             const own = getTextFormat(block, "cell:" + key);
             const format = source?.format && own ? { base: { ...source.format.base, ...own.base }, block: own.block, runs: own.runs.length ? own.runs : source.format.runs } : own || source?.format;
             const body = formattedValue(text, format, resolveToken());
-            const value = sourceId?.startsWith("finding:") ? dom("div", {}, body,
+            const value = reference && ci === 3 ? dom("div", {}, body, dom("div", {},
+              reportJump(reference.anchor, "Sumber hasil ukur · Kesehatan, baris " + reference.number))) :
+              sourceId?.startsWith("finding:") ? dom("div", {}, body,
               dom("div", {}, source?.anchor ? reportJump(source.anchor, "Lihat sumber pemeriksaan") :
                 "Sumber awal tidak tersedia · salinan tersimpan")) : body;
             return hasImage && ci === tableImageColumn(block) ?

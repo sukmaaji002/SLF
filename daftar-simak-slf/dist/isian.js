@@ -177,12 +177,12 @@ function automaticTableCellSource(block, row, column) {
 
 function tableCellValue(block, row, column, sources) {
   const measurement = block.healthMeasurements?.[block.rowIds?.[row]];
-  if (measurement && column < 4) return healthMeasurementValues(measurement)[column];
+  if (measurement && column < 4) return linkedHealthMeasurementValues(measurement, sources)[column];
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
   const automatic = sources.get(automaticTableCellSource(block, row, column));
   const value = source ? sources.get(source)?.value || (source.startsWith("finding:") ? block.rows[row][column] : "") :
     automatic?.value || block.rows[row][column];
-  if (measurement && column === 4 && !source) return inspectionRecommendation(measurement, value);
+  if (measurement && column === 4 && !source) return inspectionRecommendation(resolvedHealthMeasurement(measurement, sources), value);
   if (source) return value;
   return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
 }
@@ -298,6 +298,7 @@ function recordedPermitNumbers(project, beforeBlock, sources) {
 
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
+  sources.healthRows = healthMeasurementReferences(project);
   const teamLeads = new Set();
   const designatedLeads = new Set();
   let hasDesignation = false;
@@ -398,7 +399,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       for (const [ri, row] of block.rows.entries()) {
         const rowId = block.rowIds?.[ri];
         const measurement = block.healthMeasurements?.[rowId];
-        if (measurement?.measured?.trim()) {
+        if (measurement?.measured?.trim() && !measurement.healthSource) {
           const [parameter, , reference, result] = healthMeasurementValues(measurement);
           const label = [parameter, cleanValue(measurement.location)].filter(Boolean).join(" · ");
           const id = "finding:measurement:" + block.sourceId + ":" + rowId;

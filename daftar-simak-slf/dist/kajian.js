@@ -921,11 +921,13 @@ function refreshLinkedFields(except) {
   const narratives = [...editor.querySelectorAll(".linked-fields")];
   const tableFields = [...editor.querySelectorAll(".table-link[data-linked], .table-link[data-automatic]")];
   const leadFields = [...editor.querySelectorAll(".team-lead")];
-  if (narratives.length || tableFields.length || leadFields.length) {
+  const measurementFields = [...editor.querySelectorAll(".health-source-field")];
+  if (narratives.length || tableFields.length || leadFields.length || measurementFields.length) {
     const sources = reportSources(current());
     for (const details of narratives) if (details !== except) details.refreshSources(sources);
     for (const details of tableFields) details.refreshValue(sources);
     for (const control of leadFields) control.refreshMembers(sources);
+    for (const control of measurementFields) control.refreshValue(sources);
   }
 }
 
@@ -1598,6 +1600,7 @@ function tableEditor(block) {
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
   const sources = reportSources(current());
+  const chapter = current().chapters.find((entry) => entry.blocks.includes(block));
   const locations = guidedHealth ? healthRoomChoices(current(), block, sources) : [];
   const imageColumn = tableImageColumn(block);
   const tableName = tokenName(block.text);
@@ -1609,7 +1612,11 @@ function tableEditor(block) {
   for (const [index, row] of block.rows.entries()) {
     const rowId = block.rowIds[index];
     const measurement = block.healthMeasurements?.[rowId];
-    const cells = measurement ? healthMeasurementCells(measurement, locations, inspectionKind) : [];
+    const linked = inspectionKind === "comfort" && measurement?.healthSource;
+    const outputs = linked ? Array.from({ length: 4 }, () => dom("p", { className: "health-threshold" })) : [];
+    const cells = linked ? ["Parameter", "Ruang / sistem", "Acuan pembanding", "Hasil / temuan"].map((label, column) =>
+      dom("td", {}, dom("span", { className: "health-field-label" }, label), outputs[column])) :
+      measurement ? healthMeasurementCells(measurement, locations, inspectionKind) : [];
     const firstManualColumn = cells.length;
     cells.push(...row.slice(firstManualColumn).map((_, offset) => {
       const column = offset + firstManualColumn;
@@ -1620,6 +1627,16 @@ function tableEditor(block) {
     }));
     if (measurement) {
       cells[0].append(button("＋ Ruang lain", () => addRow(measurement.parameter, index + 1, measurement), "quiet"));
+      if (inspectionKind === "comfort") {
+        const control = healthMeasurementSourceField(measurement, chapter, outputs, sources, (id) => {
+          if (id) measurement.healthSource = id;
+          else delete measurement.healthSource;
+          save();
+          render();
+          editor.querySelector('tr[data-row-id="' + rowId + '"] .health-source-field:not([hidden]) select')?.focus();
+        });
+        cells[1].prepend(control);
+      }
     }
     cells[imageColumn].append(tableRowImageEditor(current(), block, rowId, index));
     const rowElement = dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
@@ -1741,7 +1758,7 @@ function tableCellField(block, row, column, sources, options, measurement) {
   const reset = measurement ? button("Gunakan saran otomatis", () => {
     delete measurement.recommendationMode;
     block.rows[row][column] = "";
-    updateTextFormat(block, "cell:" + key, input.value, inspectionRecommendation(measurement, ""));
+    updateTextFormat(block, "cell:" + key, input.value, inspectionRecommendation(resolvedHealthMeasurement(measurement, reportSources(current())), ""));
     refreshLinkedFields();
     save();
   }, "quiet") : undefined;
@@ -1754,7 +1771,8 @@ function tableCellField(block, row, column, sources, options, measurement) {
     const readOnly = Boolean(source);
     const savedValue = block.rows[row][column];
     const finding = source?.startsWith("finding:");
-    const nextValue = source ? entry?.value || (finding ? savedValue : "") : measurement ? inspectionRecommendation(measurement, savedValue) :
+    const effectiveMeasurement = measurement && resolvedHealthMeasurement(measurement, registry);
+    const nextValue = source ? entry?.value || (finding ? savedValue : "") : measurement ? inspectionRecommendation(effectiveMeasurement, savedValue) :
       token && savedValue === value ? "" : savedValue;
     const placeholder = source && !entry?.value ? "Sumber belum tersedia" :
       automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
@@ -1768,7 +1786,7 @@ function tableCellField(block, row, column, sources, options, measurement) {
       const manual = measurement.recommendationMode === "manual" || Boolean(savedValue.trim());
       mode.textContent = manual ? "Isian pengkaji" : nextValue ? "Otomatis · bisa diedit" : "Saran muncul setelah acuan dan hasil diisi.";
       mode.hidden = readOnly;
-      reset.hidden = readOnly || !manual || !healthMeasurement(measurement).recommendation;
+      reset.hidden = readOnly || !manual || !healthMeasurement(effectiveMeasurement).recommendation;
     }
     if (changed) control.syncTextFormat();
   }
@@ -2113,7 +2131,12 @@ function validateBackup(data) {
             block.healthMeasurements && typeof block.healthMeasurements === "object" && !Array.isArray(block.healthMeasurements)) {
           clean.healthMeasurements = Object.fromEntries(clean.rowIds.flatMap((id) => {
             const entry = block.healthMeasurements[id];
-            return entry && Object.hasOwn(healthParameters, entry.parameter) ? [[id, pickText(entry, healthMeasurementFields)]] : [];
+            if (!entry || !Object.hasOwn(healthParameters, entry.parameter)) return [];
+            const measurement = pickText(entry, healthMeasurementFields);
+            const reference = measurement.healthSource?.split(":");
+            if (architectureInspectionKind(clean) !== "comfort" || !reusableHealthParameter(entry.parameter) ||
+                reference?.length !== 2 || !reference.every((part) => sourceUuid.test(part))) delete measurement.healthSource;
+            return [[id, measurement]];
           }));
         }
         if (clean.rowIds && block.rowImages && typeof block.rowImages === "object") {
