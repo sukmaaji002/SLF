@@ -127,17 +127,15 @@ function reportParagraphs(text, format, resolveToken) {
 }
 
 function appearanceSectionParagraphs(block) {
-  return (block.appearanceSections ?? []).flatMap(({ area, part, condition, evidence }) => {
+  return (block.appearanceSections ?? []).flatMap(({ area, part, condition }) => {
     const location = area?.trim();
     const element = part?.trim();
     const title = [location, element].filter(Boolean).join(" — ");
     const note = condition?.trim();
-    const reference = evidence?.trim();
-    if (!title && !note && !reference) return [];
+    if (!title && !note) return [];
     const paragraph = dom("p", { className: "report-text" });
-    if (title) paragraph.append(dom("strong", {}, title), note || reference ? ". " : "");
-    if (note) paragraph.append(note, reference ? (/\p{P}$/u.test(note) ? " " : ". ") : "");
-    if (reference) paragraph.append("Dokumentasi dapat dilihat pada " + reference, /[.!?]$/.test(reference) ? "" : ".");
+    if (title) paragraph.append(dom("strong", {}, title), note ? ". " : "");
+    if (note) paragraph.append(note);
     return [paragraph];
   });
 }
@@ -318,8 +316,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
-        const body = appearanceReportText(block.body, sources, block.links);
-        section.append(...reportParagraphs(body, getTextFormat(block, "body"), resolveToken(block.links)));
+        section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         section.append(...appearanceSectionParagraphs(block));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);

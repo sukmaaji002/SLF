@@ -25,7 +25,6 @@ const appearanceFields = new Map([
   ["sisi atau area", ["Di bagian mana?", "Sisi bangunan", "sisi depan bangunan"]],
   ["bentuk, fasad, atap, atau elemen arsitektural yang diperiksa", ["Apa yang dilihat?", "Bagian yang diperiksa", "dinding dan kanopi pintu masuk"]],
   ["hasil observasi", ["Bagaimana kondisinya?", "Kondisi yang terlihat", "cat dinding mengelupas di dekat pintu masuk, sedangkan kanopi terlihat utuh"]],
-  [appearanceEvidenceToken, ["Foto atau gambar mana yang dirujuk?", "Nomor foto atau gambar", "Gambar 5.3"]],
 ]);
 
 const inputExamples = {

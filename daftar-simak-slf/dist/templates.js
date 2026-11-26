@@ -89,10 +89,9 @@ const intensityDetailFields = [
 ];
 const previousIntensityNarrative = "Parameter intensitas yang ditelaah meliputi [luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan]. Data aktual [nilai dan satuan] dibandingkan dengan [nilai dan sumber pembanding]. Hasil telaah dicatat sebagai [temuan atau keterbatasan].";
 const intensityNarrative = "Pemeriksaan intensitas dan sempadan menggunakan data ukur dan batas acuan yang tersedia. Catatan pemeriksaan adalah [temuan atau keterbatasan].";
-const appearanceEvidenceToken = "nomor foto atau gambar";
-const appearanceEvidenceParagraph = "\n\nDokumentasi dapat dilihat pada [" + appearanceEvidenceToken + "].";
+const appearanceEvidenceParagraph = "\n\nDokumentasi dapat dilihat pada [nomor foto atau gambar].";
 const previousAppearanceNarrative = "Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].";
-const appearanceNarrative = "Pada [sisi atau area], pemeriksaan mencakup [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi yang terlihat adalah [hasil observasi]." + appearanceEvidenceParagraph;
+const appearanceNarrative = "Pada [sisi atau area], pemeriksaan mencakup [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi yang terlihat adalah [hasil observasi].";
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -427,6 +426,9 @@ function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
     let revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
+    if (block.type === "heading" && block.body.endsWith(appearanceEvidenceParagraph)) {
+      revisedNarrative = block.body.slice(0, -appearanceEvidenceParagraph.length);
+    }
     if (block.type === "heading" && block.body === previousIntensityNarrative) {
       const savedDetails = intensityDetailFields.flatMap(([token, label]) => {
         const link = block.links?.[token];

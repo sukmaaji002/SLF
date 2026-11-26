@@ -371,7 +371,6 @@ const appearanceSectionFields = [
   ["area", "Sisi bangunan", "sisi depan bangunan"],
   ["part", "Bagian yang diperiksa", "kanopi pintu masuk"],
   ["condition", "Kondisi yang terlihat", "terdapat korosi pada ujung kanopi"],
-  ["evidence", "Nomor foto atau gambar (opsional)", "Gambar 5.3"],
 ];
 
 function appearanceSectionsEditor(block, changed) {
@@ -447,7 +446,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
   const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
-    data[key]?.endsWith(appearanceEvidenceParagraph) || Array.isArray(data.appearanceSections));
+    data[key] === appearanceNarrative || Array.isArray(data.appearanceSections));
   const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
     intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : undefined;
 
@@ -460,14 +459,12 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   }
 
   function updatePreview() {
-    const raw = data[key] || "";
+    const text = data[key] || "";
     const links = getLinks();
-    const text = appearanceGuide ? appearanceReportText(raw, sources, links) : raw;
     const fields = reportTokens(text);
     const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links).value === "[" + name + "]").length;
     summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
-      fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" :
-        raw !== text ? "Lihat atau ubah isian" : "Tambahkan isian otomatis";
+      fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";
     preview.removeAttribute("style");
     const format = getTextFormat(data, key);
     styleTextBlock(preview, format);
@@ -505,7 +502,6 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
     const intensityDetails = intensityGuide ? dom("div", { className: "form-grid narrative-fields" }) : undefined;
-    let appearanceEvidence;
     const useSteps = useGuide ? [
       ["Menurut dokumen", "Catat dokumen yang dipakai dan fungsi yang tertulis di dalamnya."],
       ["Di lapangan", "Catat bagian yang diperiksa dan penggunaannya saat ini."],
@@ -713,7 +709,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
-        const extra = entry.closest(".intensity-narrative-details, .appearance-evidence");
+        const extra = entry.closest(".intensity-narrative-details");
         if (extra) extra.open = true;
         entry.scrollIntoView({ block: "nearest" });
         if (!manual.hidden) focusManual();
@@ -721,13 +717,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         else source.querySelector("summary").focus();
       });
       const isIntensityDetail = intensityGuide && guideField && token !== intensityFinding;
-      if (appearanceGuide && token === appearanceEvidenceToken && data[key].endsWith(appearanceEvidenceParagraph)) {
-        appearanceEvidence = dom("details", { className: "narrative-source appearance-evidence" },
-          dom("summary", {}, "Rujuk foto atau gambar lain (opsional)"), entry);
-      } else {
-        if (appearanceGuide && token === "hasil observasi") entry.classList.add("wide");
-        (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
-      }
+      if (appearanceGuide && token === "hasil observasi") entry.classList.add("wide");
+      (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
     }
     if (followUp) {
       const instructions = dom("div", { className: "link-entry" },
@@ -755,9 +746,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (appearanceGuide) {
       const instructions = dom("p", { className: "hint" },
-        "Isi satu catatan untuk tiap bagian yang diperiksa. Jika ada foto, gunakan Unggah foto subbab di bawah.");
+        "Isi satu catatan untuk tiap bagian. Nama foto bisa ditulis di Keterangan foto setelah diunggah. Nomor gambar muncul otomatis di laporan.");
       const first = grid.childElementCount ? [dom("section", { className: "narrative-step" },
-        dom("h4", {}, "Bagian 1"), grid, ...(appearanceEvidence ? [appearanceEvidence] : []))] : [];
+        dom("h4", {}, "Bagian 1"), grid)] : [];
       const additional = appearanceSectionsEditor(data, () => { updatePreview(); save(); });
       content.replaceChildren(instructions, ...first, ...additional,
         ...(fields.has("tujuan kajian") ? [editPurpose] : []));
@@ -1829,7 +1820,7 @@ function validateBackup(data) {
         clean.body = block.body;
         clean.depth = block.depth === 2 ? 2 : 1;
         if (Array.isArray(block.appearanceSections)) {
-          const keys = appearanceSectionFields.map(([key]) => key);
+          const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
           clean.appearanceSections = block.appearanceSections.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => Object.fromEntries(keys.filter((key) => typeof entry[key] === "string").map((key) => [key, entry[key]])));
         }
