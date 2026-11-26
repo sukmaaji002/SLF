@@ -92,6 +92,13 @@ const intensityNarrative = "Pemeriksaan intensitas dan sempadan menggunakan data
 const appearanceEvidenceParagraph = "\n\nDokumentasi dapat dilihat pada [nomor foto atau gambar].";
 const previousAppearanceNarrative = "Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].";
 const appearanceNarrative = "Pada [sisi atau area], pemeriksaan mencakup [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi yang terlihat adalah [hasil observasi].";
+const previousRoomLayoutNarrative = "Penataan ruang pada [lantai atau zona] diperiksa terhadap [denah atau gambar rujukan]. Hasil pemeriksaan menunjukkan [susunan, fungsi, luasan, atau perubahan yang teramati]. Area yang belum dicakup adalah [batasan pemeriksaan].";
+const roomLayoutLegacyFields = [
+  ["lantai atau zona", "Area yang diperiksa"],
+  ["denah atau gambar rujukan", "Denah rujukan"],
+  ["susunan, fungsi, luasan, atau perubahan yang teramati", "Hasil pemeriksaan"],
+  ["batasan pemeriksaan", "Batasan pemeriksaan"],
+];
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -171,7 +178,7 @@ const reportTemplates = {
           ["Peruntukan bangunan", { body: buildingUse, previous: "[Catat fungsi yang diizinkan dan pemanfaatan aktual per ruang atau unit.]" }],
           ["Intensitas bangunan", { body: intensityNarrative, previous: "[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]" }],
           ["Penampilan bangunan", { body: appearanceNarrative, previous: "[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]" }],
-          ["Tata ruang dalam", {"body":"Penataan ruang pada [lantai atau zona] diperiksa terhadap [denah atau gambar rujukan]. Hasil pemeriksaan menunjukkan [susunan, fungsi, luasan, atau perubahan yang teramati]. Area yang belum dicakup adalah [batasan pemeriksaan].","previous":"[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]"}],
+          ["Tata ruang dalam", { body: "", previous: "[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]" }],
           ["Keselarasan dengan lingkungan", {"body":"Kondisi area luar ditinjau pada [ruang terbuka, sirkulasi, atau parkir]. Hubungan tapak dengan area sekitarnya tercatat sebagai [hasil observasi] berdasarkan [denah situasi, foto, atau pengukuran].","previous":"[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]"}],
         ],
         ["Kesehatan", {"body":"Pemeriksaan aspek kesehatan mencakup [parameter yang diperiksa] pada [ruang atau sistem]. Hasil observasi atau pengukuran dirujuk pada [tabel, gambar, atau lampiran] dan dibandingkan dengan [acuan yang digunakan]. Ringkasan temuan untuk bidang ini adalah [temuan kesehatan].","previous":"[Catat hasil pemeriksaan pencahayaan atau aspek kesehatan yang dibahas dalam disiplin arsitektur.]"}],
@@ -436,7 +443,13 @@ function upgradeReportDraft(project) {
       });
       revisedNarrative = [...savedDetails, intensityNarrative].join(" ");
     }
-    if (revisedNarrative) {
+    if (block.type === "heading" && block.body === previousRoomLayoutNarrative) {
+      revisedNarrative = roomLayoutLegacyFields.flatMap(([token, label]) => {
+        const link = block.links?.[token];
+        return link?.source || link?.value?.trim() ? [label + " — [" + token + "]."] : [];
+      }).join(" ");
+    }
+    if (revisedNarrative !== undefined) {
       updateTextFormat(block, "body", block.body, revisedNarrative);
       block.body = revisedNarrative;
     }

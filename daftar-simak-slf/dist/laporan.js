@@ -140,6 +140,20 @@ function appearanceSectionParagraphs(block) {
   });
 }
 
+function roomLayoutParagraphs(block) {
+  return (block.roomLayoutAreas ?? []).flatMap(({ area, selected, observation, reference, limitation }) => {
+    if (!selected || !area?.trim()) return [];
+    const details = [
+      ["", observation],
+      ["Denah — ", reference],
+      ["Batasan — ", limitation],
+    ].flatMap(([label, text]) => text?.trim() ? [label + text.trim()] : []);
+    if (!details.length) return [];
+    return [dom("p", { className: "report-text" }, dom("strong", {}, area.trim()),
+      ...details.flatMap((line) => [dom("br"), line]))];
+  });
+}
+
 function reportFormatted(element, text, format, prefix = "") {
   element.replaceChildren(prefix, formattedText(text, format));
   return styleTextBlock(element, format);
@@ -318,6 +332,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         section.append(...appearanceSectionParagraphs(block));
+        section.append(...roomLayoutParagraphs(block));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);

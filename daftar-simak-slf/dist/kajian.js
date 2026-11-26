@@ -209,7 +209,8 @@ function documentReviewLinks(project) {
 
 function priorNarrativeChoices(project, sources, beforeBlock, tokens, coverKey, coverLabel) {
   const names = new Set([sources.get("cover:" + coverKey)?.value].filter(Boolean));
-  const links = dom("div", { className: "button-row" }, button("Buka " + coverLabel + " di Sampul", () => {
+  const links = dom("div", { className: "button-row" });
+  if (coverKey) links.append(button("Buka " + coverLabel + " di Sampul", () => {
     active = "cover";
     render();
     if (narrowLayout.matches) $("section-navigation").open = false;
@@ -225,10 +226,12 @@ function priorNarrativeChoices(project, sources, beforeBlock, tokens, coverKey, 
         const link = block.links?.[token];
         const sourceId = link?.source ?? automaticSource(token, sources);
         const selectedSource = !link || link.source ? sources.get(sourceId) : undefined;
-        const recorded = (selectedSource?.locations ?? link?.locations ?? [selectedSource?.value ?? link?.value])
-          .map(cleanValue).filter(Boolean);
+        const existingAreas = token === existingAreaToken && !link?.source && Array.isArray(link?.existingAreas) ?
+          [...(link.existingAreaChoices ?? []), ...link.existingAreas] : undefined;
+        const recorded = (selectedSource?.locations ?? link?.locations ?? existingAreas ??
+          [selectedSource?.value ?? link?.value]).map(cleanValue).filter(Boolean);
         for (const name of recorded) names.add(name);
-        if (coverKey === "building" && token !== sampleLocationToken && !recorded.length) continue;
+        if (coverKey !== "owner" && token !== sampleLocationToken && !recorded.length) continue;
         const label = token[0].toLocaleUpperCase("id") + token.slice(1);
         links.append(button("Buka " + label + " · Bab " + roman(chapterIndex + 1), () => {
           active = chapterIndex;
@@ -407,12 +410,86 @@ function appearanceSectionsEditor(block, changed) {
   return [list, add];
 }
 
+const roomLayoutFields = ["area", "observation", "reference", "limitation"];
+
+function roomLayoutEditor(project, block, sources, changed) {
+  const areas = block.roomLayoutAreas ?? [];
+  const prior = priorNarrativeChoices(project, sources, block, [
+    sampleLocationToken, existingAreaToken, "nama gedung atau blok", "lantai atau area",
+    "nama unit", "unit atau area bangunan", "area sampel",
+  ]);
+  const checklistLocations = sources.get("project:sample-locations")?.locations ?? [];
+  const oldArea = resolveReportLink("", "lantai atau zona", sources, block.links).value;
+  const names = new Map();
+  for (const name of [...prior.names, ...checklistLocations, oldArea, ...areas.filter((area) => !area.manual).map((area) => area.area)]) {
+    const key = tokenName(name ?? "");
+    if (key && !names.has(key)) names.set(key, name);
+  }
+  const list = dom("div", { className: "appearance-sections" });
+  const { fieldset, sync } = narrativeChoiceCheckboxes("Pilih lantai atau area", [...names.values()], (name, checked) => {
+    const existing = areas.find((area) => !area.manual && tokenName(area.area ?? "") === tokenName(name));
+    if (existing) existing.selected = checked;
+    else if (checked) areas.push({ area: name, selected: true });
+    renderAreas();
+    commit();
+  });
+  sync(areas.filter((area) => area.selected && !area.manual).map((area) => area.area ?? ""));
+  const add = button("＋ Tambah area sendiri", () => {
+    areas.push({ selected: true, manual: true });
+    renderAreas();
+    commit();
+    list.lastElementChild?.querySelector("input")?.focus();
+  });
+  function commit() {
+    block.roomLayoutAreas = areas;
+    changed();
+  }
+  function renderAreas() {
+    list.replaceChildren(...areas.flatMap((entry, index) => {
+      if (!entry.selected) return [];
+      const input = (key, label, example, type = "text") => {
+        const control = field(label, entry[key], (value) => { entry[key] = value; commit(); }, type);
+        control.querySelector("input, textarea").placeholder = example;
+        return control;
+      };
+      const group = dom("fieldset", { className: "link-entry" },
+        dom("legend", {}, entry.manual ? "Area tambahan" : entry.area),
+        entry.manual ? input("area", "Nama lantai atau area", "Contoh · ruang arsip lantai 2") : "",
+        input("observation", "Apa yang ditemukan?", "Contoh · Ruang arsip sekarang dipakai sebagai ruang staf.", "area"),
+        dom("details", { className: "narrative-source", open: Boolean(entry.reference || entry.limitation) },
+          dom("summary", {}, "Denah dan batasan (opsional)"),
+          input("reference", "Denah pembanding", "Contoh · Denah A-02"),
+          input("limitation", "Bagian yang belum diperiksa", "Contoh · Ruang panel terkunci")));
+      if (entry.manual) group.append(button("Hapus area", () => {
+        if (roomLayoutFields.some((key) => entry[key]?.trim()) && !confirm("Hapus area beserta catatannya?")) return;
+        areas.splice(index, 1);
+        renderAreas();
+        commit();
+        add.focus();
+      }, "quiet"));
+      return [group];
+    }));
+  }
+  if (checklistLocations.length) prior.links.append(button("Buka Daftar Simak", () => {
+    active = "checklist";
+    slfChecklistItem = "";
+    render();
+    $("section-title").focus();
+  }, "quiet"));
+  renderAreas();
+  return dom("div", { className: "room-layout-areas" },
+    dom("p", { className: "hint" }, "Centang area yang diperiksa. Di setiap area, catat penggunaan ruang atau perubahan yang terlihat. Bandingkan dengan denah jika tersedia."),
+    names.size ? fieldset : dom("p", { className: "hint" }, "Belum ada area dari isian sebelumnya. Tambahkan area sendiri di bawah."),
+    prior.links.childElementCount ? dom("details", { className: "narrative-source" }, dom("summary", {}, "Buka sumber daftar area"), prior.links) : "",
+    list, add);
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
   const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
   const details = dom("details", { className: "linked-fields" }, summary, content);
   const preview = dom("p", { className: "linked-preview" });
-  const extraPreview = dom("div", { className: "appearance-preview", hidden: true });
+  const extraPreview = dom("div", { className: "additional-narrative-preview", hidden: true });
   const textEditor = dom("details", { className: "narrative-editor", open: !data[key]?.trim() },
     dom("summary", {}, "Ubah teks dan format"),
     dom("p", { className: "hint" }, "Teks dalam tanda kurung siku menjadi isian yang bisa dilengkapi dari panel di atas."),
@@ -447,6 +524,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
   const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
     data[key] === appearanceNarrative || Array.isArray(data.appearanceSections));
+  const roomLayoutGuide = key === "body" && (tokenName(data.text ?? "") === "tata ruang dalam" ||
+    Array.isArray(data.roomLayoutAreas));
+  if (roomLayoutGuide && !data[key]?.trim()) textEditor.open = false;
   const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
     intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : undefined;
 
@@ -465,6 +545,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links).value === "[" + name + "]").length;
     summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
       fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";
+    if (roomLayoutGuide) {
+      const selected = (data.roomLayoutAreas ?? []).filter((area) => area.selected).length;
+      summary.textContent = "Catat per area" + (selected ? " · " + selected + " area dipilih" : "");
+    }
     preview.removeAttribute("style");
     const format = getTextFormat(data, key);
     styleTextBlock(preview, format);
@@ -479,9 +563,15 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         guideFields?.get(token)?.[1] ?? "Isi " + name.trim();
       return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
-    if (appearanceGuide) {
-      extraPreview.replaceChildren(...appearanceSectionParagraphs(data));
+    if (appearanceGuide || roomLayoutGuide) {
+      extraPreview.replaceChildren(...(roomLayoutGuide ? roomLayoutParagraphs(data) : appearanceSectionParagraphs(data)));
       extraPreview.hidden = !extraPreview.childElementCount;
+    }
+    if (roomLayoutGuide && !text.trim()) {
+      preview.textContent = "Catatan muncul di sini setelah area dan hasil pemeriksaannya diisi.";
+      preview.hidden = !extraPreview.hidden;
+    } else {
+      preview.hidden = false;
     }
   }
 
@@ -491,7 +581,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     if (!details.open) return;
     entries.clear();
     const fields = reportTokens(data[key] || "");
-    if (!fields.size && !appearanceGuide) {
+    if (!fields.size && !appearanceGuide && !roomLayoutGuide) {
       content.replaceChildren(insertPurpose);
       return;
     }
@@ -709,7 +799,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
-        const extra = entry.closest(".intensity-narrative-details");
+        const extra = entry.closest(".intensity-narrative-details, .room-layout-legacy");
         if (extra) extra.open = true;
         entry.scrollIntoView({ block: "nearest" });
         if (!manual.hidden) focusManual();
@@ -744,6 +834,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       ] : [];
       if (grid.childElementCount === 1) grid.firstElementChild.classList.add("wide");
       content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else if (roomLayoutGuide) {
+      const areas = roomLayoutEditor(project, data, sources, () => { updatePreview(); save(); });
+      content.replaceChildren(areas, ...(grid.childElementCount ? [dom("details", { className: "narrative-source room-layout-legacy" },
+        dom("summary", {}, "Isian narasi yang sudah ada"), grid)] : []));
     } else if (appearanceGuide) {
       const instructions = dom("p", { className: "hint" },
         "Isi satu catatan untuk tiap bagian. Nama foto bisa ditulis di Keterangan foto setelah diunggah. Nomor gambar muncul otomatis di laporan.");
@@ -1823,6 +1917,10 @@ function validateBackup(data) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
           clean.appearanceSections = block.appearanceSections.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => Object.fromEntries(keys.filter((key) => typeof entry[key] === "string").map((key) => [key, entry[key]])));
+        }
+        if (Array.isArray(block.roomLayoutAreas)) {
+          clean.roomLayoutAreas = block.roomLayoutAreas.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+            .map((entry) => ({ ...pickText(entry, roomLayoutFields), selected: entry.selected === true, manual: entry.manual === true }));
         }
       }
       if (block.type === "heading" || block.type === "text") {
