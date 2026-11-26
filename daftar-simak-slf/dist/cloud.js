@@ -8,6 +8,12 @@ const slfCloudPhotoTypes = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
   "image/avif": "avif", "image/bmp": "bmp", "image/tiff": "tif",
 };
+const slfCloudPhotoRef = /^[a-f0-9]{64}\.(jpg|png|webp|gif|avif|bmp|tif)$/;
+
+async function slfPhotoDigest(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 class SlfSyncConflict extends Error {}
 
@@ -39,17 +45,22 @@ function slfCreateDraftStore(client, owner, photos) {
   const drafts = () => client.from("slf_drafts");
   const bucket = client.storage.from("slf-photos");
   const verifiedUploads = new Set();
-  const photoDigests = new Map();
 
-  async function upload(projectId, blob, known) {
+  async function upload(projectId, blob, previous, known, mediaByDigest) {
     const extension = slfCloudPhotoTypes[blob.type];
     if (!extension || !blob.size || blob.size > 50_000_000) {
       throw Error("Foto online harus berupa JPEG, PNG, WebP, GIF, AVIF, BMP, atau TIFF, maksimal 50 MB per foto.");
     }
-    const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-    const file = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("") + "." + extension;
+    const digest = await slfPhotoDigest(await blob.arrayBuffer()) + "." + extension;
+    if (mediaByDigest[digest]) return mediaByDigest[digest];
+    const previousRef = previous.mediaByDigest?.[digest] ?? digest;
+    if (slfCloudPhotoRef.test(previousRef) && known.has(previousRef)) {
+      mediaByDigest[digest] = previousRef;
+      return previousRef;
+    }
+    const file = await slfPhotoDigest(new TextEncoder().encode(previous.dirty + ":" + digest)) + "." + extension;
     const path = owner + "/" + projectId + "/" + file;
-    if (!known.has(file) && !verifiedUploads.has(path)) {
+    if (!verifiedUploads.has(path)) {
       const { error } = await bucket.upload(path, blob, { contentType: blob.type, upsert: false });
       if (error) {
         const duplicate = ["Duplicate", "ResourceAlreadyExists", "KeyAlreadyExists", "already_exists"].includes(error.code) ||
@@ -58,44 +69,46 @@ function slfCreateDraftStore(client, owner, photos) {
       }
       verifiedUploads.add(path);
     }
+    mediaByDigest[digest] = file;
     return file;
   }
 
   async function download(projectId, ref) {
-    if (!/^[a-f0-9]{64}\.(jpg|png|webp|gif|avif|bmp|tif)$/.test(ref ?? "")) throw Error("Rujukan foto tidak valid.");
+    if (!slfCloudPhotoRef.test(ref ?? "")) throw Error("Rujukan foto tidak valid.");
     return slfCheckCloudResult(await bucket.download(owner + "/" + projectId + "/" + ref));
   }
 
-  async function pack(project, checklist, previousMedia) {
+  async function pack(project, checklist, previous) {
     const copy = structuredClone(project);
     const files = {};
-    const known = new Set(previousMedia ?? []);
+    const known = new Set(previous.media ?? []);
+    const mediaByDigest = {};
     const refs = new Set();
-    const keepDigests = new Set();
     for (const entry of slfReportPhotos(copy)) {
       if (!entry.image) continue;
       if (!imageSource.test(entry.image)) throw Error("Format draf memuat foto yang tidak valid.");
-      const key = project.id + ":" + entry.image;
-      let ref = photoDigests.get(key);
-      if (!ref) {
-        ref = await upload(project.id, await (await fetch(entry.image)).blob(), known);
-        photoDigests.set(key, ref);
-      }
-      keepDigests.add(key);
+      const ref = await upload(project.id, await (await fetch(entry.image)).blob(), previous, known, mediaByDigest);
       refs.add(ref);
       entry.image = { file: ref };
-    }
-    for (const key of photoDigests.keys()) {
-      if (key.startsWith(project.id + ":") && !keepDigests.has(key)) photoDigests.delete(key);
     }
     for (const key of checklistPhotos(checklist)) {
       const blob = await photos(project.id, key);
       if (!blob) throw Error("Ada foto Daftar Simak yang belum tersimpan di perangkat ini.");
-      const ref = await upload(project.id, blob, known);
+      const ref = await upload(project.id, blob, previous, known, mediaByDigest);
       refs.add(ref);
       files[key] = ref;
     }
-    return { version: 1, project: copy, checklist, files, media: [...refs] };
+    return { version: 1, project: copy, checklist, files, media: [...refs], mediaByDigest };
+  }
+
+  async function removeRetiredPhotos() {
+    if (typeof client.rpc !== "function") return;
+    try {
+      const paths = slfCheckCloudResult(await client.rpc("slf_retired_photo_paths"));
+      if (paths?.length) slfCheckCloudResult(await bucket.remove(paths));
+    } catch {
+      // Leave the objects queued for the next sync.
+    }
   }
 
   return {
@@ -106,13 +119,16 @@ function slfCreateDraftStore(client, owner, photos) {
         const page = slfCheckCloudResult(await drafts().select("id,name,revision,updated_at,created_at:payload->project->>createdAt")
           .eq("owner_id", owner).order("updated_at", { ascending: false }).order("id").range(start, start + pageSize - 1));
         rows.push(...page);
-        if (page.length < pageSize) return rows;
+        if (page.length < pageSize) {
+          await removeRetiredPhotos();
+          return rows;
+        }
       }
     },
     async pull(id) {
       const row = slfCheckCloudResult(await drafts().select("id,name,revision,payload,updated_at")
         .eq("owner_id", owner).eq("id", id).single());
-      const { project, checklist, files, media, version } = row.payload;
+      const { project, checklist, files, media, mediaByDigest, version } = row.payload;
       if (version !== 1 || project?.id !== id || !reportTemplates[project.template] ||
           !Array.isArray(project.chapters) || !checklist?.identity || !checklist?.checks) throw Error("Format draf online tidak dikenali.");
       const memo = new Map();
@@ -124,15 +140,14 @@ function slfCreateDraftStore(client, owner, photos) {
         if (entry.image?.file) {
           const ref = entry.image.file;
           entry.image = await blobData(await getFile(ref));
-          photoDigests.set(id + ":" + entry.image, ref);
         }
       }
       const blobs = {};
       for (const key of checklistPhotos(checklist)) blobs[key] = await getFile(files?.[key]);
-      return { project, checklist, blobs, revision: row.revision, media, updatedAt: row.updated_at };
+      return { project, checklist, blobs, revision: row.revision, media, mediaByDigest, updatedAt: row.updated_at };
     },
     async push(project, checklist, previous) {
-      const payload = await pack(project, checklist, previous?.media);
+      const payload = await pack(project, checklist, previous);
       const revision = previous.dirty;
       const data = { name: project.name.trim().slice(0, 120) || "Kajian tanpa judul", revision, payload };
       let alreadyWritten = false;
@@ -150,7 +165,8 @@ function slfCreateDraftStore(client, owner, photos) {
           .eq("owner_id", owner).eq("id", project.id).maybeSingle());
         if (existing?.revision !== revision) throw new SlfSyncConflict();
       }
-      return { revision, media: payload.media };
+      if (previous.media?.some((file) => !payload.media.includes(file))) await removeRetiredPhotos();
+      return { revision, media: payload.media, mediaByDigest: payload.mediaByDigest };
     },
   };
 }

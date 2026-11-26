@@ -2222,24 +2222,33 @@ function validateBackup(data) {
 }
 
 async function importBackup(file) {
+  const owner = slfCloudOwner();
+  const signedInAs = slfAuthUser?.id;
+  const state = workspace;
+  const input = $("backup-file");
+  const sameWorkspace = () => workspace === state && slfCloudOwner() === owner && slfAuthUser?.id === signedInAs && !isTrial();
   try {
     const raw = JSON.parse(await file.text());
+    if (!sameWorkspace()) return;
     const { project, checklist } = validateBackup(raw);
     project.createdAt = new Date().toISOString();
     upgradeReportDraft(project);
+    const photos = {};
     for (const key of checklistPhotos(checklist)) {
       const photo = raw.photos?.[key];
       if (typeof photo !== "string" || !/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(photo)) continue;
-      const blob = await (await fetch(photo)).blob();
-      await checklistPhoto(project.id, key, blob);
+      photos[key] = await (await fetch(photo)).blob();
+      if (!sameWorkspace()) return;
     }
-    localStorage.setItem(slfChecklistKey(project.id, slfCloudOwner()), JSON.stringify(checklist));
-    workspace.projects.push(project);
+    await storeChecklistPhotos(project.id, photos, owner);
+    if (!sameWorkspace()) return;
+    localStorage.setItem(slfChecklistKey(project.id, owner), JSON.stringify(checklist));
+    state.projects.push(project);
     setCurrent(project.id, true);
   } catch {
-    status.textContent = "Impor gagal. Periksa file cadangan atau ruang penyimpanan browser.";
+    if (sameWorkspace()) status.textContent = "Impor gagal. Periksa file cadangan atau ruang penyimpanan browser.";
   } finally {
-    $("backup-file").value = "";
+    if (input.files[0] === file) input.value = "";
   }
 }
 

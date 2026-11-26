@@ -112,7 +112,7 @@ async function slfInstallRemote(snapshot, id, state, store) {
   const index = state.projects.findIndex((entry) => entry.id === id);
   if (index < 0) state.projects.push(project);
   else state.projects[index] = project;
-  state.cloud[id] = { revision: snapshot.revision, media: snapshot.media, updatedAt: snapshot.updatedAt };
+  state.cloud[id] = { revision: snapshot.revision, media: snapshot.media, mediaByDigest: snapshot.mediaByDigest, updatedAt: snapshot.updatedAt };
   return true;
 }
 
