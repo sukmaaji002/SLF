@@ -140,12 +140,12 @@ function appearanceSectionParagraphs(block) {
   });
 }
 
-function roomLayoutParagraphs(block) {
-  return (block.roomLayoutAreas ?? []).flatMap(({ area, selected, observation, reference, limitation }) => {
+function areaObservationParagraphs(areas, referenceLabel) {
+  return (areas ?? []).flatMap(({ area, selected, observation, reference, limitation }) => {
     if (!selected || !area?.trim()) return [];
     const details = [
       ["", observation],
-      ["Denah — ", reference],
+      [referenceLabel + " — ", reference],
       ["Batasan — ", limitation],
     ].flatMap(([label, text]) => text?.trim() ? [label + text.trim()] : []);
     if (!details.length) return [];
@@ -332,7 +332,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         section.append(...appearanceSectionParagraphs(block));
-        section.append(...roomLayoutParagraphs(block));
+        section.append(...areaObservationParagraphs(block.roomLayoutAreas, "Denah"),
+          ...areaObservationParagraphs(block.environmentAreas, "Bukti pendukung"));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);

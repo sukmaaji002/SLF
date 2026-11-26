@@ -99,6 +99,12 @@ const roomLayoutLegacyFields = [
   ["susunan, fungsi, luasan, atau perubahan yang teramati", "Hasil pemeriksaan"],
   ["batasan pemeriksaan", "Batasan pemeriksaan"],
 ];
+const previousEnvironmentNarrative = "Kondisi area luar ditinjau pada [ruang terbuka, sirkulasi, atau parkir]. Hubungan tapak dengan area sekitarnya tercatat sebagai [hasil observasi] berdasarkan [denah situasi, foto, atau pengukuran].";
+const environmentLegacyFields = [
+  ["ruang terbuka, sirkulasi, atau parkir", "Area yang diperiksa"],
+  ["hasil observasi", "Hasil telaah"],
+  ["denah situasi, foto, atau pengukuran", "Bukti pendukung"],
+];
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -179,7 +185,7 @@ const reportTemplates = {
           ["Intensitas bangunan", { body: intensityNarrative, previous: "[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]" }],
           ["Penampilan bangunan", { body: appearanceNarrative, previous: "[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]" }],
           ["Tata ruang dalam", { body: "", previous: "[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]" }],
-          ["Keselarasan dengan lingkungan", {"body":"Kondisi area luar ditinjau pada [ruang terbuka, sirkulasi, atau parkir]. Hubungan tapak dengan area sekitarnya tercatat sebagai [hasil observasi] berdasarkan [denah situasi, foto, atau pengukuran].","previous":"[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]"}],
+          ["Keselarasan dengan lingkungan", { body: "", previous: "[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]" }],
         ],
         ["Kesehatan", {"body":"Pemeriksaan aspek kesehatan mencakup [parameter yang diperiksa] pada [ruang atau sistem]. Hasil observasi atau pengukuran dirujuk pada [tabel, gambar, atau lampiran] dan dibandingkan dengan [acuan yang digunakan]. Ringkasan temuan untuk bidang ini adalah [temuan kesehatan].","previous":"[Catat hasil pemeriksaan pencahayaan atau aspek kesehatan yang dibahas dalam disiplin arsitektur.]"}],
         ["Kenyamanan", {"body":"Pemeriksaan kenyamanan mencakup [parameter yang diperiksa] pada [area sampel]. Hasil pengamatan atau pengukuran menunjukkan [hasil terverifikasi], dengan acuan [standar atau dokumen pembanding] dan keterbatasan [batasan yang relevan].","previous":"[Jelaskan ruang gerak, tata perabot, dan pandangan dari atau ke bangunan.]"}],
@@ -443,8 +449,10 @@ function upgradeReportDraft(project) {
       });
       revisedNarrative = [...savedDetails, intensityNarrative].join(" ");
     }
-    if (block.type === "heading" && block.body === previousRoomLayoutNarrative) {
-      revisedNarrative = roomLayoutLegacyFields.flatMap(([token, label]) => {
+    const legacyFields = block.body === previousRoomLayoutNarrative ? roomLayoutLegacyFields :
+      block.body === previousEnvironmentNarrative ? environmentLegacyFields : undefined;
+    if (block.type === "heading" && legacyFields) {
+      revisedNarrative = legacyFields.flatMap(([token, label]) => {
         const link = block.links?.[token];
         return link?.source || link?.value?.trim() ? [label + " — [" + token + "]."] : [];
       }).join(" ");
