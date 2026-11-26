@@ -413,6 +413,15 @@ function appearanceSectionsEditor(block, changed) {
 }
 
 const areaObservationFields = ["area", "observation", "reference", "limitation"];
+const environmentObservationFields = [...areaObservationFields, "location", "impact", "followUp"];
+const environmentObservationExamples = new Map([
+  ["ruang terbuka tapak", "Contoh · Area depan berupa perkerasan dan dipakai untuk manuver. Taman berada di sisi timur."],
+  ["sirkulasi kendaraan", "Contoh · Kendaraan masuk dan keluar melalui satu gerbang. Truk berputar di halaman depan."],
+  ["jalur pedestrian", "Contoh · Jalur dari gerbang ke pintu masuk terpisah dari lintasan truk, kecuali pada titik persilangan di depan pos."],
+  ["area parkir", "Contoh · Parkir motor di sisi barat dan parkir mobil di halaman depan. Catat kapasitas atau kondisi saat jam sibuk jika diperiksa."],
+  ["drainase dan limpasan", "Contoh · Saluran sisi timur menerima aliran dari halaman. Sebagian mulut saluran tertutup sedimen."],
+  ["batas tapak dan akses sekitar", "Contoh · Pagar sisi utara berbatasan dengan jalan umum. Pintu masuk bangunan bersebelahan dengan akses persil tetangga."],
+]);
 const earlierRoomTokens = [
   sampleLocationToken, existingAreaToken, "nama gedung atau blok", "lantai atau area",
   "nama unit", "unit atau area bangunan", "area sampel",
@@ -481,9 +490,13 @@ function areaObservationEditor(project, block, sources, areaKey, changed) {
         control.querySelector("input, textarea").placeholder = example;
         return control;
       };
-      const evidence = environment ? dom("details", { className: "narrative-source", open: Boolean(entry.reference) },
-        dom("summary", {}, "Bukti pendukung (opsional)"),
-        input("reference", "Denah, foto, atau hasil ukur", "Contoh · Denah tapak A-01 atau lebar jalur 1,5 m")) :
+      const evidence = environment ? dom("details", { className: "narrative-source",
+        open: Boolean(entry.location || entry.impact || entry.reference || entry.followUp) },
+        dom("summary", {}, "Lokasi, dampak, bukti, dan tindak lanjut (opsional)"),
+        input("location", "Lokasi yang diperiksa", "Contoh · depan pos satpam"),
+        input("impact", "Dampak terhadap pengguna atau area sekitar", "Contoh · Kendaraan yang antre menutup akses masuk di sebelah tapak.", "area"),
+        input("reference", "Denah, foto, atau hasil ukur", "Contoh · Denah tapak A-01 atau lebar jalur 1,5 m"),
+        input("followUp", "Tindak lanjut yang disarankan", "Contoh · Atur posisi antrean truk agar akses tetangga tetap terbuka.", "area")) :
         dom("details", { className: "narrative-source", open: Boolean(entry.reference || entry.limitation) },
           dom("summary", {}, "Denah dan batasan (opsional)"),
           input("reference", "Denah pembanding", "Contoh · Denah A-02"),
@@ -492,10 +505,12 @@ function areaObservationEditor(project, block, sources, areaKey, changed) {
         dom("legend", {}, entry.manual ? "Area tambahan" : entry.area),
         entry.manual ? (environment ? input("area", "Nama aspek atau area", "Contoh · drainase sisi timur") :
           input("area", "Nama lantai atau area", "Contoh · ruang arsip lantai 2")) : "",
-        input("observation", "Apa yang ditemukan?", environment ? "Contoh · Kendaraan yang parkir menutup sebagian jalur pejalan kaki." :
+        input("observation", "Apa yang ditemukan?", environment ?
+          environmentObservationExamples.get(tokenName(entry.area ?? "")) ?? "Contoh · Catat kondisi, cara area digunakan, dan bagian yang perlu diperhatikan." :
           "Contoh · Ruang arsip sekarang dipakai sebagai ruang staf.", "area"), evidence);
       if (entry.manual) group.append(button("Hapus area", () => {
-        if (areaObservationFields.some((key) => entry[key]?.trim()) && !confirm("Hapus area beserta catatannya?")) return;
+        const fields = environment ? environmentObservationFields : areaObservationFields;
+        if (fields.some((key) => entry[key]?.trim()) && !confirm("Hapus area beserta catatannya?")) return;
         areas.splice(index, 1);
         renderAreas();
         commit();
@@ -513,7 +528,7 @@ function areaObservationEditor(project, block, sources, areaKey, changed) {
   renderAreas();
   return dom("div", { className: "room-layout-areas" },
     dom("p", { className: "hint" }, environment ?
-      "Centang yang ditelaah. Pada tiap pilihan, tulis kondisi yang terlihat dan dampaknya pada area sekitar jika ada." :
+      "Centang aspek yang diperiksa. Jelaskan kondisi dan cara area digunakan. Buka rincian bila ada dampak, bukti, atau tindak lanjut yang perlu dicatat." :
       "Centang area yang diperiksa. Di setiap area, catat penggunaan ruang atau perubahan yang terlihat. Bandingkan dengan denah jika tersedia."),
     names.size ? fieldset : dom("p", { className: "hint" }, "Belum ada area dari isian sebelumnya. Tambahkan area sendiri di bawah."),
     prior.links.childElementCount ? dom("details", { className: "narrative-source" }, dom("summary", {}, "Buka sumber daftar area"), prior.links) : "",
@@ -604,7 +619,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
     if (appearanceGuide || areaKey) {
-      extraPreview.replaceChildren(...(areaKey ? areaObservationParagraphs(data[areaKey], environmentGuide ? "Bukti pendukung" : "Denah") :
+      extraPreview.replaceChildren(...(environmentGuide ? environmentObservationParagraphs(data.environmentAreas) :
+        areaKey ? areaObservationParagraphs(data[areaKey], "Denah") :
         appearanceSectionParagraphs(data)));
       extraPreview.hidden = !extraPreview.childElementCount;
     }
@@ -2110,7 +2126,8 @@ function validateBackup(data) {
         for (const key of ["roomLayoutAreas", "environmentAreas"]) {
           if (!Array.isArray(block[key])) continue;
           clean[key] = block[key].filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-            .map((entry) => ({ ...pickText(entry, areaObservationFields), selected: entry.selected === true, manual: entry.manual === true }));
+            .map((entry) => ({ ...pickText(entry, key === "environmentAreas" ? environmentObservationFields : areaObservationFields),
+              selected: entry.selected === true, manual: entry.manual === true }));
         }
       }
       if (block.type === "heading" || block.type === "text") {

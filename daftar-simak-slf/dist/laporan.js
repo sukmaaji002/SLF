@@ -154,6 +154,21 @@ function areaObservationParagraphs(areas, referenceLabel) {
   });
 }
 
+function environmentObservationParagraphs(areas) {
+  return (areas ?? []).flatMap(({ area, selected, location, observation, impact, reference, followUp, limitation }) => {
+    if (!selected || !area?.trim()) return [];
+    const details = [
+      ["Lokasi", location],
+      ["Kondisi teramati", observation],
+      ["Dampak", impact],
+      ["Bukti pendukung", reference],
+      ["Tindak lanjut", followUp],
+      ["Batasan pemeriksaan", limitation],
+    ].flatMap(([label, text]) => text?.trim() ? [dom("br"), dom("strong", {}, label + " — "), text.trim()] : []);
+    return details.length ? [dom("p", { className: "report-text" }, dom("strong", {}, area.trim()), ...details)] : [];
+  });
+}
+
 function reportFormatted(element, text, format, prefix = "") {
   element.replaceChildren(prefix, formattedText(text, format));
   return styleTextBlock(element, format);
@@ -335,7 +350,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         section.append(...appearanceSectionParagraphs(block));
         section.append(...areaObservationParagraphs(block.roomLayoutAreas, "Denah"),
-          ...areaObservationParagraphs(block.environmentAreas, "Bukti pendukung"));
+          ...environmentObservationParagraphs(block.environmentAreas));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         if (!architectureInspectionKind(chapter.blocks[bi + 1])) {
