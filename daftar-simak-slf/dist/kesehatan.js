@@ -1,7 +1,9 @@
 "use strict";
 
+const lightingStandardUrl = "https://pesta.bsn.go.id/produk/detail/13243-sni61972020";
 const healthSources = {
-  lighting: ["SNI 6197:2020 · pencahayaan rata-rata minimum", "https://pesta.bsn.go.id/produk/detail/13243-sni61972020"],
+  lighting: ["SNI 6197:2020 · pencahayaan rata-rata minimum", lightingStandardUrl],
+  glare: ["SNI 6197:2020 · pengendalian silau", lightingStandardUrl],
   office: ["Permenkes 48/2016 · Lampiran Bab IV", "https://peraturan.bpk.go.id/Details/113097/permenkes-no-48-tahun-2016"],
   water: ["Permenkes 2/2023 · Lampiran Bab II A", "https://peraturan.bpk.go.id/Details/245563/permenkes-no-2-tahun-2023"],
   indoor: ["Permenkes 2/2023 · Lampiran Bab II B", "https://peraturan.bpk.go.id/Details/245563/permenkes-no-2-tahun-2023"],
@@ -187,9 +189,23 @@ const healthParameters = {
     below: "Tambah jarak bebas dengan mengatur ulang rak, barang, atau lintasan. Sesuaikan pengaturan arah lalu lintas alat angkut sebelum lintasan digunakan.",
   },
   glare: {
-    label: "Silau di area pengguna", unit: "status",
-    categories: [{ id: "work", label: "Area kerja · isi kriteria", manual: true }],
+    label: "Pengamatan silau (manual)", unit: "status",
+    categories: [{ id: "work", label: "Area kerja · isi kriteria", manual: true, pending: "Isi kriteria pengamatan visual",
+      guidance: "Untuk membandingkan terhadap SNI 6197:2020, pilih Indeks silau (UGR) dan masukkan hasil perhitungannya." }],
     below: "Pasang peneduh pada jendela, gunakan diffuser pada armatur, atau ubah posisi meja agar pantulan cahaya tidak mengenai bidang kerja dan layar.",
+  },
+  glareUgr: {
+    label: "Indeks silau (UGR)", unit: "UGR", source: "glare",
+    categories: [
+      ["warehouse", "Gudang atau ruang penyimpanan dingin", 25],
+      ["corridor-stairs", "Koridor atau ruang tangga", 22],
+      ["dining", "Kantin, kafetaria, atau ruang makan", 22],
+      ["office", "Ruang kantor (pekerjaan umum)", 19],
+      ["class-library", "Ruang kelas atau perpustakaan umum", 19],
+      ["drawing", "Ruang gambar atau pekerjaan yang sangat teliti", 16],
+    ].map(([id, label, max]) => ({ id, label, max, section: "Tabel 8 (maksimum yang direkomendasikan)",
+      guidance: "Masukkan hasil perhitungan UGR untuk pencahayaan di dalam ruang." })),
+    above: "Kurangi silau dengan mengatur posisi atau arah lampu, atau gunakan armatur dengan pelindung optik. Periksa kembali UGR dan tingkat pencahayaan setelah penyesuaian.",
   },
   vibration: {
     label: "Getaran ruang", unit: "mm/s",
@@ -238,12 +254,12 @@ const healthParameters = {
 };
 const inspectionParameters = {
   health: ["lighting", "temperature", "humidity", "airSpeed", "openings", "ventilationPerPerson", "outdoorAir", "ph", "turbidity", "tds", "ecoli", "sanitation", "plumbing", "noise", "custom"],
-  comfort: ["circulation", "forkliftClearance", "temperature", "humidity", "airSpeed", "lighting", "glare", "noise", "vibration", "custom"],
+  comfort: ["circulation", "forkliftClearance", "temperature", "humidity", "airSpeed", "lighting", "glareUgr", "noise", "vibration", "custom"],
   ease: ["doorClear", "rampSlope", "rampWidth", "circulation", "accessibleToilet", "guidance", "custom"],
 };
 const defaultInspectionParameters = {
   health: ["lighting", "temperature", "humidity", "openings", "ph", "turbidity", "sanitation"],
-  comfort: ["circulation", "temperature", "humidity", "noise", "glare"],
+  comfort: ["circulation", "temperature", "humidity", "noise", "glareUgr"],
   ease: ["doorClear", "rampSlope", "accessibleToilet", "guidance"],
 };
 const healthMeasurementFields = ["parameter", "location", "category", "measured", "minimum", "maximum", "reference", "name", "unit", "recommendationMode", "healthSource"];
@@ -388,7 +404,14 @@ function initializeHealthMeasurements(project) {
     if (block.headers[4] === "Bukti / gambar") block.headers[4] = architectureHealthColumns[4];
     if (!block.healthMeasurements && JSON.stringify(block.headers) !== JSON.stringify(architectureHealthColumns)) continue;
     block.inspectionKind = kind || "health";
-    if (block.healthMeasurements) continue;
+    if (block.healthMeasurements) {
+      if (kind === "comfort") for (const row of Object.values(block.healthMeasurements)) {
+        if (row.parameter !== "glare" || row.measured?.trim() || row.reference?.trim()) continue;
+        row.parameter = "glareUgr";
+        delete row.category;
+      }
+      continue;
+    }
     ensureReportReferences({ chapters: [{ blocks: [block] }] });
     const blank = block.rows.findIndex((row, index) => !row.some((cell, column) =>
       cell.trim() || block.cellLinks?.[tableCellKey(block, index, column)] ||
@@ -482,7 +505,8 @@ function healthMeasurementCells(row, locations, kind) {
     const qualitative = result.parameter.unit === "status";
     numericField.hidden = qualitative;
     visualField.hidden = !qualitative;
-    resultLabel.textContent = result.unit ? "Hasil ukur (" + result.unit + ")" : "Hasil ukur";
+    resultLabel.textContent = row.parameter === "glareUgr" ? "Hasil perhitungan (UGR)" :
+      result.unit ? "Hasil ukur (" + result.unit + ")" : "Hasil ukur";
     status.textContent = result.status;
     status.dataset.status = result.status === "Memenuhi parameter ini" ? "pass" : result.status === "Di luar acuan" ? "fail" : "";
   }
