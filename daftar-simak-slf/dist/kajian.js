@@ -367,11 +367,53 @@ function repeatedNarrativeField(spec, data, changed, groups = [], suggestedNumbe
   return form;
 }
 
+const appearanceSectionFields = [
+  ["area", "Sisi bangunan", "sisi depan bangunan"],
+  ["part", "Bagian yang diperiksa", "kanopi pintu masuk"],
+  ["condition", "Kondisi yang terlihat", "terdapat korosi pada ujung kanopi"],
+  ["evidence", "Nomor foto atau gambar (opsional)", "Gambar 5.3"],
+];
+
+function appearanceSectionsEditor(block, changed) {
+  const list = dom("div", { className: "appearance-sections" });
+  const add = button("＋ Tambah bagian yang diperiksa", () => {
+    (block.appearanceSections ??= []).push({});
+    renderSections();
+    changed();
+    list.lastElementChild?.querySelector("input")?.focus();
+  });
+  function renderSections() {
+    list.replaceChildren(...(block.appearanceSections ?? []).map((section, index) => {
+      const inputs = appearanceSectionFields.map(([key, label, example]) => {
+        const control = field(label, section[key], (value) => {
+          section[key] = value;
+          changed();
+        }, key === "condition" ? "area" : "text");
+        control.querySelector("input, textarea").placeholder = "Contoh · " + example;
+        return control;
+      });
+      const remove = button("Hapus bagian", () => {
+        if (appearanceSectionFields.some(([key]) => section[key]?.trim()) && !confirm("Hapus bagian beserta catatannya?")) return;
+        block.appearanceSections.splice(index, 1);
+        renderSections();
+        changed();
+        (list.children[index]?.querySelector("input") ?? add).focus();
+      }, "quiet");
+      remove.setAttribute("aria-label", "Hapus bagian " + (index + 2));
+      return dom("fieldset", { className: "link-entry" }, dom("legend", {}, "Bagian " + (index + 2)),
+        dom("div", { className: "form-grid" }, ...inputs), remove);
+    }));
+  }
+  renderSections();
+  return [list, add];
+}
+
 function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
   const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
   const details = dom("details", { className: "linked-fields" }, summary, content);
   const preview = dom("p", { className: "linked-preview" });
+  const extraPreview = dom("div", { className: "appearance-preview", hidden: true });
   const textEditor = dom("details", { className: "narrative-editor", open: !data[key]?.trim() },
     dom("summary", {}, "Ubah teks dan format"),
     dom("p", { className: "hint" }, "Teks dalam tanda kurung siku menjadi isian yang bisa dilengkapi dari panel di atas."),
@@ -381,7 +423,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       save();
     }));
   const wrapper = dom("div", { className: "wide guided-narrative" },
-    dom("div", { className: "narrative-preview" }, dom("h4", {}, "Tampilan di laporan"), preview), details, textEditor);
+    dom("div", { className: "narrative-preview" }, dom("h4", {}, "Tampilan di laporan"), preview, extraPreview), details, textEditor);
   wrapper.openNarrativeField = openField;
   const control = textEditor.querySelector("textarea");
   const insertPurpose = button("Tambahkan isian Tujuan Kajian", () => {
@@ -405,7 +447,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
   const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
-    data[key]?.endsWith(appearanceEvidenceParagraph));
+    data[key]?.endsWith(appearanceEvidenceParagraph) || Array.isArray(data.appearanceSections));
   const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
     intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : undefined;
 
@@ -440,6 +482,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         guideFields?.get(token)?.[1] ?? "Isi " + name.trim();
       return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
+    if (appearanceGuide) {
+      extraPreview.replaceChildren(...appearanceSectionParagraphs(data));
+      extraPreview.hidden = !extraPreview.childElementCount;
+    }
   }
 
   function update(nextSources = reportSources(project)) {
@@ -448,7 +494,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     if (!details.open) return;
     entries.clear();
     const fields = reportTokens(data[key] || "");
-    if (!fields.size) {
+    if (!fields.size && !appearanceGuide) {
       content.replaceChildren(insertPurpose);
       return;
     }
@@ -709,8 +755,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (appearanceGuide) {
       const instructions = dom("p", { className: "hint" },
-        "Catat apa yang terlihat dari luar bangunan. Jika ada foto, gunakan Unggah foto subbab di bawah.");
-      content.replaceChildren(instructions, grid, ...(appearanceEvidence ? [appearanceEvidence] : []),
+        "Isi satu catatan untuk tiap bagian yang diperiksa. Jika ada foto, gunakan Unggah foto subbab di bawah.");
+      const first = grid.childElementCount ? [dom("section", { className: "narrative-step" },
+        dom("h4", {}, "Bagian 1"), grid, ...(appearanceEvidence ? [appearanceEvidence] : []))] : [];
+      const additional = appearanceSectionsEditor(data, () => { updatePreview(); save(); });
+      content.replaceChildren(instructions, ...first, ...additional,
         ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (useGuide) {
       const sections = useSteps.flatMap(({ title, tip, fields }, index) => {
@@ -1775,7 +1824,16 @@ function validateBackup(data) {
     const blocks = chapter.blocks.map((block) => {
       valid(block && ["heading", "text", "table", "photo"].includes(block.type) && typeof block.text === "string");
       const clean = { type: block.type, text: block.text };
-      if (block.type === "heading") { valid(typeof block.body === "string"); clean.body = block.body; clean.depth = block.depth === 2 ? 2 : 1; }
+      if (block.type === "heading") {
+        valid(typeof block.body === "string");
+        clean.body = block.body;
+        clean.depth = block.depth === 2 ? 2 : 1;
+        if (Array.isArray(block.appearanceSections)) {
+          const keys = appearanceSectionFields.map(([key]) => key);
+          clean.appearanceSections = block.appearanceSections.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+            .map((entry) => Object.fromEntries(keys.filter((key) => typeof entry[key] === "string").map((key) => [key, entry[key]])));
+        }
+      }
       if (block.type === "heading" || block.type === "text") {
         clean.links = importLinks(block.links);
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;

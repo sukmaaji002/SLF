@@ -126,6 +126,22 @@ function reportParagraphs(text, format, resolveToken) {
   return paragraphs;
 }
 
+function appearanceSectionParagraphs(block) {
+  return (block.appearanceSections ?? []).flatMap(({ area, part, condition, evidence }) => {
+    const location = area?.trim();
+    const element = part?.trim();
+    const title = [location, element].filter(Boolean).join(" — ");
+    const note = condition?.trim();
+    const reference = evidence?.trim();
+    if (!title && !note && !reference) return [];
+    const paragraph = dom("p", { className: "report-text" });
+    if (title) paragraph.append(dom("strong", {}, title), note || reference ? ". " : "");
+    if (note) paragraph.append(note, reference ? (/\p{P}$/u.test(note) ? " " : ". ") : "");
+    if (reference) paragraph.append("Dokumentasi dapat dilihat pada " + reference, /[.!?]$/.test(reference) ? "" : ".");
+    return [paragraph];
+  });
+}
+
 function reportFormatted(element, text, format, prefix = "") {
   element.replaceChildren(prefix, formattedText(text, format));
   return styleTextBlock(element, format);
@@ -304,6 +320,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         const body = appearanceReportText(block.body, sources, block.links);
         section.append(...reportParagraphs(body, getTextFormat(block, "body"), resolveToken(block.links)));
+        section.append(...appearanceSectionParagraphs(block));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);

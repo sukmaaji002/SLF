@@ -116,6 +116,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .narrative-fields { gap: 8px; }
 .narrative-step { display: grid; min-width: 0; gap: 6px; }
 .narrative-step + .narrative-step { border-top: 1px solid var(--line); padding-top: 10px; }
+.appearance-sections { display: grid; gap: 10px; }
+.appearance-sections:empty { display: none; }
+.appearance-sections legend { font-size: .9rem; font-weight: 700; }
+.appearance-preview { display: grid; gap: 6px; margin-top: 6px; }
 .link-entry { min-width: 0; display: grid; gap: 7px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow-wrap: anywhere; }
 .link-entry > button { justify-self: start; }
 .narrative-field-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
