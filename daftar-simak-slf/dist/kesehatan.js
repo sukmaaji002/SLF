@@ -237,13 +237,46 @@ const healthParameters = {
     below: "Singkirkan penghalang pada lintasan ram dan lebarkan permukaan yang dapat digunakan sesuai konfigurasi tepi pengaman serta pegangan rambat.",
   },
   accessibleToilet: {
-    label: "Fasilitas toilet aksesibel", unit: "status", source: "accessibility",
-    categories: [{ id: "features", label: "Toilet aksesibel · isi kriteria fasilitas", manual: true }],
+    label: "Fasilitas toilet aksesibel", unit: "status", source: "building",
+    overview: "Standar teknis toilet, hlm. 797–799",
+    categories: [
+      { id: "toilet-dimensions", label: "Toilet · dimensi ruang dalam", min: 1,
+        section: "Standar teknis toilet, butir (viii), hlm. 797",
+        criterion: "Ruang dalam sekurang-kurangnya 152,5 cm × 227,5 cm dan memungkinkan pengguna kursi roda bermanuver." },
+      { id: "toilet-door-width", label: "Toilet · lebar bersih pintu", min: 1,
+        section: "Standar teknis toilet, butir (x), hlm. 798",
+        criterion: "Lebar bersih bukaan pintu toilet aksesibel sekurang-kurangnya 90 cm." },
+      { id: "toilet-grab-bar", label: "Toilet · pegangan rambat", min: 1,
+        section: "Standar teknis toilet, butir (xvii), hlm. 798–799",
+        criterion: "Tersedia pegangan rambat untuk membantu perpindahan pengguna dari kursi roda ke kloset dan sebaliknya." },
+      { id: "toilet-alarm", label: "Toilet · alarm darurat", min: 1,
+        section: "Standar teknis toilet, butir (xv)–(xvi), hlm. 798",
+        criterion: "Lampu alarm di atas sisi luar pintu berfungsi saat tombol darurat ditekan atau tuas yang mudah dijangkau di dalam toilet ditarik." },
+      { id: "features", label: "Toilet aksesibel · isi kriteria fasilitas", manual: true, source: "accessibility" },
+    ],
     below: "Bebaskan ruang manuver, sesuaikan arah bukaan pintu, dan lengkapi pegangan rambat serta perlengkapan pada posisi yang dapat dijangkau sesuai kriteria.",
   },
   guidance: {
-    label: "Jalur pemandu dan penunjuk arah", unit: "status", source: "accessibility",
-    categories: [{ id: "route", label: "Jalur akses · isi kriteria", manual: true }],
+    label: "Jalur pemandu dan penunjuk arah", unit: "status", source: "building",
+    overview: "Jalur pemandu dan rambu, hlm. 702–703 dan 833–834",
+    categories: [
+      { id: "guiding-block", label: "Jalur pemandu · ubin pengarah", min: 1,
+        section: "Ketentuan jalur pemandu, hlm. 702",
+        criterion: "Ubin pengarah bermotif garis dan dipasang searah perjalanan untuk memberi orientasi yang jelas." },
+      { id: "warning-block", label: "Jalur pemandu · ubin peringatan", min: 1,
+        section: "Ketentuan jalur pemandu, hlm. 702",
+        criterion: "Ubin peringatan bermotif bulat dan terpasang pada titik yang memerlukan peringatan, seperti peralihan ke tangga atau lintasan kendaraan." },
+      { id: "tactile-material", label: "Jalur pemandu · bahan dan kontras ubin", min: 1,
+        section: "Ketentuan jalur pemandu, hlm. 702–703",
+        criterion: "Ubin pemandu kuat, tidak licin, dan berwarna kontras terhadap lantai di sekitarnya." },
+      { id: "sign-position", label: "Penunjuk arah · penempatan dan keterbacaan", min: 1,
+        section: "Penempatan rambu dan marka, hlm. 833",
+        criterion: "Rambu arah dan tujuan terlihat tanpa penghalang, cukup terang untuk dibaca, dan tidak mengganggu sirkulasi." },
+      { id: "sign-contrast", label: "Penunjuk arah · kontras huruf dan simbol", min: 1,
+        section: "Ketentuan rambu, hlm. 834",
+        criterion: "Huruf dan simbol kontras terhadap latar. Bahan karakter dan latar tidak menyilaukan." },
+      { id: "route", label: "Jalur akses · isi kriteria", manual: true, source: "accessibility" },
+    ],
     below: "Bebaskan jalur dari penghalang, sambungkan jalur pemandu yang terputus, dan letakkan rambu berkontras pada akses utama serta titik perubahan arah.",
   },
   custom: {
@@ -301,7 +334,7 @@ function healthMeasurement(row) {
     (parameter.unit !== "pH" || number <= 14) && (parameter.unit !== "% RH" || number <= 100);
   const numberText = (value) => healthNumberFormat.format(value);
   const suffix = unit ? " " + unit : "";
-  const threshold = comparable ? qualitative ? "Terpenuhi" :
+  const threshold = comparable ? qualitative ? category?.criterion ?? "Terpenuhi" :
     (min !== null && max !== null ? numberText(min) + "–" + numberText(max) :
       min !== null ? "≥ " + numberText(min) : (category?.exclusiveMax ? "< " : "≤ ") + numberText(max)) + suffix : "";
   const measured = valid ? qualitative ? (number === 1 ? "Terpenuhi" : "Belum terpenuhi") : numberText(number) + suffix : "";
@@ -475,7 +508,19 @@ function healthMeasurementCells(row, locations, kind) {
     save();
   }
   function selectCategory() {
-    row.category = categorySelect.value;
+    const next = categorySelect.value;
+    const parameter = healthParameters[row.parameter];
+    const changesComponent = row.category && next !== row.category &&
+      parameter.categories.some(({ id, criterion }) => criterion && (id === row.category || id === next));
+    if (changesComponent && row.measured?.trim()) {
+      if (!confirm("Ganti komponen pemeriksaan dan kosongkan hasil baris ini?")) {
+        categorySelect.value = row.category;
+        return;
+      }
+      delete row.measured;
+      visualResult.value = "";
+    }
+    row.category = next;
     commit();
   }
   function updateResult() {
@@ -490,13 +535,17 @@ function healthMeasurementCells(row, locations, kind) {
       categoryWarehouse = warehouse;
     }
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
+    const overview = !row.category ? result.parameter.overview : undefined;
+    const referenceSource = result.source ?? (overview ? healthSources[result.parameter.source] : undefined);
+    const referenceSection = result.category?.section ?? overview;
     threshold.textContent = result.threshold ||
       (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
-        ventilationDesign ? "Batas mengikuti perhitungan desain" : result.category?.pending ?? "Acuan belum lengkap");
-    source.replaceChildren(...(result.source ? [dom("a", { href: result.source[1], target: "_blank", rel: "noopener",
-      title: [result.source[0], result.category?.section].filter(Boolean).join(" · ") },
-      [result.source[0].split(" · ")[0], result.category?.section].filter(Boolean).join(" · "))] : []));
-    source.hidden = !result.source;
+        ventilationDesign ? "Batas mengikuti perhitungan desain" : result.category?.pending ??
+          (overview ? "Pilih komponen untuk melihat kriterianya" : "Acuan belum lengkap"));
+    source.replaceChildren(...(referenceSource ? [dom("a", { href: referenceSource[1], target: "_blank", rel: "noopener",
+      title: [referenceSource[0], referenceSection].filter(Boolean).join(" · ") },
+      [referenceSource[0].split(" · ")[0], referenceSection].filter(Boolean).join(" · "))] : []));
+    source.hidden = !referenceSource;
     guidance.textContent = result.officeMismatch ? "Gunakan PP 16/2021 untuk batas umum luas bukaan gudang." :
       result.category?.guidance ?? "";
     guidance.hidden = !guidance.textContent;
