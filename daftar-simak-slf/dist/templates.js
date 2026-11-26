@@ -77,11 +77,14 @@ const easeNarrative = previousEaseNarrative.replace(
   "Ketentuan yang dibandingkan dengan kondisi lapangan meliputi",
   "Parameter pembanding ditetapkan",
 );
+const previousDocumentFollowUp = "Dari penelaahan dokumen, tercatat [dokumen yang kurang atau perbedaan data] dengan dampak terhadap verifikasi [aspek yang terdampak]. Konfirmasi atau pelengkapan dokumen menjadi tindak lanjut [penanggung jawab] dengan bukti yang diperlukan berupa [bukti atau dokumen].";
+const documentFollowUp = "Pemeriksaan dokumen menemukan [dokumen yang kurang atau perbedaan data]. Hal yang perlu dikonfirmasi adalah [aspek yang terdampak]. Tindak lanjut dilakukan oleh [penanggung jawab] dengan menyiapkan [bukti atau dokumen].";
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
   [previousComfortNarrative, comfortNarrative],
   [previousEaseNarrative, easeNarrative],
+  [previousDocumentFollowUp, documentFollowUp],
 ]);
 
 const reportTemplates = {
@@ -143,7 +146,7 @@ const reportTemplates = {
         ["Dokumen perizinan dan teknis", {"body":"Dokumen perizinan yang ditelaah adalah [jenis dokumen dan nomor], sedangkan dokumen teknis yang tersedia meliputi [gambar rencana, gambar terbangun, dan dokumen terkait]. Pencocokan fungsi, data teknis, dan lingkup izin terhadap kondisi aktual menghasilkan [ringkasan hasil telaah].","previous":"[Bandingkan PBG/IMB, gambar rencana, gambar terbangun, dan dokumen pendukung yang tersedia.]"}],
         { table: "Rekap pemeriksaan dokumen", columns: documentReviewHeaders,
           rows: documentReviewExamples.map((name) => documentReviewRow("[" + name + "]")) },
-        ["Kesenjangan dan tindak lanjut", {"body":"Dari penelaahan dokumen, tercatat [dokumen yang kurang atau perbedaan data] dengan dampak terhadap verifikasi [aspek yang terdampak]. Konfirmasi atau pelengkapan dokumen menjadi tindak lanjut [penanggung jawab] dengan bukti yang diperlukan berupa [bukti atau dokumen].","previous":"[Sebutkan dokumen yang kurang, data yang berbeda, dan siapa yang perlu menindaklanjutinya.]"}],
+        ["Kesenjangan dan tindak lanjut", { body: documentFollowUp, previous: "[Sebutkan dokumen yang kurang, data yang berbeda, dan siapa yang perlu menindaklanjutinya.]" }],
       ],
       [
         "Laporan pengkajian teknis bidang arsitektur",

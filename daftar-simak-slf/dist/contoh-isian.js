@@ -1,5 +1,12 @@
 "use strict";
 
+const documentFollowUpFields = new Map([
+  ["dokumen yang kurang atau perbedaan data", ["Apa yang belum lengkap atau berbeda?", "Temuan", "Gambar terbangun lantai 1 belum tersedia"]],
+  ["aspek yang terdampak", ["Apa yang belum bisa dipastikan?", "Hal yang perlu dipastikan", "Kesesuaian denah lantai 1 dengan kondisi bangunan"]],
+  ["penanggung jawab", ["Siapa yang perlu menindaklanjuti?", "Pihak yang menindaklanjuti", "Pengelola gedung"]],
+  ["bukti atau dokumen", ["Apa yang perlu disiapkan?", "Bukti yang dibutuhkan", "Gambar terbangun terbaru untuk lantai 1"]],
+]);
+
 const inputExamples = {
   "aspek": "tata bangunan atau keselamatan, sesuai butir yang dibahas",
   "sampel / sumber bukti": "titik P-01 di koridor dan Foto 2.1",

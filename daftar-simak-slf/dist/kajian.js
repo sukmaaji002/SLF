@@ -399,6 +399,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const entries = new Map();
   let lastText = data[key];
   let sources = initialSources;
+  const followUp = key === "body" && (tokenName(data.text ?? "") === "kesenjangan dan tindak lanjut" ||
+    reportTokens(data[key] || "").has("dokumen yang kurang atau perbedaan data"));
 
   function openField(token) {
     if (!details.open) {
@@ -425,7 +427,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const link = Object.hasOwn(links, token) ? links[token] : undefined;
       const fromChecklist = token === "tanggal pemeriksaan" && (!link || link.source === "identity:date");
       const caption = fromChecklist ? "Isi tanggal pemeriksaan di Daftar Simak" :
-        repeatedNarrativeFields.get(token)?.previewLabel ?? "Isi " + name.trim();
+        repeatedNarrativeFields.get(token)?.previewLabel ??
+        (followUp ? documentFollowUpFields.get(token)?.[1] : undefined) ?? "Isi " + name.trim();
       return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
   }
@@ -453,6 +456,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       ease: fields.has(easeParameterToken) || (methodHeading === "kemudahan" && fields.has(easeReferenceToken)),
     };
     for (const [token, name] of fields) {
+      const followUpField = followUp ? documentFollowUpFields.get(token) : undefined;
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
@@ -467,7 +471,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const permitDocuments = token === permitDocumentsToken;
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
-      const fieldTitle = repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
+      const fieldTitle = followUpField?.[0] ?? repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
       const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: repeated?.label ?? "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
@@ -495,7 +499,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         focusManual();
       }, "quiet");
       const simpleChoices = safetyParameters || comfortParameters || repeated?.method;
-      const example = simpleChoices || repeated?.label ? "" : inputExample(token);
+      const example = simpleChoices || repeated?.label || followUpField ? "" : inputExample(token);
       const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly || permitDocuments ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
@@ -553,7 +557,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       }
       const suggestedNumbers = permitDocuments ? recordedPermitNumbers(project, data, sources) : undefined;
       const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices, suggestedNumbers) :
-        field(manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
+        field(followUpField?.[1] ?? manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
       const focusManual = () => {
@@ -561,7 +565,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         if (input) focusTextField(input);
         else manual.querySelector("button")?.focus();
       };
-      const choices = repeated || token === "tanggal pemeriksaan" ? [] : presets;
+      const choices = repeated || token === "tanggal pemeriksaan" || followUpField ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -603,7 +607,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         const filled = Boolean(self ? manualData.value.trim() : linkedValue);
         badge.textContent = filled ? "Terisi" : "Belum terisi";
         badge.dataset.filled = String(filled);
-        sourceSummary.textContent = self ? (repeated?.label ? "Tautkan ke isian lain" : "Sumber: Isi sendiri") :
+        sourceSummary.textContent = self ? (repeated?.label || followUpField ? "Tautkan ke isian lain" : "Sumber: Isi sendiri") :
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
@@ -636,6 +640,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (choiceField) entry.append(choiceField);
       if (priorChoices) entry.append(priorChoices.links);
       entry.append(manual);
+      if (followUpField) entry.append(dom("p", { className: "hint" }, "Contoh jawaban · " + followUpField[2]));
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
@@ -647,7 +652,15 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       });
       grid.append(entry);
     }
-    content.replaceChildren(grid, fields.has("tujuan kajian") ? editPurpose : insertPurpose);
+    if (followUp) {
+      const instructions = dom("div", { className: "link-entry" },
+        dom("p", {}, "Lihat rekap pemeriksaan. Jika ada dokumen yang belum lengkap atau datanya berbeda, jawab pertanyaan di bawah."),
+        dom("p", { className: "hint" }, "Jika tidak ada temuan, buka Ubah teks dan format lalu ganti narasi dengan kalimat “Tidak ditemukan kekurangan atau perbedaan pada dokumen yang ditelaah.”"),
+        documentReviewLinks(project));
+      content.replaceChildren(instructions, grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else {
+      content.replaceChildren(grid, fields.has("tujuan kajian") ? editPurpose : insertPurpose);
+    }
   }
 
   details.addEventListener("toggle", () => {
