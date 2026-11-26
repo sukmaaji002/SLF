@@ -302,7 +302,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
-        section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+        const body = appearanceReportText(block.body, sources, block.links);
+        section.append(...reportParagraphs(body, getTextFormat(block, "body"), resolveToken(block.links)));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
         appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);

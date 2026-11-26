@@ -468,6 +468,13 @@ function resolveReportLink(original, label, sources, links) {
   return { value: (key === "tanggal pemeriksaan" ? inspectionDate(value) : value?.trim()) || original, format };
 }
 
+function appearanceReportText(text, sources, links) {
+  if (text.endsWith(appearanceEvidenceParagraph) && !resolveReportLink("", appearanceEvidenceToken, sources, links).value) {
+    return text.slice(0, -appearanceEvidenceParagraph.length);
+  }
+  return text;
+}
+
 function resolveReportText(text, sources, links) {
   return text.replace(tokenPattern, (original, label) => resolveReportLink(original, label, sources, links).value);
 }

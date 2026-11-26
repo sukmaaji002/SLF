@@ -404,8 +404,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const useGuide = key === "body" && (tokenName(data.text ?? "") === "peruntukan bangunan" ||
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
+  const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
+    data[key]?.endsWith(appearanceEvidenceParagraph));
   const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
-    intensityGuide ? intensityGuideFields : undefined;
+    intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : undefined;
 
   function openField(token) {
     if (!details.open) {
@@ -416,16 +418,18 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   }
 
   function updatePreview() {
-    const text = data[key] || "";
+    const raw = data[key] || "";
+    const links = getLinks();
+    const text = appearanceGuide ? appearanceReportText(raw, sources, links) : raw;
     const fields = reportTokens(text);
-    const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, getLinks()).value === "[" + name + "]").length;
+    const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links).value === "[" + name + "]").length;
     summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
-      fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";
+      fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" :
+        raw !== text ? "Lihat atau ubah isian" : "Tambahkan isian otomatis";
     preview.removeAttribute("style");
     const format = getTextFormat(data, key);
     styleTextBlock(preview, format);
     preview.replaceChildren(text.trim() ? formattedText(text, format, (original, name) => {
-      const links = getLinks();
       const resolved = resolveReportLink(original, name, sources, links);
       if (resolved.value !== original) return resolved;
       const token = tokenName(name);
@@ -455,6 +459,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
     const intensityDetails = intensityGuide ? dom("div", { className: "form-grid narrative-fields" }) : undefined;
+    let appearanceEvidence;
     const useSteps = useGuide ? [
       ["Menurut dokumen", "Catat dokumen yang dipakai dan fungsi yang tertulis di dalamnya."],
       ["Di lapangan", "Catat bagian yang diperiksa dan penggunaannya saat ini."],
@@ -662,7 +667,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
       entries.set(token, () => {
-        const extra = entry.closest(".intensity-narrative-details");
+        const extra = entry.closest(".intensity-narrative-details, .appearance-evidence");
         if (extra) extra.open = true;
         entry.scrollIntoView({ block: "nearest" });
         if (!manual.hidden) focusManual();
@@ -670,7 +675,13 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         else source.querySelector("summary").focus();
       });
       const isIntensityDetail = intensityGuide && guideField && token !== intensityFinding;
-      (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
+      if (appearanceGuide && token === appearanceEvidenceToken && data[key].endsWith(appearanceEvidenceParagraph)) {
+        appearanceEvidence = dom("details", { className: "narrative-source appearance-evidence" },
+          dom("summary", {}, "Rujuk foto atau gambar lain (opsional)"), entry);
+      } else {
+        if (appearanceGuide && token === "hasil observasi") entry.classList.add("wide");
+        (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
+      }
     }
     if (followUp) {
       const instructions = dom("div", { className: "link-entry" },
@@ -696,6 +707,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       ] : [];
       if (grid.childElementCount === 1) grid.firstElementChild.classList.add("wide");
       content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else if (appearanceGuide) {
+      const instructions = dom("p", { className: "hint" },
+        "Catat apa yang terlihat dari luar bangunan. Jika ada foto, gunakan Unggah foto subbab di bawah.");
+      content.replaceChildren(instructions, grid, ...(appearanceEvidence ? [appearanceEvidence] : []),
+        ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (useGuide) {
       const sections = useSteps.flatMap(({ title, tip, fields }, index) => {
         if (!fields.childElementCount) return [];

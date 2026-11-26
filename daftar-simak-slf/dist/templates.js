@@ -89,6 +89,10 @@ const intensityDetailFields = [
 ];
 const previousIntensityNarrative = "Parameter intensitas yang ditelaah meliputi [luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan]. Data aktual [nilai dan satuan] dibandingkan dengan [nilai dan sumber pembanding]. Hasil telaah dicatat sebagai [temuan atau keterbatasan].";
 const intensityNarrative = "Pemeriksaan intensitas dan sempadan menggunakan data ukur dan batas acuan yang tersedia. Catatan pemeriksaan adalah [temuan atau keterbatasan].";
+const appearanceEvidenceToken = "nomor foto atau gambar";
+const appearanceEvidenceParagraph = "\n\nDokumentasi dapat dilihat pada [" + appearanceEvidenceToken + "].";
+const previousAppearanceNarrative = "Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].";
+const appearanceNarrative = "Pada [sisi atau area], pemeriksaan mencakup [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi yang terlihat adalah [hasil observasi]." + appearanceEvidenceParagraph;
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -96,6 +100,7 @@ const revisedStandardNarratives = new Map([
   [previousEaseNarrative, easeNarrative],
   [previousDocumentFollowUp, documentFollowUp],
   [previousBuildingUse, buildingUse],
+  [previousAppearanceNarrative, appearanceNarrative],
 ]);
 
 const reportTemplates = {
@@ -166,7 +171,7 @@ const reportTemplates = {
           {"body":"Kondisi tata bangunan dibandingkan dengan [dokumen pembanding] untuk menilai peruntukan, intensitas, penampilan, tata ruang dalam, dan hubungan dengan lingkungan. Hasil penilaian disajikan menurut ruang lingkup dan bukti yang tersedia pada bagian berikut.","previous":"[Ringkas hasil perbandingan desain dengan kondisi bangunan.]"},
           ["Peruntukan bangunan", { body: buildingUse, previous: "[Catat fungsi yang diizinkan dan pemanfaatan aktual per ruang atau unit.]" }],
           ["Intensitas bangunan", { body: intensityNarrative, previous: "[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]" }],
-          ["Penampilan bangunan", {"body":"Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].","previous":"[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]"}],
+          ["Penampilan bangunan", { body: appearanceNarrative, previous: "[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]" }],
           ["Tata ruang dalam", {"body":"Penataan ruang pada [lantai atau zona] diperiksa terhadap [denah atau gambar rujukan]. Hasil pemeriksaan menunjukkan [susunan, fungsi, luasan, atau perubahan yang teramati]. Area yang belum dicakup adalah [batasan pemeriksaan].","previous":"[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]"}],
           ["Keselarasan dengan lingkungan", {"body":"Kondisi area luar ditinjau pada [ruang terbuka, sirkulasi, atau parkir]. Hubungan tapak dengan area sekitarnya tercatat sebagai [hasil observasi] berdasarkan [denah situasi, foto, atau pengukuran].","previous":"[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]"}],
         ],
