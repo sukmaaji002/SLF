@@ -180,7 +180,8 @@ function tableCellValue(block, row, column, sources) {
   if (measurement && column < 4) return healthMeasurementValues(measurement)[column];
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
   const automatic = sources.get(automaticTableCellSource(block, row, column));
-  const value = source ? sources.get(source)?.value || "" : automatic?.value || block.rows[row][column];
+  const value = source ? sources.get(source)?.value || (source.startsWith("finding:") ? block.rows[row][column] : "") :
+    automatic?.value || block.rows[row][column];
   if (measurement && column === 4 && !source) return inspectionRecommendation(measurement, value);
   if (source) return value;
   return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
@@ -204,7 +205,12 @@ function tableImageColumn(block) {
     4 : block.headers.length - 1;
 }
 
+function isFollowUpMatrix(block) {
+  return block.type === "table" && tokenName(block.text) === "matriks rekomendasi dan tindak lanjut" && block.headers.length >= 2;
+}
+
 function tableSourceAvailable(id, block) {
+  if (id.startsWith("finding:")) return isFollowUpMatrix(block) || Object.values(block.cellLinks ?? {}).includes(id);
   if (block.healthMeasurements || architectureInspectionKind(block)) return true;
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
     ["project:purpose", "project:scope", "project:application", "project:chapter-order",
@@ -305,8 +311,13 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const tables = [];
   let hasResults = false;
   let hasPhotos = false;
+  const findingActions = [];
   function add(id, group, label, value, format) {
     sources.set(id, { group, label, value: cleanValue(value), format });
+  }
+  function addFinding(id, group, label, details, anchor, actionable) {
+    add(id, group, label, [label, ...details].filter(Boolean).join(" · "));
+    Object.assign(sources.get(id), { anchor, actionable });
   }
   const intensity = calculateIntensity(project, checklist);
   if (intensity.land.value > 0) add("project:land-area", "Intensitas dan tata ruang", "Luas persil", intensityValue(intensity.land.value, " m²"));
@@ -317,6 +328,12 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       intensityValue(metric.measurement.value, unit));
     if (metric.value !== null) add("project:" + metric.key, "Intensitas dan tata ruang", metric.name,
       intensityValue(metric.value, intensityUnit(metric)));
+    if (/^(?:Dalam|Di luar) batas /.test(metric.status)) {
+      const unit = intensityUnit(metric);
+      const limit = (metric.side === "Min" ? "Min. " : "Maks. ") + intensityValue(metric.limit, unit);
+      addFinding("finding:intensity:" + metric.key, "Intensitas dan sempadan", metric.name,
+        [intensityValue(metric.value, unit), limit, metric.status, metric.source], "report-intensity-results", metric.status.startsWith("Di luar"));
+    }
   }
   const purpose = project.purpose;
   add("project:purpose", "Bagian awal", "Tujuan kajian", projectPurposeValue(purpose), getTextFormat(purpose, "custom"));
@@ -350,6 +367,14 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     for (const row of check.rows) {
       if (cleanValue(row.location) && tokenName(item.title) !== "jarak antar bangunan") locations.add(cleanValue(row.location));
       if (row.photo || row.ndtPhoto) hasPhotos = true;
+      const conformity = cleanValue(row.conformity);
+      const issue = cleanValue(row.nonconformity);
+      if (conformity || issue) {
+        const label = [item.title, cleanValue(row.location), cleanValue(row.label)].filter(Boolean).join(" · ");
+        const actionable = conformity ? tokenName(conformity) === "tidak sesuai" : Boolean(issue);
+        addFinding("finding:check:" + item.id + ":" + row.key, "Daftar simak", label,
+          [conformity, actionable ? issue : ""], "report-check-" + item.id, actionable);
+      }
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!cleanValue(row[key]) || key === "photo" || key === "ndtPhoto") continue;
         if (key !== "location") hasResults = true;
@@ -360,7 +385,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   for (const [index, chapter] of project.chapters.entries()) {
-    for (const block of chapter.blocks) {
+    for (const [bi, block] of chapter.blocks.entries()) {
       if ((block.type === "heading" || block.type === "text") && block.sourceId) {
         const text = inspectionIntroductions.get(block.body) ??
           (block.type === "heading" ? block.body : block.text);
@@ -371,6 +396,16 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       if (block.sourceId || isDocumentReviewTable(block)) tables.push(block);
       if (!block.sourceId) continue;
       for (const [ri, row] of block.rows.entries()) {
+        const rowId = block.rowIds?.[ri];
+        const measurement = block.healthMeasurements?.[rowId];
+        if (measurement?.measured?.trim()) {
+          const [parameter, , reference, result] = healthMeasurementValues(measurement);
+          const label = [parameter, cleanValue(measurement.location)].filter(Boolean).join(" · ");
+          const id = "finding:measurement:" + block.sourceId + ":" + rowId;
+          const actionable = healthMeasurement(measurement).status === "Di luar acuan";
+          addFinding(id, "Hasil pengukuran", label, [result, reference], "report-chapter-" + index + "-block-" + bi, actionable);
+          if (actionable) findingActions.push([id, block, ri]);
+        }
         for (const ci of row.keys()) {
           const key = tableCellKey(block, ri, ci);
           if (block.cellLinks?.[key]) continue;
@@ -468,6 +503,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     filledIntroSource(project, "dokumen, hasil survei, atau hasil uji", sources));
   add("project:intro-limits", "Data kajian", "Keterbatasan akses atau data yang diisi di Bab I",
     filledIntroSource(project, "keterbatasan akses atau data", sources));
+  for (const [id, block, row] of findingActions) sources.get(id).action = tableCellValue(block, row, 4, sources);
   return sources;
 }
 
@@ -499,7 +535,7 @@ function resolveReportText(text, sources, links) {
 }
 
 const sourceUuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
-const validReportSource = (source) => typeof source === "string" && /^(?:project|cover|identity|check|cell|document|narrative):[a-z\d.:/%()!'*~-]+$/i.test(source);
+const validReportSource = (source) => typeof source === "string" && /^(?:project|cover|identity|check|cell|document|narrative|finding):[a-z\d.:/%()!'*~-]+$/i.test(source);
 
 function narrativeGroupEntries(groups) {
   return groups.flatMap(({ name, entries, fixed }) => {

@@ -629,6 +629,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     }
     const groups = new Map();
     for (const [id, source] of sources) {
+      if (id.startsWith("finding:")) continue;
       if (!groups.has(source.group)) groups.set(source.group, []);
       groups.get(source.group).push([id, source.label]);
     }
@@ -1531,6 +1532,45 @@ function renderChapter(project) {
   editor.append(actions);
 }
 
+function followUpPicker(block, sources) {
+  const used = new Set(Object.values(block.cellLinks ?? {}));
+  const choices = [...sources].filter(([id, entry]) => id.startsWith("finding:") && entry.actionable && entry.value && !used.has(id));
+  const pick = dom("select", { ariaLabel: "Temuan yang akan ditambahkan" }, new Option("Pilih temuan", ""));
+  for (const group of new Set(choices.map(([, entry]) => entry.group))) {
+    pick.append(dom("optgroup", { label: group }, ...choices.filter(([, entry]) => entry.group === group)
+      .map(([id, entry]) => new Option(entry.label, id))));
+  }
+  const preview = dom("p", { className: "hint" });
+  const add = button("Tambahkan ke matriks", () => {
+    const id = pick.value;
+    const entry = sources.get(id);
+    if (!entry || Object.values(block.cellLinks ?? {}).includes(id)) return;
+    const empty = block.rows.findIndex((row, index) => !block.rowImages?.[block.rowIds[index]] && row.every((value, column) => {
+      const key = tableCellKey(block, index, column);
+      return (!value.trim() || /^\[[^\[\]\r\n]+\]$/.test(value.trim())) &&
+        !block.cellLinks?.[key] && !getTextFormat(block, "cell:" + key);
+    }));
+    const index = empty < 0 ? block.rows.length : empty;
+    const rowId = block.rowIds[index] ?? crypto.randomUUID();
+    block.rowIds[index] = rowId;
+    block.rows[index] = block.headers.map((_, column) => column === 0 ? entry.value : column === 1 ? entry.action ?? "" : "");
+    (block.cellLinks ??= {})[tableCellKey(block, index, 0)] = id;
+    save();
+    render();
+    const action = editor.querySelector('tr[data-row-id="' + rowId + '"] td:nth-child(2) input');
+    if (action) focusTextField(action);
+  });
+  add.disabled = true;
+  pick.addEventListener("change", () => {
+    preview.textContent = sources.get(pick.value)?.value || "";
+    add.disabled = !pick.value;
+  });
+  return dom("details", { className: "health-column-settings" }, dom("summary", {}, "Ambil temuan pemeriksaan"),
+    choices.length ? dom("div", { className: "form-grid" }, dom("label", {}, "Temuan yang perlu ditindaklanjuti", pick),
+      dom("div", {}, preview, add)) :
+      dom("p", { className: "hint" }, "Temuan di luar acuan atau tidak sesuai akan tersedia setelah dicatat pada pemeriksaan."));
+}
+
 function tableEditor(block) {
   const team = isTeamTable(block);
   const guidedHealth = Boolean(block.healthMeasurements);
@@ -1561,6 +1601,7 @@ function tableEditor(block) {
   const locations = guidedHealth ? healthRoomChoices(current(), block, sources) : [];
   const imageColumn = tableImageColumn(block);
   const tableName = tokenName(block.text);
+  const followUps = isFollowUpMatrix(block) ? followUpPicker(block, sources) : undefined;
   const statusColumn = isDocumentReviewTable(block) ?
     block.headers.findIndex((header) => tokenName(header) === "status verifikasi") : -1;
   const toolColumn = tableName === "daftar alat pemeriksaan" ?
@@ -1646,7 +1687,7 @@ function tableEditor(block) {
   const editor = dom("div", {}, ...(guidedHealth ? [dom("p", { className: "hint" },
     "Pilih atau ketik nama ruang, tentukan acuan, lalu isi hasil ukur. Gunakan ＋ Ruang lain untuk menambah pemeriksaan pada aspek yang sama."),
     dom("details", { className: "health-column-settings" }, dom("summary", {}, "Sunting judul kolom"),
-      dom("div", { className: "form-grid" }, ...columnFields))] : []), matrix, actions);
+      dom("div", { className: "form-grid" }, ...columnFields))] : []), ...(followUps ? [followUps] : []), matrix, actions);
   if (team) {
     const select = dom("select");
     const hint = dom("p", { className: "hint" });
@@ -1712,7 +1753,8 @@ function tableCellField(block, row, column, sources, options, measurement) {
     link.toggleAttribute("data-automatic", Boolean(measurement || automatic) || tokenName(block.text) === "data umum bangunan gedung");
     const readOnly = Boolean(source);
     const savedValue = block.rows[row][column];
-    const nextValue = source ? entry?.value || "" : measurement ? inspectionRecommendation(measurement, savedValue) :
+    const finding = source?.startsWith("finding:");
+    const nextValue = source ? entry?.value || (finding ? savedValue : "") : measurement ? inspectionRecommendation(measurement, savedValue) :
       token && savedValue === value ? "" : savedValue;
     const placeholder = source && !entry?.value ? "Sumber belum tersedia" :
       automatic && entry?.value ? entry.value + " · dari Intensitas" : example ? "Contoh: " + example : token ?? "";
@@ -1720,7 +1762,8 @@ function tableCellField(block, row, column, sources, options, measurement) {
     if (input.value !== nextValue) input.value = nextValue;
     if (input.readOnly !== readOnly) input.readOnly = readOnly;
     input.placeholder = placeholder;
-    summary.textContent = source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
+    summary.textContent = finding && !entry?.value ? "Sumber temuan tidak tersedia · salinan tersimpan" :
+      source ? "Data tertaut" : automatic && entry?.value ? "Otomatis dari Intensitas" : "Ambil data";
     if (measurement) {
       const manual = measurement.recommendationMode === "manual" || Boolean(savedValue.trim());
       mode.textContent = manual ? "Isian pengkaji" : nextValue ? "Otomatis · bisa diedit" : "Saran muncul setelah acuan dan hasil diisi.";
@@ -1737,6 +1780,7 @@ function tableCellField(block, row, column, sources, options, measurement) {
     pick.replaceChildren(new Option("Isi manual", ""));
     const groups = new Map();
     for (const [id, entry] of registry) {
+      if (id.startsWith("finding:") && id !== selected) continue;
       if (!entry.value || !tableSourceAvailable(id, block) || id === "cell:" + block.sourceId + ":" + key) continue;
       if (!groups.has(entry.group)) groups.set(entry.group, []);
       groups.get(entry.group).push(new Option(entry.label, id));
@@ -1751,6 +1795,7 @@ function tableCellField(block, row, column, sources, options, measurement) {
   link.addEventListener("toggle", refreshOptions);
   pick.addEventListener("change", () => {
     block.cellLinks ??= {};
+    if (!pick.value && block.cellLinks[key]?.startsWith("finding:")) block.rows[row][column] = input.value;
     if (pick.value) block.cellLinks[key] = pick.value;
     else delete block.cellLinks[key];
     refreshOptions();

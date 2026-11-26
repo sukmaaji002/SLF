@@ -357,10 +357,14 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
               !hasImage && !values.some((value) => value?.trim())) return [];
           return [values.map((text, ci) => {
             const key = tableCellKey(block, ri, ci);
-            const source = sources.get(block.cellLinks?.[key]);
+            const sourceId = block.cellLinks?.[key];
+            const source = sources.get(sourceId);
             const own = getTextFormat(block, "cell:" + key);
             const format = source?.format && own ? { base: { ...source.format.base, ...own.base }, block: own.block, runs: own.runs.length ? own.runs : source.format.runs } : own || source?.format;
-            const value = formattedValue(text, format, resolveToken());
+            const body = formattedValue(text, format, resolveToken());
+            const value = sourceId?.startsWith("finding:") ? dom("div", {}, body,
+              dom("div", {}, source?.anchor ? reportJump(source.anchor, "Lihat sumber pemeriksaan") :
+                "Sumber awal tidak tersedia · salinan tersimpan")) : body;
             return hasImage && ci === tableImageColumn(block) ?
               dom("div", {}, value, dom("img", { className: "report-table-image", src: image, alt: "Gambar baris " + (ri + 1) })) : value;
           })];
