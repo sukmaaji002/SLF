@@ -1,6 +1,7 @@
 "use strict";
 
 const lightingStandardUrl = "https://pesta.bsn.go.id/produk/detail/13243-sni61972020";
+const toiletBasicCriterion = "Ruang dalam minimal 152,5 cm × 227,5 cm dengan ruang manuver kursi roda. Lebar bersih pintu minimal 90 cm. Tersedia pegangan rambat untuk perpindahan dari kursi roda ke kloset dan alarm darurat berfungsi.";
 const healthSources = {
   lighting: ["SNI 6197:2020 · pencahayaan rata-rata minimum", lightingStandardUrl],
   glare: ["SNI 6197:2020 · pengendalian silau", lightingStandardUrl],
@@ -240,6 +241,10 @@ const healthParameters = {
     label: "Fasilitas toilet aksesibel", unit: "status", source: "building",
     overview: "Standar teknis toilet, hlm. 797–799",
     categories: [
+      { id: "toilet-basic", label: "Toilet · kriteria dasar PP 16/2021", min: 1,
+        section: "Standar teknis toilet, butir (viii), (x), dan (xv)–(xvii), hlm. 797–799",
+        criterion: toiletBasicCriterion,
+        guidance: "Pilih Terpenuhi setelah keempat komponen diperiksa. Pilih komponen tersendiri jika yang diperiksa hanya satu bagian." },
       { id: "toilet-dimensions", label: "Toilet · dimensi ruang dalam", min: 1,
         section: "Standar teknis toilet, butir (viii), hlm. 797",
         criterion: "Ruang dalam sekurang-kurangnya 152,5 cm × 227,5 cm dan memungkinkan pengguna kursi roda bermanuver." },
@@ -252,9 +257,9 @@ const healthParameters = {
       { id: "toilet-alarm", label: "Toilet · alarm darurat", min: 1,
         section: "Standar teknis toilet, butir (xv)–(xvi), hlm. 798",
         criterion: "Lampu alarm di atas sisi luar pintu berfungsi saat tombol darurat ditekan atau tuas yang mudah dijangkau di dalam toilet ditarik." },
-      { id: "features", label: "Toilet aksesibel · isi kriteria fasilitas", manual: true, source: "accessibility" },
+      { id: "features", label: "Toilet aksesibel · acuan khusus (isi sendiri)", manual: true, source: "accessibility" },
     ],
-    below: "Bebaskan ruang manuver, sesuaikan arah bukaan pintu, dan lengkapi pegangan rambat serta perlengkapan pada posisi yang dapat dijangkau sesuai kriteria.",
+    below: "Perbaiki komponen yang belum memenuhi kriteria. Sesuaikan ruang manuver atau lebar bersih pintu, lengkapi pegangan rambat, atau perbaiki alarm sesuai temuan. Periksa kembali fungsi komponen setelah perbaikan.",
   },
   guidance: {
     label: "Jalur pemandu dan penunjuk arah", unit: "status", source: "building",
@@ -317,6 +322,7 @@ function healthMeasurement(row) {
   if (!parameter) return {};
   const officeMismatch = row.category === "office-natural" && ventilationWarehouse(row);
   const category = officeMismatch ? undefined : parameter.categories.find((entry) => entry.id === row.category);
+  const toiletNeedsCriterion = row.parameter === "accessibleToilet" && row.category === "features" && !row.reference?.trim();
   const custom = row.parameter === "custom";
   const manual = Boolean(custom || category?.manual || row.category === "manual");
   const source = category ? healthSources[category.source ?? parameter.source] : undefined;
@@ -340,16 +346,19 @@ function healthMeasurement(row) {
   const measured = valid ? qualitative ? (number === 1 ? "Terpenuhi" : "Belum terpenuhi") : numberText(number) + suffix : "";
   const below = valid && min !== null && number < min;
   const above = valid && max !== null && (number > max || (category?.exclusiveMax && number === max));
-  const status = officeMismatch ? "Pilih acuan yang sesuai untuk gudang" :
+  const status = toiletNeedsCriterion ? "Hasil perlu dikonfirmasi terhadap kriteria" :
+    officeMismatch ? "Pilih acuan yang sesuai untuk gudang" :
     !row.category && !custom ? "Pilih kategori atau acuan" :
     !comparable ? "Lengkapi acuan pembanding" :
       !row.measured?.trim() ? "Belum diukur atau diperiksa" :
         !valid ? "Periksa kembali hasil ukur" : below || above ? "Di luar acuan" : "Memenuhi parameter ini";
-  const recommendation = !comparable || !valid ? "" :
+  const recommendation = toiletNeedsCriterion ?
+    "Ukur ruang dalam dan lebar bersih pintu, periksa pegangan rambat, lalu uji alarm darurat. Pilih acuan yang dipakai dan konfirmasi hasil pemeriksaan." :
+    !comparable || !valid ? "" :
     below ? parameter.below ?? healthParameters.custom.below :
       above ? parameter.above ?? healthParameters.custom.above :
         "Pertahankan kondisi dan jadwal pemeliharaan. Catat hasil dan bukti pemeriksaan.";
-  return { parameter, category, manual, source, reference, threshold, measured, status, recommendation, unit, officeMismatch };
+  return { parameter, category, manual, source, reference, threshold, measured, status, recommendation, unit, officeMismatch, toiletNeedsCriterion };
 }
 
 function healthMeasurementValues(row) {
@@ -480,6 +489,10 @@ function healthMeasurementCells(row, locations, kind) {
     categorySelect.value = "pp-natural";
     selectCategory();
   }, "quiet");
+  const useToiletCriterion = button("Gunakan kriteria dasar PP 16/2021", () => {
+    categorySelect.value = "toilet-basic";
+    selectCategory();
+  }, "quiet");
   const numericResult = dom("input", { inputMode: "decimal", ariaLabel: "Hasil pengukuran", placeholder: "Contoh · 325,5" });
   const visualResult = dom("select", { ariaLabel: "Hasil pemeriksaan" },
     new Option("Pilih hasil", ""), new Option("Terpenuhi", "1"), new Option("Belum terpenuhi", "0"));
@@ -535,10 +548,10 @@ function healthMeasurementCells(row, locations, kind) {
       categoryWarehouse = warehouse;
     }
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
-    const overview = !row.category ? result.parameter.overview : undefined;
-    const referenceSource = result.source ?? (overview ? healthSources[result.parameter.source] : undefined);
+    const overview = !row.category || result.toiletNeedsCriterion ? result.parameter.overview : undefined;
+    const referenceSource = overview ? healthSources[result.parameter.source] : result.source;
     const referenceSection = result.category?.section ?? overview;
-    threshold.textContent = result.threshold ||
+    threshold.textContent = result.toiletNeedsCriterion ? toiletBasicCriterion : result.threshold ||
       (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
         ventilationDesign ? "Batas mengikuti perhitungan desain" : result.category?.pending ??
           (overview ? "Pilih komponen untuk melihat kriterianya" : "Acuan belum lengkap"));
@@ -546,10 +559,12 @@ function healthMeasurementCells(row, locations, kind) {
       title: [referenceSource[0], referenceSection].filter(Boolean).join(" · ") },
       [referenceSource[0].split(" · ")[0], referenceSection].filter(Boolean).join(" · "))] : []));
     source.hidden = !referenceSource;
-    guidance.textContent = result.officeMismatch ? "Gunakan PP 16/2021 untuk batas umum luas bukaan gudang." :
+    guidance.textContent = result.toiletNeedsCriterion ? "Kriteria dasar di atas tersedia sebagai pilihan. Terapkan acuan dan pilih kembali hasil setelah diperiksa." :
+      result.officeMismatch ? "Gunakan PP 16/2021 untuk batas umum luas bukaan gudang." :
       result.category?.guidance ?? "";
     guidance.hidden = !guidance.textContent;
     generalVentilation.hidden = !(ventilationDesign || result.officeMismatch || (warehouse && !row.category));
+    useToiletCriterion.hidden = !result.toiletNeedsCriterion;
     manual.hidden = !result.manual;
     const qualitative = result.parameter.unit === "status";
     numericField.hidden = qualitative;
@@ -605,7 +620,7 @@ function healthMeasurementCells(row, locations, kind) {
       location,
       categoryField)),
     dom("td", {}, dom("div", { className: "health-measurement" },
-      dom("span", { className: "health-field-label" }, "Acuan pembanding"), threshold, source, guidance, generalVentilation, manual)),
+      dom("span", { className: "health-field-label" }, "Acuan pembanding"), threshold, source, guidance, generalVentilation, useToiletCriterion, manual)),
     dom("td", {}, dom("div", { className: "health-measurement" },
       numericField, visualField, status)),
   ];
