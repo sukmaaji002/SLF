@@ -7,6 +7,7 @@ const healthSources = {
   indoor: ["Permenkes 2/2023 · Lampiran Bab II B", "https://peraturan.bpk.go.id/Details/245563/permenkes-no-2-tahun-2023"],
   sanitation: ["Permenaker 5/2018 · Pasal 34", "https://jdih.kemnaker.go.id/peraturan/detail/1546/peraturan-menteri-nomor-5-tahun-2018"],
   ventilation: ["SNI 6572-1:2024 · ventilasi gedung nonresidensial", "https://pesta.bsn.go.id/produk/detail/14965-sni6572-12024"],
+  naturalVentilation: ["PP 16/2021", "https://peraturan.bpk.go.id/Download/244292/PP%20Nomor%2016%20Tahun%202021-dikompresi.pdf"],
   plumbing: ["SNI 8153:2025 · sistem plambing", "https://pesta.bsn.go.id/produk/by_ics/629"],
   accessibility: ["Permen PUPR 14/PRT/M/2017", "https://peraturan.bpk.go.id/Details/104477/permen-pupr-no-14prtm2017-tahun-2017"],
 };
@@ -73,8 +74,12 @@ const healthParameters = {
   openings: {
     label: "Luas bukaan ventilasi", unit: "% luas lantai", source: "office",
     categories: [
+      { id: "pp-natural", label: "Ventilasi alami · batas umum PP 16/2021", min: 5, source: "naturalVentilation",
+        section: "Standar Teknis Ventilasi Alami, butir III.a, hlm. 583",
+        guidance: "Hasil ukur (%) = luas bukaan ÷ luas lantai yang membutuhkan ventilasi × 100." },
       { id: "office-natural", label: "Ruang kerja kantor tanpa AC · ventilasi silang", min: 15 },
-      { id: "nonresidential", label: "Ventilasi alami gedung nonresidensial · isi batas", manual: true, source: "ventilation" },
+      { id: "nonresidential", label: "Ventilasi alami nonresidensial · desain SNI 6572-1:2024", manual: true,
+        source: "ventilation", section: "Pasal 6.4.2", guidance: "Isi batas dari perhitungan desain zona. SNI menentukan ukuran bukaan berdasarkan konfigurasi bukaan dan kebutuhan aliran udara, antara lain melalui Tabel 7 atau 8 pada Jalur A." },
     ],
     below: "Singkirkan penghalang pada bukaan, pulihkan bukaan yang macet, dan tambah luas bebas bukaan pada sisi masuk dan keluar udara. Jika bukaan terbatas, rancang ventilasi mekanis sesuai kebutuhan ruang.",
     above: "Jika acuan menetapkan batas maksimum, gunakan kisi atau bukaan yang dapat diatur untuk mengendalikan luas efektif. Pertahankan kebutuhan udara segar.",
@@ -309,7 +314,12 @@ function healthMeasurementCells(row, locations, kind) {
   const customFields = dom("div", { className: "health-measurement" });
   const threshold = dom("p", { className: "health-threshold" });
   const source = dom("p", { className: "hint" });
+  const guidance = dom("p", { className: "hint" });
   const manual = dom("div", { className: "health-measurement" });
+  const generalVentilation = button("Pilih acuan PP 16/2021 (≥ 5%)", () => {
+    categorySelect.value = "pp-natural";
+    selectCategory();
+  }, "quiet");
   const numericResult = dom("input", { inputMode: "decimal", ariaLabel: "Hasil pengukuran", placeholder: "Contoh · 325,5" });
   const visualResult = dom("select", { ariaLabel: "Hasil pemeriksaan" },
     new Option("Pilih hasil", ""), new Option("Terpenuhi", "1"), new Option("Belum terpenuhi", "0"));
@@ -337,13 +347,22 @@ function healthMeasurementCells(row, locations, kind) {
     refreshLinkedFields();
     save();
   }
+  function selectCategory() {
+    row.category = categorySelect.value;
+    commit();
+  }
   function updateResult() {
     const result = healthMeasurement(row);
-    threshold.textContent = result.threshold || "Acuan belum lengkap";
+    const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
+    threshold.textContent = result.threshold ||
+      (ventilationDesign ? "Batas mengikuti perhitungan desain" : "Acuan belum lengkap");
     source.replaceChildren(...(result.source ? [dom("a", { href: result.source[1], target: "_blank", rel: "noopener",
       title: [result.source[0], result.category?.section].filter(Boolean).join(" · ") },
       [result.source[0].split(" · ")[0], result.category?.section].filter(Boolean).join(" · "))] : []));
     source.hidden = !result.source;
+    guidance.textContent = result.category?.guidance ?? "";
+    guidance.hidden = !guidance.textContent;
+    generalVentilation.hidden = !ventilationDesign;
     manual.hidden = !result.manual;
     const qualitative = result.parameter.unit === "status";
     numericField.hidden = qualitative;
@@ -370,6 +389,7 @@ function healthMeasurementCells(row, locations, kind) {
       ...parameter.categories.map(({ id, label }) => new Option(label, id)), new Option("Acuan lain · isi sendiri", "manual"));
     categorySelect.value = row.category || "";
     numericResult.value = row.measured || "";
+    numericResult.placeholder = row.parameter === "openings" ? "Contoh · 5,5" : "Contoh · 325,5";
     visualResult.value = row.measured || "";
     const reference = field("Nomor acuan dan kriteria", row.reference, (value) => { row.reference = value; commit(); });
     manual.replaceChildren(reference, ...(parameter.unit === "status" ? [] :
@@ -388,7 +408,7 @@ function healthMeasurementCells(row, locations, kind) {
     updateParameter();
     commit();
   });
-  categorySelect.addEventListener("change", () => { row.category = categorySelect.value; commit(); });
+  categorySelect.addEventListener("change", selectCategory);
   numericResult.addEventListener("input", () => { row.measured = numericResult.value; commit(); });
   visualResult.addEventListener("change", () => { row.measured = visualResult.value; commit(); });
   updateParameter();
@@ -400,7 +420,7 @@ function healthMeasurementCells(row, locations, kind) {
       location,
       categoryField)),
     dom("td", {}, dom("div", { className: "health-measurement" },
-      dom("span", { className: "health-field-label" }, "Acuan pembanding"), threshold, source, manual)),
+      dom("span", { className: "health-field-label" }, "Acuan pembanding"), threshold, source, guidance, generalVentilation, manual)),
     dom("td", {}, dom("div", { className: "health-measurement" },
       numericField, visualField, status)),
   ];
