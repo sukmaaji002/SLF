@@ -1414,6 +1414,24 @@ function renderIntensityAnalysis(project, checklist) {
       dom("label", { className: "intensity-toggle" }, diagram, "Sertakan skema ilustratif di laporan")));
 }
 
+function introductionEditor(owner, value, label) {
+  const text = dom("div", { className: "linked-preview" });
+  const preview = dom("div", { className: "narrative-preview" }, dom("h4", {}, label), text);
+  function show(value) {
+    text.textContent = value;
+    preview.hidden = !value.trim();
+  }
+  const edit = dom("details", { className: "narrative-editor" },
+    dom("summary", {}, "Sunting " + label.toLocaleLowerCase("id")),
+    field(label, value, (updated) => {
+      owner.introduction = updated;
+      show(updated);
+      save();
+    }, "area"));
+  show(value);
+  return dom("div", { className: "guided-narrative" }, preview, edit);
+}
+
 function renderChapter(project) {
   const index = active;
   const chapter = project.chapters[index];
@@ -1443,6 +1461,7 @@ function renderChapter(project) {
     save();
   }));
   if (!isTrial()) editor.append(chapterActions);
+  editor.append(introductionEditor(chapter, introductionText(chapter), "Pengantar bab"));
   editor.append(sectionPhotoEditor(chapter, "Unggah foto bab", () => workspace.projects.includes(project) && project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
   editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
@@ -1852,6 +1871,9 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
   const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; }, sources);
   if (block.type === "heading") {
     wrapper.append(boundField(block, "text", "Judul subbab"));
+    if (block.body !== architectureHealthIntro || Object.hasOwn(block, "introduction")) {
+      wrapper.append(introductionEditor(block, introductionText(chapter, block), "Pengantar subbab"));
+    }
     const project = current();
     wrapper.append(linked("body", "Isi subbab"), sectionPhotoEditor(block, "Unggah foto subbab",
       () => project.chapters.includes(chapter) && chapter.blocks.includes(block)));
@@ -1930,6 +1952,7 @@ function validateBackup(data) {
       if (block.type === "heading") {
         valid(typeof block.body === "string");
         clean.body = block.body;
+        if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
         if (Array.isArray(block.appearanceSections)) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
@@ -1977,7 +2000,9 @@ function validateBackup(data) {
       if (block.type === "photo" && block.image) { valid(imageSource.test(block.image)); clean.image = block.image; }
       return block.type === "heading" || block.type === "photo" ? restorePhotos(clean, block) : clean;
     });
-    return restorePhotos(importTextFormats({ title: chapter.title, blocks, checklist: chapter.checklist === true }, chapter, ["title"]), chapter);
+    const clean = { title: chapter.title, blocks, checklist: chapter.checklist === true };
+    if (typeof chapter.introduction === "string") clean.introduction = chapter.introduction;
+    return restorePhotos(importTextFormats(clean, chapter, ["title"]), chapter);
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,

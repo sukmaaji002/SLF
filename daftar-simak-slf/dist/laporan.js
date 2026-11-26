@@ -315,6 +315,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     const section = reportSection(chapterLabel(project, index), "report-chapter-" + index);
     if (getTextFormat(chapter, "title")) reportFormatted(section.firstElementChild, chapter.title, getTextFormat(chapter, "title"), "Bab " + roman(index + 1) + " · ");
     section.dataset.chapterNumber = String(index + 1);
+    section.append(...reportParagraphs(introductionText(chapter)));
     appendPhotos(section, (chapter.photos ?? []).map((photo, i) => [photo, section.id + "-photo-" + i]));
     const headings = headingEntries(chapter, index);
     appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
@@ -330,6 +331,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
       if (block.type === "heading") {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
+        section.append(...reportParagraphs(introductionText(chapter, block)));
         section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         section.append(...appearanceSectionParagraphs(block));
         section.append(...areaObservationParagraphs(block.roomLayoutAreas, "Denah"),
