@@ -77,7 +77,8 @@ const healthParameters = {
       { id: "pp-natural", label: "Ventilasi alami · batas umum PP 16/2021", min: 5, source: "naturalVentilation",
         section: "Standar Teknis Ventilasi Alami, butir III.a, hlm. 583",
         guidance: "Hasil ukur (%) = luas bukaan ÷ luas lantai yang membutuhkan ventilasi × 100." },
-      { id: "office-natural", label: "Ruang kerja kantor tanpa AC · ventilasi silang", min: 15 },
+      { id: "office-natural", label: "Khusus ruang kerja kantor tanpa AC · ventilasi silang", min: 15,
+        section: "Ventilasi Udara, butir 12, hlm. 65" },
       { id: "nonresidential", label: "Ventilasi alami nonresidensial · desain SNI 6572-1:2024", manual: true,
         source: "ventilation", section: "Pasal 6.4.2", guidance: "Isi batas dari perhitungan desain zona. SNI menentukan ukuran bukaan berdasarkan konfigurasi bukaan dan kebutuhan aliran udara, antara lain melalui Tabel 7 atau 8 pada Jalur A." },
     ],
@@ -227,10 +228,18 @@ function healthNumber(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
+function ventilationWarehouse(row) {
+  if (row.parameter !== "openings") return false;
+  const location = row.location?.trim() || "";
+  return /^(?:ruang\s+)?gudang\b/i.test(location) &&
+    !/\b(?:kantor|perkantoran|ruang\s+kerja|administrasi|admin|office)\b/i.test(location);
+}
+
 function healthMeasurement(row) {
   const parameter = Object.hasOwn(healthParameters, row.parameter) ? healthParameters[row.parameter] : undefined;
   if (!parameter) return {};
-  const category = parameter.categories.find((entry) => entry.id === row.category);
+  const officeMismatch = row.category === "office-natural" && ventilationWarehouse(row);
+  const category = officeMismatch ? undefined : parameter.categories.find((entry) => entry.id === row.category);
   const custom = row.parameter === "custom";
   const manual = Boolean(custom || category?.manual || row.category === "manual");
   const source = category ? healthSources[category.source ?? parameter.source] : undefined;
@@ -254,7 +263,8 @@ function healthMeasurement(row) {
   const measured = valid ? qualitative ? (number === 1 ? "Terpenuhi" : "Belum terpenuhi") : numberText(number) + suffix : "";
   const below = valid && min !== null && number < min;
   const above = valid && max !== null && (number > max || (category?.exclusiveMax && number === max));
-  const status = !row.category && !custom ? "Pilih kategori atau acuan" :
+  const status = officeMismatch ? "Pilih acuan yang sesuai untuk gudang" :
+    !row.category && !custom ? "Pilih kategori atau acuan" :
     !comparable ? "Lengkapi acuan pembanding" :
       !row.measured?.trim() ? "Belum diukur atau diperiksa" :
         !valid ? "Periksa kembali hasil ukur" : below || above ? "Di luar acuan" : "Memenuhi parameter ini";
@@ -262,7 +272,7 @@ function healthMeasurement(row) {
     below ? parameter.below ?? healthParameters.custom.below :
       above ? parameter.above ?? healthParameters.custom.above :
         "Pertahankan kondisi dan jadwal pemeliharaan. Catat hasil dan bukti pemeriksaan.";
-  return { parameter, category, manual, source, reference, threshold, measured, status, recommendation, unit };
+  return { parameter, category, manual, source, reference, threshold, measured, status, recommendation, unit, officeMismatch };
 }
 
 function healthMeasurementValues(row) {
@@ -353,16 +363,21 @@ function healthMeasurementCells(row, locations, kind) {
   }
   function updateResult() {
     const result = healthMeasurement(row);
+    const warehouse = ventilationWarehouse(row);
+    const officeOption = Array.from(categorySelect.options).find((option) => option.value === "office-natural");
+    if (officeOption) officeOption.disabled = warehouse;
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
     threshold.textContent = result.threshold ||
-      (ventilationDesign ? "Batas mengikuti perhitungan desain" : "Acuan belum lengkap");
+      (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
+        ventilationDesign ? "Batas mengikuti perhitungan desain" : "Acuan belum lengkap");
     source.replaceChildren(...(result.source ? [dom("a", { href: result.source[1], target: "_blank", rel: "noopener",
       title: [result.source[0], result.category?.section].filter(Boolean).join(" · ") },
       [result.source[0].split(" · ")[0], result.category?.section].filter(Boolean).join(" · "))] : []));
     source.hidden = !result.source;
-    guidance.textContent = result.category?.guidance ?? "";
+    guidance.textContent = result.officeMismatch ? "Gunakan PP 16/2021 untuk batas umum luas bukaan gudang." :
+      result.category?.guidance ?? "";
     guidance.hidden = !guidance.textContent;
-    generalVentilation.hidden = !ventilationDesign;
+    generalVentilation.hidden = !(ventilationDesign || result.officeMismatch || (warehouse && !row.category));
     manual.hidden = !result.manual;
     const qualitative = result.parameter.unit === "status";
     numericField.hidden = qualitative;
