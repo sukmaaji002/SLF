@@ -413,6 +413,28 @@ function appearanceSectionsEditor(block, changed) {
 }
 
 const areaObservationFields = ["area", "observation", "reference", "limitation"];
+const earlierRoomTokens = [
+  sampleLocationToken, existingAreaToken, "nama gedung atau blok", "lantai atau area",
+  "nama unit", "unit atau area bangunan", "area sampel",
+];
+
+function healthRoomChoices(project, table, sources) {
+  const { names } = priorNarrativeChoices(project, sources, table, [...earlierRoomTokens, "lantai atau zona"]);
+  for (const location of sources.get("project:sample-locations")?.locations ?? []) names.add(location);
+  for (const chapter of project.chapters) {
+    for (const block of chapter.blocks) {
+      if (block === table) {
+        const unique = new Map([...names].map((name) => [tokenName(name), name]));
+        return [...unique.values()];
+      }
+      for (const entry of block.roomLayoutAreas ?? []) {
+        const name = cleanValue(entry.area);
+        if (entry.selected && name) names.add(name);
+      }
+    }
+  }
+  return [...names];
+}
 
 function areaObservationEditor(project, block, sources, areaKey, changed) {
   const environment = areaKey === "environmentAreas";
@@ -420,10 +442,7 @@ function areaObservationEditor(project, block, sources, areaKey, changed) {
   const prior = environment ? {
     names: choicesForInput("ruang terbuka, sirkulasi, atau parkir"),
     links: dom("div"),
-  } : priorNarrativeChoices(project, sources, block, [
-    sampleLocationToken, existingAreaToken, "nama gedung atau blok", "lantai atau area",
-    "nama unit", "unit atau area bangunan", "area sampel",
-  ]);
+  } : priorNarrativeChoices(project, sources, block, earlierRoomTokens);
   const checklistLocations = environment ? [] : sources.get("project:sample-locations")?.locations ?? [];
   const oldArea = resolveReportLink("", environment ? "ruang terbuka, sirkulasi, atau parkir" : "lantai atau zona", sources, block.links).value;
   const names = new Map();
@@ -1522,6 +1541,8 @@ function tableEditor(block) {
   header.append(dom("th", {}, "Baris"));
   const rows = dom("tbody");
   const sources = reportSources(current());
+  const locations = guidedHealth ? healthRoomChoices(current(), block, sources) : [];
+  const imageColumn = tableImageColumn(block);
   const tableName = tokenName(block.text);
   const statusColumn = isDocumentReviewTable(block) ?
     block.headers.findIndex((header) => tokenName(header) === "status verifikasi") : -1;
@@ -1530,7 +1551,8 @@ function tableEditor(block) {
   for (const [index, row] of block.rows.entries()) {
     const rowId = block.rowIds[index];
     const measurement = block.healthMeasurements?.[rowId];
-    const cells = measurement ? healthMeasurementCells(measurement) : [];
+    const recommendation = measurement ? dom("p", { className: "hint health-recommendation" }) : undefined;
+    const cells = measurement ? healthMeasurementCells(measurement, locations, recommendation) : [];
     const firstManualColumn = cells.length;
     cells.push(...row.slice(firstManualColumn).map((_, offset) => {
       const column = offset + firstManualColumn;
@@ -1538,8 +1560,12 @@ function tableEditor(block) {
         column === statusColumn ? ["Tersedia", "Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
           column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []));
     }));
-    cells.at(-1).append(tableRowImageEditor(current(), block, rowId, index));
-    rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
+    if (measurement) {
+      cells[0].append(button("＋ Tambah baris aspek ini", () => addRow(measurement.parameter, index + 1), "quiet"));
+      cells[4].prepend(recommendation);
+    }
+    cells[imageColumn].append(tableRowImageEditor(current(), block, rowId, index));
+    const rowElement = dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
       const populated = block.rowImages?.[rowId] || (measurement && healthMeasurementFields.some((key) => key !== "parameter" && measurement[key]?.trim())) || row.some((cell, column) =>
         (isDocumentReviewTable(block) ? tableCellValue(block, index, column, sources) : cell).trim() ||
         block.cellLinks?.[tableCellKey(block, index, column)]);
@@ -1556,20 +1582,25 @@ function tableEditor(block) {
       block.rowIds.splice(index, 1);
       save();
       render();
-    }, "danger"))));
+    }, "danger")));
+    rowElement.dataset.rowId = rowId;
+    rows.append(rowElement);
   }
   table.append(dom("thead", {}, header), rows);
   matrix.append(table);
   const change = (edit) => { edit(); save(); render(); };
-  const addRow = (guided) => change(() => {
-      block.rows.push(block.headers.map(() => ""));
-      const id = crypto.randomUUID();
-      block.rowIds.push(id);
-      if (guided) block.healthMeasurements[id] = { parameter: "lighting" };
+  const addRow = (parameter, position = block.rows.length) => {
+    const id = crypto.randomUUID();
+    change(() => {
+      block.rows.splice(position, 0, block.headers.map(() => ""));
+      block.rowIds.splice(position, 0, id);
+      if (parameter) block.healthMeasurements[id] = { parameter };
     });
+    if (parameter) document.querySelector('tr[data-row-id="' + id + '"] td:nth-child(2) input')?.focus();
+  };
   const actions = dom("div", { className: "button-row" },
-    button(guidedHealth ? "＋ Baris pengukuran" : "＋ Baris", () => addRow(guidedHealth)),
-    ...(guidedHealth ? [button("＋ Baris manual", () => addRow(false))] : []),
+    button(guidedHealth ? "＋ Baris pengukuran" : "＋ Baris", () => addRow(guidedHealth ? "lighting" : undefined)),
+    ...(guidedHealth ? [button("＋ Baris manual", () => addRow())] : []),
     button("＋ Kolom", () => change(() => {
       block.headers.push("Kolom baru");
       block.columnIds.push(crypto.randomUUID());
@@ -1592,7 +1623,7 @@ function tableEditor(block) {
     });
   }));
   const editor = dom("div", {}, ...(guidedHealth ? [dom("p", { className: "hint" },
-    "Isi nama ruang, pilih kategori, lalu masukkan hasil ukur tanpa pemisah ribuan. Hasil dibandingkan per parameter. Satu baris untuk satu titik atau ruang.")] : []), matrix, actions);
+    "Pilih nama ruang dari isian sebelumnya atau ketik sendiri, lalu pilih kategori dan isi hasil ukur. Gunakan Tambah baris aspek ini untuk memeriksa ruang lain dengan parameter yang sama.")] : []), matrix, actions);
   if (team) {
     const select = dom("select");
     const hint = dom("p", { className: "hint" });

@@ -112,7 +112,7 @@ const architectureHealthIntro = [
   "Tabel berikut merangkum pemeriksaan per parameter dan lokasi agar setiap temuan dapat ditelusuri ke ruang atau sistem yang diperiksa. Hasil dicatat bersama acuan dan bukti pendukung yang tersedia. Jika suatu bagian belum dapat diperiksa atau datanya belum cukup, keterbatasannya dicatat pada baris terkait sebagai dasar pemeriksaan lanjutan.",
 ].join("\n\n");
 const architectureHealthTableTitle = "Hasil pemeriksaan aspek kesehatan";
-const architectureHealthColumns = ["Parameter pemeriksaan", "Ruang / sistem", "Acuan", "Hasil / temuan", "Bukti / gambar"];
+const architectureHealthColumns = ["Parameter pemeriksaan", "Ruang / sistem", "Acuan", "Hasil / temuan", "Keterangan / rekomendasi"];
 const architectureHealthTokens = ["parameter yang diperiksa", "ruang atau sistem", "acuan yang digunakan", "temuan kesehatan", "tabel, gambar, atau lampiran"];
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
@@ -463,7 +463,8 @@ function upgradeArchitectureHealthDraft(project) {
     }
     let table = chapter.blocks[index + 1];
     if (table?.type !== "table" || table.text !== architectureHealthTableTitle ||
-        (hasValues && JSON.stringify(table.headers) !== JSON.stringify(architectureHealthColumns))) {
+        (hasValues && (table.headers.length !== architectureHealthColumns.length ||
+          table.headers.slice(0, 4).some((value, column) => value !== architectureHealthColumns[column])))) {
       table = { type: "table", text: architectureHealthTableTitle, headers: [...architectureHealthColumns],
         rows: hasValues ? [] : [architectureHealthColumns.map(() => "")] };
       chapter.blocks.splice(index + 1, 0, table);

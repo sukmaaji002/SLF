@@ -361,7 +361,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
             const own = getTextFormat(block, "cell:" + key);
             const format = source?.format && own ? { base: { ...source.format.base, ...own.base }, block: own.block, runs: own.runs.length ? own.runs : source.format.runs } : own || source?.format;
             const value = formattedValue(text, format, resolveToken());
-            return hasImage && ci === row.length - 1 ?
+            return hasImage && ci === tableImageColumn(block) ?
               dom("div", {}, value, dom("img", { className: "report-table-image", src: image, alt: "Gambar baris " + (ri + 1) })) : value;
           })];
         });

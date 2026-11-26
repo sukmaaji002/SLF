@@ -160,15 +160,18 @@ function healthMeasurement(row) {
 
 function healthMeasurementValues(row) {
   const result = healthMeasurement(row);
-  if (!result.parameter || ![row.location, row.category, row.measured].some((value) => value?.trim())) return ["", "", "", ""];
+  if (!result.parameter || ![row.location, row.category, row.measured].some((value) => value?.trim())) return ["", "", "", "", ""];
   return [result.parameter.label, [row.location, result.category?.label || (result.manual ? "Acuan lain" : "")].filter(Boolean).join(" · "),
     [result.threshold, result.reference].filter(Boolean).join(" · "),
-    [result.measured || row.measured?.trim(), result.status, result.recommendation].filter(Boolean).join(" · ")];
+    [result.measured || row.measured?.trim(), result.status].filter(Boolean).join(" · "),
+    result.recommendation ? "Rekomendasi · " + result.recommendation : ""];
 }
 
 function initializeHealthMeasurements(project) {
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
-    if (!isArchitectureHealthTable(block) || block.healthMeasurements ||
+    if (!isArchitectureHealthTable(block) && !block.healthMeasurements) continue;
+    if (block.headers[4] === "Bukti / gambar") block.headers[4] = architectureHealthColumns[4];
+    if (block.healthMeasurements ||
         JSON.stringify(block.headers) !== JSON.stringify(architectureHealthColumns)) continue;
     ensureReportReferences({ chapters: [{ blocks: [block] }] });
     const blank = block.rows.findIndex((row, index) => !row.some((cell, column) =>
@@ -187,7 +190,7 @@ function initializeHealthMeasurements(project) {
   }
 }
 
-function healthMeasurementCells(row) {
+function healthMeasurementCells(row, locations, recommendation) {
   const parameterSelect = dom("select", { ariaLabel: "Parameter kesehatan" },
     ...Object.entries(healthParameters).map(([id, parameter]) => new Option(parameter.label, id)));
   parameterSelect.value = row.parameter;
@@ -202,7 +205,21 @@ function healthMeasurementCells(row) {
   const numericField = dom("label", {}, resultLabel, numericResult);
   const visualField = dom("label", {}, "Hasil pemeriksaan", visualResult);
   const status = dom("p", { className: "health-status", role: "status" });
-  const recommendation = dom("p", { className: "hint" });
+  const location = field("Nama ruang atau titik ukur", row.location, (value) => {
+    row.location = value;
+    locationSelect.value = locations.find((name) => tokenName(name) === tokenName(value)) || "";
+    commit();
+  });
+  const locationInput = location.querySelector("input");
+  const locationSelect = dom("select", { ariaLabel: "Ambil nama ruang dari isian sebelumnya" },
+    new Option("Pilih dari isian sebelumnya", ""), ...locations.map((name) => new Option(name, name)));
+  locationSelect.value = locations.find((name) => tokenName(name) === tokenName(row.location || "")) || "";
+  locationSelect.addEventListener("change", () => {
+    if (!locationSelect.value) return;
+    locationInput.value = locationSelect.value;
+    row.location = locationInput.value;
+    commit();
+  });
   function commit() {
     updateResult();
     refreshLinkedFields();
@@ -258,10 +275,11 @@ function healthMeasurementCells(row) {
   return [
     dom("td", {}, dom("label", {}, "Parameter", parameterSelect)),
     dom("td", {}, dom("div", { className: "health-measurement" },
-      field("Nama ruang atau titik ukur", row.location, (value) => { row.location = value; commit(); }),
+      locations.length ? dom("label", {}, "Ambil nama ruang", locationSelect) : "",
+      location,
       dom("label", {}, "Kategori ruang atau sistem", categorySelect))),
     dom("td", {}, dom("div", { className: "health-measurement" }, threshold, source, manual)),
     dom("td", {}, dom("div", { className: "health-measurement" },
-      numericField, visualField, status, recommendation)),
+      numericField, visualField, status)),
   ];
 }

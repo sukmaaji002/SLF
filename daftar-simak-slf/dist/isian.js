@@ -177,14 +177,20 @@ function tableCellValue(block, row, column, sources) {
   const measurement = block.healthMeasurements?.[block.rowIds?.[row]];
   if (measurement && column < 4) return healthMeasurementValues(measurement)[column];
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
-  if (source) return sources.get(source)?.value || "";
   const automatic = sources.get(automaticTableCellSource(block, row, column));
-  const value = automatic?.value || block.rows[row][column];
+  const value = source ? sources.get(source)?.value || "" : automatic?.value || block.rows[row][column];
+  if (measurement && column === 4) return [value, healthMeasurementValues(measurement)[4]].filter(Boolean).join(" · ");
+  if (source) return value;
   return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
 }
 
 function isArchitectureHealthTable(block) {
   return block?.type === "table" && tokenName(block.text) === tokenName(architectureHealthTableTitle);
+}
+
+function tableImageColumn(block) {
+  return (block.healthMeasurements || isArchitectureHealthTable(block)) && block.headers.length >= 5 ?
+    4 : block.headers.length - 1;
 }
 
 function tableSourceAvailable(id, block) {
