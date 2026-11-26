@@ -401,6 +401,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   let sources = initialSources;
   const followUp = key === "body" && (tokenName(data.text ?? "") === "kesenjangan dan tindak lanjut" ||
     reportTokens(data[key] || "").has("dokumen yang kurang atau perbedaan data"));
+  const useGuide = key === "body" && (tokenName(data.text ?? "") === "peruntukan bangunan" ||
+    reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
+  const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields : undefined;
 
   function openField(token) {
     if (!details.open) {
@@ -428,7 +431,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const fromChecklist = token === "tanggal pemeriksaan" && (!link || link.source === "identity:date");
       const caption = fromChecklist ? "Isi tanggal pemeriksaan di Daftar Simak" :
         repeatedNarrativeFields.get(token)?.previewLabel ??
-        (followUp ? documentFollowUpFields.get(token)?.[1] : undefined) ?? "Isi " + name.trim();
+        guideFields?.get(token)?.[1] ?? "Isi " + name.trim();
       return { value: caption, node: button(caption, fromChecklist ? openChecklistDate : () => openField(token), "narrative-placeholder") };
     }) : "Belum ada teks. Pilih Ubah teks dan format untuk mulai menulis.");
   }
@@ -449,6 +452,13 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       groups.get(source.group).push([id, source.label]);
     }
     const grid = dom("div", { className: "form-grid narrative-fields" });
+    const useSteps = useGuide ? [
+      ["Menurut dokumen", "Catat dokumen yang dipakai dan fungsi yang tertulis di dalamnya."],
+      ["Di lapangan", "Catat bagian yang diperiksa dan penggunaannya saat ini."],
+      ["Hasil perbandingan", "Tulis sesuai, berbeda, atau belum bisa dipastikan. Sertakan foto, denah, atau dokumen yang mendukung."],
+    ].map(([title, tip]) => ({
+      title, tip, fields: dom("div", { className: "form-grid narrative-fields" }),
+    })) : [];
     const methodHeading = key === "body" ? tokenName(data.text ?? "") : "";
     const methods = {
       health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
@@ -456,7 +466,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       ease: fields.has(easeParameterToken) || (methodHeading === "kemudahan" && fields.has(easeReferenceToken)),
     };
     for (const [token, name] of fields) {
-      const followUpField = followUp ? documentFollowUpFields.get(token) : undefined;
+      const guideField = guideFields?.get(token);
+      const showDocumentChoices = useGuide && token === "dokumen rujukan";
       const links = getLinks();
       const saved = Object.hasOwn(links, token) ? links[token] : undefined;
       const auto = automaticSource(token, sources);
@@ -471,7 +482,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const permitDocuments = token === permitDocumentsToken;
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
-      const fieldTitle = followUpField?.[0] ?? repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
+      const fieldTitle = guideField?.[0] ?? repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
       const manualOnly = token === "daftar alat pemeriksaan";
       const select = dom("select", { ariaLabel: repeated?.label ?? "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
@@ -499,7 +510,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         focusManual();
       }, "quiet");
       const simpleChoices = safetyParameters || comfortParameters || repeated?.method;
-      const example = simpleChoices || repeated?.label || followUpField ? "" : inputExample(token);
+      const example = simpleChoices || repeated?.label || guideField ? "" : inputExample(token);
       const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly || permitDocuments ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
@@ -557,7 +568,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       }
       const suggestedNumbers = permitDocuments ? recordedPermitNumbers(project, data, sources) : undefined;
       const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices, suggestedNumbers) :
-        field(followUpField?.[1] ?? manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
+        field(guideField?.[1] ?? manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
         token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
       const manualInput = manual.querySelector("input");
       const focusManual = () => {
@@ -565,7 +576,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         if (input) focusTextField(input);
         else manual.querySelector("button")?.focus();
       };
-      const choices = repeated || token === "tanggal pemeriksaan" || followUpField ? [] : presets;
+      const choices = repeated || token === "tanggal pemeriksaan" || (guideField && !showDocumentChoices) ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -574,8 +585,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       };
       const isExample = !Object.hasOwn(inputChoices, token);
       let choiceField;
-      if (choiceLegend) {
+      if (choiceLegend && choices.length) {
         choiceField = multipleChoiceField(choiceLegend, choices, manualInput, applyChoiceValue);
+        if (showDocumentChoices) choiceField = dom("details", { className: "narrative-source" },
+          dom("summary", {}, "Pilih jenis dokumen"), choiceField);
       } else if (choices.length) {
         const pick = dom("select", { ariaLabel: "Pilihan isian " + name },
           new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option)));
@@ -607,7 +620,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         const filled = Boolean(self ? manualData.value.trim() : linkedValue);
         badge.textContent = filled ? "Terisi" : "Belum terisi";
         badge.dataset.filled = String(filled);
-        sourceSummary.textContent = self ? (repeated?.label || followUpField ? "Tautkan ke isian lain" : "Sumber: Isi sendiri") :
+        sourceSummary.textContent = self ? (repeated?.label || guideField ? "Tautkan ke isian lain" : "Sumber: Isi sendiri") :
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
@@ -637,10 +650,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (token === "daftar dokumen" || technicalDocuments) entry.append(documentReviewLinks(project));
       if (openDate) entry.append(openDate);
       if (scope) entry.append(scope);
-      if (choiceField) entry.append(choiceField);
+      if (choiceField && !showDocumentChoices) entry.append(choiceField);
       if (priorChoices) entry.append(priorChoices.links);
       entry.append(manual);
-      if (followUpField) entry.append(dom("p", { className: "hint" }, "Contoh jawaban · " + followUpField[2]));
+      if (guideField) entry.append(dom("p", { className: "hint" }, "Contoh jawaban · " + guideField[2]));
+      if (choiceField && showDocumentChoices) entry.append(choiceField);
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
@@ -650,7 +664,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         else if (!useManual.hidden) useManual.focus();
         else source.querySelector("summary").focus();
       });
-      grid.append(entry);
+      (useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
     }
     if (followUp) {
       const instructions = dom("div", { className: "link-entry" },
@@ -658,6 +672,15 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("p", { className: "hint" }, "Jika tidak ada temuan, buka Ubah teks dan format lalu ganti narasi dengan kalimat “Tidak ditemukan kekurangan atau perbedaan pada dokumen yang ditelaah.”"),
         documentReviewLinks(project));
       content.replaceChildren(instructions, grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else if (useGuide) {
+      const sections = useSteps.flatMap(({ title, tip, fields }, index) => {
+        if (!fields.childElementCount) return [];
+        if (fields.childElementCount === 1) fields.firstElementChild.classList.add("wide");
+        return [dom("section", { className: "narrative-step" },
+          dom("h4", {}, (index + 1) + ". " + title), dom("p", { className: "hint" }, tip), fields)];
+      });
+      content.replaceChildren(...sections, ...(grid.childElementCount ? [grid] : []),
+        ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else {
       content.replaceChildren(grid, fields.has("tujuan kajian") ? editPurpose : insertPurpose);
     }

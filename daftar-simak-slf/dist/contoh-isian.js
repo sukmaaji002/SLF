@@ -7,6 +7,14 @@ const documentFollowUpFields = new Map([
   ["bukti atau dokumen", ["Apa yang perlu disiapkan?", "Bukti yang dibutuhkan", "Gambar terbangun terbaru untuk lantai 1"]],
 ]);
 
+const buildingUseFields = new Map([
+  ["dokumen rujukan", ["Dokumen apa yang Anda pakai?", "Nama atau nomor dokumen", "PBG No. 123/2024", 0]],
+  ["fungsi yang tercatat", ["Apa fungsi yang tertulis di dokumen?", "Fungsi di dokumen", "Gudang", 0]],
+  ["area sampel", ["Bagian mana yang Anda periksa?", "Area yang diperiksa", "Gudang lantai 1", 1]],
+  ["fungsi teramati", ["Dipakai untuk apa saat diperiksa?", "Penggunaan saat ini", "Penyimpanan barang", 1]],
+  ["kesesuaian atau perbedaan beserta rujukan bukti", ["Apakah penggunaannya sesuai?", "Hasil dan bukti", "sesuai dengan fungsi pada PBG, sebagaimana terlihat pada Foto 5.1", 2]],
+]);
+
 const inputExamples = {
   "aspek": "tata bangunan atau keselamatan, sesuai butir yang dibahas",
   "sampel / sumber bukti": "titik P-01 di koridor dan Foto 2.1",

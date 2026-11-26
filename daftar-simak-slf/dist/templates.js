@@ -79,12 +79,15 @@ const easeNarrative = previousEaseNarrative.replace(
 );
 const previousDocumentFollowUp = "Dari penelaahan dokumen, tercatat [dokumen yang kurang atau perbedaan data] dengan dampak terhadap verifikasi [aspek yang terdampak]. Konfirmasi atau pelengkapan dokumen menjadi tindak lanjut [penanggung jawab] dengan bukti yang diperlukan berupa [bukti atau dokumen].";
 const documentFollowUp = "Pemeriksaan dokumen menemukan [dokumen yang kurang atau perbedaan data]. Hal yang perlu dikonfirmasi adalah [aspek yang terdampak]. Tindak lanjut dilakukan oleh [penanggung jawab] dengan menyiapkan [bukti atau dokumen].";
+const previousBuildingUse = "Fungsi atau peruntukan bangunan menurut [dokumen rujukan] adalah [fungsi yang tercatat]. Pemanfaatan aktual di [area sampel] adalah [fungsi teramati]. Hasil perbandingannya adalah [kesesuaian atau perbedaan beserta rujukan bukti].";
+const buildingUse = "Menurut [dokumen rujukan], fungsi bangunan adalah [fungsi yang tercatat]. Saat diperiksa, [area sampel] digunakan untuk [fungsi teramati]. Hasil perbandingannya adalah [kesesuaian atau perbedaan beserta rujukan bukti].";
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
   [previousComfortNarrative, comfortNarrative],
   [previousEaseNarrative, easeNarrative],
   [previousDocumentFollowUp, documentFollowUp],
+  [previousBuildingUse, buildingUse],
 ]);
 
 const reportTemplates = {
@@ -153,7 +156,7 @@ const reportTemplates = {
         [
           "Pemeriksaan persyaratan tata bangunan gedung",
           {"body":"Kondisi tata bangunan dibandingkan dengan [dokumen pembanding] untuk menilai peruntukan, intensitas, penampilan, tata ruang dalam, dan hubungan dengan lingkungan. Hasil penilaian disajikan menurut ruang lingkup dan bukti yang tersedia pada bagian berikut.","previous":"[Ringkas hasil perbandingan desain dengan kondisi bangunan.]"},
-          ["Peruntukan bangunan", {"body":"Fungsi atau peruntukan bangunan menurut [dokumen rujukan] adalah [fungsi yang tercatat]. Pemanfaatan aktual di [area sampel] adalah [fungsi teramati]. Hasil perbandingannya adalah [kesesuaian atau perbedaan beserta rujukan bukti].","previous":"[Catat fungsi yang diizinkan dan pemanfaatan aktual per ruang atau unit.]"}],
+          ["Peruntukan bangunan", { body: buildingUse, previous: "[Catat fungsi yang diizinkan dan pemanfaatan aktual per ruang atau unit.]" }],
           ["Intensitas bangunan", {"body":"Parameter intensitas yang ditelaah meliputi [luas, jumlah lantai, tinggi, koefisien, atau jarak sempadan yang relevan]. Data aktual [nilai dan satuan] dibandingkan dengan [nilai dan sumber pembanding]. Hasil telaah dicatat sebagai [temuan atau keterbatasan].","previous":"[Catat luas, jumlah lantai, ketinggian, intensitas, dan sempadan berdasarkan data proyek.]"}],
           ["Penampilan bangunan", {"body":"Penampilan bangunan diamati pada [sisi atau area] dan meliputi [bentuk, fasad, atap, atau elemen arsitektural yang diperiksa]. Kondisi teramati adalah [hasil observasi] dengan dokumentasi pada [nomor foto atau gambar].","previous":"[Uraikan bentuk, fasad, atap, dan kondisi elemen arsitektural.]"}],
           ["Tata ruang dalam", {"body":"Penataan ruang pada [lantai atau zona] diperiksa terhadap [denah atau gambar rujukan]. Hasil pemeriksaan menunjukkan [susunan, fungsi, luasan, atau perubahan yang teramati]. Area yang belum dicakup adalah [batasan pemeriksaan].","previous":"[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]"}],

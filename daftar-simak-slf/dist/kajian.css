@@ -114,6 +114,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .narrative-editor > .hint { padding: 0 10px 8px; }
 .narrative-editor > .text-format-field { margin: 0 10px 10px; }
 .narrative-fields { gap: 8px; }
+.narrative-step { display: grid; min-width: 0; gap: 6px; }
+.narrative-step + .narrative-step { border-top: 1px solid var(--line); padding-top: 10px; }
 .link-entry { min-width: 0; display: grid; gap: 7px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow-wrap: anywhere; }
 .link-entry > button { justify-self: start; }
 .narrative-field-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
