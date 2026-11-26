@@ -353,7 +353,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
           const values = row.map((_, ci) => tableCellValue(block, ri, ci, sources));
           const image = block.rowImages?.[block.rowIds?.[ri]];
           const hasImage = imageSource.test(image || "");
-          if (documentReview && !hasImage && !values.some((value) => value?.trim())) return [];
+          if ((documentReview || block.healthMeasurements?.[block.rowIds?.[ri]]) &&
+              !hasImage && !values.some((value) => value?.trim())) return [];
           return [values.map((text, ci) => {
             const key = tableCellKey(block, ri, ci);
             const source = sources.get(block.cellLinks?.[key]);

@@ -174,6 +174,8 @@ function automaticTableCellSource(block, row, column) {
 }
 
 function tableCellValue(block, row, column, sources) {
+  const measurement = block.healthMeasurements?.[block.rowIds?.[row]];
+  if (measurement && column < 4) return healthMeasurementValues(measurement)[column];
   const source = block.cellLinks?.[tableCellKey(block, row, column)];
   if (source) return sources.get(source)?.value || "";
   const automatic = sources.get(automaticTableCellSource(block, row, column));

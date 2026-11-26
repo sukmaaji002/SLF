@@ -484,6 +484,7 @@ function upgradeArchitectureHealthDraft(project) {
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
   upgradeArchitectureHealthDraft(project);
+  initializeHealthMeasurements(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
     let revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
     if (block.type === "heading" && block.body.endsWith(appearanceEvidenceParagraph)) {

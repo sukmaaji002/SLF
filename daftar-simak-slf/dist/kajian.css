@@ -88,6 +88,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .matrix th, .matrix td { min-width: 135px; padding: 4px; text-align: left; }
 .matrix th:last-child, .matrix td:last-child { min-width: auto; }
 .matrix label { font-size: .8125rem; }
+.health-matrix td { vertical-align: top; }
+.health-measurement { display: grid; gap: 6px; min-width: 0; }
+.health-threshold, .health-status { font-size: .875rem; font-weight: 700; }
+.health-status[data-status="pass"] { color: #286047; }
+.health-status[data-status="fail"] { color: #8b3729; }
 .team-matrix td, .team-matrix th { vertical-align: top; }
 .team-lead { margin-block: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
 .team-lead select { max-width: min(100%, 420px); }

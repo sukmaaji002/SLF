@@ -44,7 +44,7 @@ function heading(text) {
 }
 
 function draft(name, template) {
-  return {
+  const project = {
     id: crypto.randomUUID(), name, template,
     ...(template === "disiplin" ? { narrativeRevision: architectureHealthTableRevision } : {}),
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
@@ -54,6 +54,8 @@ function draft(name, template) {
       blocks: templateBlocks(sections),
     })),
   };
+  initializeHealthMeasurements(project);
+  return project;
 }
 
 const current = () => workspace.projects.find(({ id }) => id === workspace.current);
@@ -1506,7 +1508,8 @@ function renderChapter(project) {
 
 function tableEditor(block) {
   const team = isTeamTable(block);
-  const matrix = dom("div", { className: team ? "matrix team-matrix" : "matrix" });
+  const guidedHealth = Boolean(block.healthMeasurements);
+  const matrix = dom("div", { className: team ? "matrix team-matrix" : guidedHealth ? "matrix health-matrix" : "matrix" });
   const table = dom("table");
   const header = dom("tr");
   for (const [index, value] of block.headers.entries()) {
@@ -1526,13 +1529,18 @@ function tableEditor(block) {
     block.headers.findIndex((header) => tokenName(header) === "alat") : -1;
   for (const [index, row] of block.rows.entries()) {
     const rowId = block.rowIds[index];
-    const cells = row.map((_, column) =>
-      dom("td", {}, tableCellField(block, index, column, sources,
+    const measurement = block.healthMeasurements?.[rowId];
+    const cells = measurement ? healthMeasurementCells(measurement) : [];
+    const firstManualColumn = cells.length;
+    cells.push(...row.slice(firstManualColumn).map((_, offset) => {
+      const column = offset + firstManualColumn;
+      return dom("td", {}, tableCellField(block, index, column, sources,
         column === statusColumn ? ["Tersedia", "Terverifikasi", "Telah ditelaah", "Belum ditelaah", "Belum tersedia"] :
-          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : [])));
+          column === toolColumn ? inputChoices["daftar alat pemeriksaan"] : []));
+    }));
     cells.at(-1).append(tableRowImageEditor(current(), block, rowId, index));
     rows.append(dom("tr", { ariaLabel: (team ? "Pengkaji " : "Baris ") + (index + 1) }, ...cells, dom("td", {}, button("Hapus", () => {
-      const populated = block.rowImages?.[rowId] || row.some((cell, column) =>
+      const populated = block.rowImages?.[rowId] || (measurement && healthMeasurementFields.some((key) => key !== "parameter" && measurement[key]?.trim())) || row.some((cell, column) =>
         (isDocumentReviewTable(block) ? tableCellValue(block, index, column, sources) : cell).trim() ||
         block.cellLinks?.[tableCellKey(block, index, column)]);
       if (populated && !confirm("Hapus baris tabel ini?")) return;
@@ -1542,6 +1550,7 @@ function tableEditor(block) {
         setTextFormat(block, "cell:" + key, undefined);
       }
       if (block.rowImages) delete block.rowImages[rowId];
+      if (measurement) delete block.healthMeasurements[rowId];
       block.rows.splice(index, 1);
       if (block.teamLead === rowId) delete block.teamLead;
       block.rowIds.splice(index, 1);
@@ -1552,17 +1561,21 @@ function tableEditor(block) {
   table.append(dom("thead", {}, header), rows);
   matrix.append(table);
   const change = (edit) => { edit(); save(); render(); };
-  const actions = dom("div", { className: "button-row" },
-    button("＋ Baris", () => change(() => {
+  const addRow = (guided) => change(() => {
       block.rows.push(block.headers.map(() => ""));
-      block.rowIds.push(crypto.randomUUID());
-    })),
+      const id = crypto.randomUUID();
+      block.rowIds.push(id);
+      if (guided) block.healthMeasurements[id] = { parameter: "lighting" };
+    });
+  const actions = dom("div", { className: "button-row" },
+    button(guidedHealth ? "＋ Baris pengukuran" : "＋ Baris", () => addRow(guidedHealth)),
+    ...(guidedHealth ? [button("＋ Baris manual", () => addRow(false))] : []),
     button("＋ Kolom", () => change(() => {
       block.headers.push("Kolom baru");
       block.columnIds.push(crypto.randomUUID());
       block.rows.forEach((row) => row.push(""));
     })));
-  if (block.headers.length > 1) actions.append(button("Hapus kolom terakhir", () => {
+  if (block.headers.length > (guidedHealth ? architectureHealthColumns.length : 1)) actions.append(button("Hapus kolom terakhir", () => {
     const column = block.headers.length - 1;
     const populated = block.rows.some((row, index) => row[column].trim() || block.cellLinks?.[tableCellKey(block, index, column)]);
     if (populated && !confirm("Hapus kolom terakhir beserta isinya?")) return;
@@ -1578,7 +1591,8 @@ function tableEditor(block) {
       block.rows.forEach((row) => row.pop());
     });
   }));
-  const editor = dom("div", {}, matrix, actions);
+  const editor = dom("div", {}, ...(guidedHealth ? [dom("p", { className: "hint" },
+    "Isi nama ruang, pilih kategori, lalu masukkan hasil ukur tanpa pemisah ribuan. Hasil dibandingkan per parameter. Satu baris untuk satu titik atau ruang.")] : []), matrix, actions);
   if (team) {
     const select = dom("select");
     const hint = dom("p", { className: "hint" });
@@ -1978,6 +1992,13 @@ function validateBackup(data) {
         if (typeof block.sourceId === "string" && sourceUuid.test(block.sourceId)) clean.sourceId = block.sourceId;
         clean.rowIds = importIds(block.rowIds, block.rows.length);
         clean.columnIds = importIds(block.columnIds, block.headers.length);
+        if (clean.rowIds && block.headers.length >= architectureHealthColumns.length &&
+            block.healthMeasurements && typeof block.healthMeasurements === "object" && !Array.isArray(block.healthMeasurements)) {
+          clean.healthMeasurements = Object.fromEntries(clean.rowIds.flatMap((id) => {
+            const entry = block.healthMeasurements[id];
+            return entry && Object.hasOwn(healthParameters, entry.parameter) ? [[id, pickText(entry, healthMeasurementFields)]] : [];
+          }));
+        }
         if (clean.rowIds && block.rowImages && typeof block.rowImages === "object") {
           const images = clean.rowIds.flatMap((id) => {
             const image = block.rowImages[id];
