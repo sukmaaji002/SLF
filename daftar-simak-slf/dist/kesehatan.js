@@ -320,6 +320,8 @@ function healthMeasurementCells(row, locations, kind) {
     ...choices.map((id) => new Option(healthParameters[id].label, id)));
   parameterSelect.value = row.parameter;
   const categorySelect = dom("select", { ariaLabel: "Kategori ruang atau sistem" });
+  let categoryParameter;
+  let categoryWarehouse;
   const categoryField = dom("label", {}, "Kategori atau acuan", categorySelect);
   const customFields = dom("div", { className: "health-measurement" });
   const threshold = dom("p", { className: "health-threshold" });
@@ -364,8 +366,14 @@ function healthMeasurementCells(row, locations, kind) {
   function updateResult() {
     const result = healthMeasurement(row);
     const warehouse = ventilationWarehouse(row);
-    const officeOption = Array.from(categorySelect.options).find((option) => option.value === "office-natural");
-    if (officeOption) officeOption.disabled = warehouse;
+    if (categoryParameter !== row.parameter || categoryWarehouse !== warehouse) {
+      const categories = result.parameter.categories.filter(({ id }) => !warehouse || id !== "office-natural");
+      categorySelect.replaceChildren(new Option("Pilih kategori atau acuan", ""),
+        ...categories.map(({ id, label }) => new Option(label, id)), new Option("Acuan lain · isi sendiri", "manual"));
+      categorySelect.value = result.officeMismatch ? "" : row.category || "";
+      categoryParameter = row.parameter;
+      categoryWarehouse = warehouse;
+    }
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
     threshold.textContent = result.threshold ||
       (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
@@ -400,9 +408,6 @@ function healthMeasurementCells(row, locations, kind) {
       field("Jenis aspek", row.name, (value) => { row.name = value; commit(); }),
       field("Satuan (jika ada)", row.unit, (value) => { row.unit = value; commit(); }),
     ] : []));
-    categorySelect.replaceChildren(new Option("Pilih kategori atau acuan", ""),
-      ...parameter.categories.map(({ id, label }) => new Option(label, id)), new Option("Acuan lain · isi sendiri", "manual"));
-    categorySelect.value = row.category || "";
     numericResult.value = row.measured || "";
     numericResult.placeholder = row.parameter === "openings" ? "Contoh · 5,5" : "Contoh · 325,5";
     visualResult.value = row.measured || "";
