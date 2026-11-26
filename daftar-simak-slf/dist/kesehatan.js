@@ -493,7 +493,7 @@ function healthMeasurementCells(row, locations, kind) {
     categorySelect.value = "toilet-basic";
     selectCategory();
   }, "quiet");
-  const numericResult = dom("input", { inputMode: "decimal", ariaLabel: "Hasil pengukuran", placeholder: "Contoh · 325,5" });
+  const numericResult = dom("input", { inputMode: "decimal", ariaLabel: "Hasil pengukuran", placeholder: "Masukkan hasil ukur" });
   const visualResult = dom("select", { ariaLabel: "Hasil pemeriksaan" },
     new Option("Pilih hasil", ""), new Option("Terpenuhi", "1"), new Option("Belum terpenuhi", "0"));
   const resultLabel = dom("span", {}, "Hasil pengukuran");
@@ -550,14 +550,17 @@ function healthMeasurementCells(row, locations, kind) {
     const ventilationDesign = row.parameter === "openings" && row.category === "nonresidential";
     const overview = !row.category || result.toiletNeedsCriterion ? result.parameter.overview : undefined;
     const referenceSource = overview ? healthSources[result.parameter.source] : result.source;
-    const referenceSection = result.category?.section ?? overview;
+    const referenceSection = result.toiletNeedsCriterion ? overview : result.category?.section ?? overview;
+    const manualPrompt = result.parameter.unit === "status" ? "Tuliskan sumber dan kriteria yang digunakan." :
+      "Tuliskan sumber acuan dan sedikitnya satu batas ukur, minimum atau maksimum.";
     threshold.textContent = result.toiletNeedsCriterion ? toiletBasicCriterion : result.threshold ||
       (result.officeMismatch ? "Acuan kantor khusus ruang kerja tanpa AC" :
         ventilationDesign ? "Batas mengikuti perhitungan desain" : result.category?.pending ??
-          (overview ? "Pilih komponen untuk melihat kriterianya" : "Acuan belum lengkap"));
+          (overview ? "Pilih komponen untuk melihat kriterianya" : result.manual ? manualPrompt :
+            "Pilih kategori ruang atau sistem untuk melihat batas dan sumber acuannya."));
     source.replaceChildren(...(referenceSource ? [dom("a", { href: referenceSource[1], target: "_blank", rel: "noopener",
       title: [referenceSource[0], referenceSection].filter(Boolean).join(" · ") },
-      [referenceSource[0].split(" · ")[0], referenceSection].filter(Boolean).join(" · "))] : []));
+      [referenceSource[0], referenceSection].filter(Boolean).join(" · "))] : []));
     source.hidden = !referenceSource;
     guidance.textContent = result.toiletNeedsCriterion ? "Kriteria dasar di atas tersedia sebagai pilihan. Terapkan acuan dan pilih kembali hasil setelah diperiksa." :
       result.officeMismatch ? "Gunakan PP 16/2021 untuk batas umum luas bukaan gudang." :
@@ -589,7 +592,7 @@ function healthMeasurementCells(row, locations, kind) {
       field("Satuan (jika ada)", row.unit, (value) => { row.unit = value; commit(); }),
     ] : []));
     numericResult.value = row.measured || "";
-    numericResult.placeholder = row.parameter === "openings" ? "Contoh · 5,5" : "Contoh · 325,5";
+
     visualResult.value = row.measured || "";
     const reference = field("Nomor acuan dan kriteria", row.reference, (value) => { row.reference = value; commit(); });
     manual.replaceChildren(reference, ...(parameter.unit === "status" ? [] :

@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="ponsel.css">
-  <script src="format-teks.js" defer></script>
+  <link rel="stylesheet" href="editor-kajian.css?v=1">
+  <script src="format-teks.js?v=3" defer></script>
   <script src="catalog.js" defer></script>
   <script src="acuan-simak.js" defer></script>
   <script src="laporan.js?v=8" defer></script>
@@ -59,6 +60,7 @@
         <h2 id="identity-title">Identitas dan kondisi bangunan</h2>
         <span id="save-status" role="status">Penyimpanan di browser ini</span>
       </div>
+      <a class="simak-jump" href="#pemeriksaan">Langsung ke butir pemeriksaan ↓</a>
       <div class="identity-grid">
         <div><h3>Identitas pemilik bangunan gedung</h3><div id="owner-fields" class="form-grid"></div></div>
         <div><h3>Kondisi bangunan gedung</h3><div id="condition-fields" class="form-grid"></div></div>
@@ -74,6 +76,7 @@
         <h2 id="check-title">Butir pemeriksaan</h2>
         <div class="actions"><button id="simak-preview" type="button">Pratinjau formulir</button><button id="print" class="primary" type="button">Cetak / PDF</button><button id="export" type="button">Unduh CSV</button></div>
       </div>
+      <p class="simak-hint">Cari bagian bangunan yang diperiksa, lalu buka butirnya untuk melihat acuan dan mencatat hasil lapangan.</p>
       <div class="filters">
         <label>Cari butir<input id="search" type="search" placeholder="Contoh: ventilasi"></label>
         <label>Kategori<select id="category"><option value="">Semua kategori</option></select></label>

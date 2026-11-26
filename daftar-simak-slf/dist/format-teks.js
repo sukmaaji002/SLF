@@ -203,7 +203,9 @@ function textFormatControl(label, control, owner, key, changed) {
   surface.setAttribute("aria-multiline", String(multiline));
   const toolbar = node("div", { className: "text-format-toolbar", role: "group", ariaLabel: "Pengaturan teks" });
   const ruler = node("div", { className: "text-format-ruler", hidden: true });
-  const frame = node("div", { className: "text-format-frame" }, toolbar, ruler, surface);
+  const formatOptions = node("details", { className: "format-options" },
+    node("summary", {}, "Format teks"), toolbar, ruler);
+  const frame = node("div", { className: "text-format-frame" }, surface, formatOptions);
   const wrapper = node("div", { className: "text-format-field" }, label, frame);
   if (label.classList.contains("wide")) wrapper.classList.add("wide");
   if (!multiline) wrapper.classList.add("text-format-compact");
@@ -452,7 +454,7 @@ function textFormatControl(label, control, owner, key, changed) {
       surface.focus();
     });
     readers.push(() => { select.disabled = control.readOnly; });
-    toolbar.append(select);
+    frame.insertBefore(select, formatOptions);
   };
   wrapper.syncTextFormat();
   return wrapper;

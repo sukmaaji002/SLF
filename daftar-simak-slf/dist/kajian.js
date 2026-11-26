@@ -558,8 +558,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const separator = control.value.trim() ? "\n\n" : "";
     control.value += separator + "[tujuan kajian]";
     control.dispatchEvent(new Event("input"));
+    details.open = true;
     summary.focus();
   }, "quiet");
+  textEditor.append(insertPurpose);
   const editPurpose = button("Ubah tujuan di Bagian Awal", () => {
     active = "front";
     render();
@@ -635,12 +637,13 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   function update(nextSources = reportSources(project)) {
     sources = nextSources;
     updatePreview();
-    details.hidden = key === "body" && inspectionIntroductions.has(data[key]);
+    const fields = reportTokens(data[key] || "");
+    details.hidden = !fields.size && !appearanceGuide && !areaKey;
+    insertPurpose.hidden = fields.has("tujuan kajian") || (key === "body" && inspectionIntroductions.has(data[key]));
     if (!details.open) return;
     entries.clear();
-    const fields = reportTokens(data[key] || "");
     if (!fields.size && !appearanceGuide && !areaKey) {
-      content.replaceChildren(insertPurpose);
+      content.replaceChildren();
       return;
     }
     const groups = new Map();
@@ -821,7 +824,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         const filled = Boolean(self ? manualData.value.trim() : linkedValue);
         badge.textContent = filled ? "Terisi" : "Belum terisi";
         badge.dataset.filled = String(filled);
-        sourceSummary.textContent = self ? (repeated?.label || guideField ? "Tautkan ke isian lain" : "Sumber: Isi sendiri") :
+        sourceSummary.textContent = self ? "Ambil dari isian sebelumnya" :
           "Sumber: " + (select.selectedOptions[0]?.label || "Otomatis");
         manual.hidden = !self;
         value.hidden = self;
@@ -917,7 +920,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       content.replaceChildren(...sections, ...(grid.childElementCount ? [grid] : []),
         ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else {
-      content.replaceChildren(grid, fields.has("tujuan kajian") ? editPurpose : insertPurpose);
+      content.replaceChildren(grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     }
   }
 
@@ -1354,19 +1357,36 @@ function title(type, label) {
 
 function renderCover(project) {
   title("Bagian awal", "Sampul laporan");
-  editor.append(dom("p", { className: "lead" }, "Nama, alamat, fungsi, dan identitas pada sampul otomatis mengisi bagian yang sesuai dalam laporan."),
-    dom("div", { className: "form-grid" }, ...coverFields.map(([key, label, type]) => {
-      const [owner, fieldKey] = key === "consultant" ? consultantNameField(project) : [project.cover, key];
-      const control = guidedField(owner, fieldKey, fieldKey === "individualName" ? "Nama pengkaji teknis" : label, type);
-      if (key === "building" || key === "owner") control.querySelector("input").id = "cover-" + key;
-      return control;
-    })),
-    dom("hr"), pictureEditor(project.cover, "foto sampul", () => workspace.projects.includes(project)));
-  editor.append(dom("hr"), field("Nama proyek di editor", project.name, (value) => {
-    project.name = value;
-    $("projects").selectedOptions[0].textContent = value;
-    save();
-  }, "text", project, "name"));
+  const groups = [
+    ["Identitas bangunan", ["building", "use", "address", "city"]],
+    ["Pihak yang terlibat", ["owner", "consultant"]],
+    ["Identitas laporan", ["title", "number", "date"]],
+  ];
+  editor.append(dom("p", { className: "lead" }, "Mulai dari nama dan alamat bangunan. Data sampul akan digunakan kembali pada bagian laporan yang tertaut."));
+  const fields = new Map();
+  for (const [key, label, type] of coverFields) {
+    const [owner, fieldKey] = key === "consultant" ? consultantNameField(project) : [project.cover, key];
+    const control = guidedField(owner, fieldKey, fieldKey === "individualName" ? "Nama pengkaji teknis" : label, type);
+    if (key === "building" || key === "owner") control.querySelector("input").id = "cover-" + key;
+    fields.set(key, control);
+  }
+  for (const [heading, keys] of groups) {
+    editor.append(dom("section", { className: "cover-group" }, dom("h3", {}, heading),
+      dom("div", { className: "form-grid" }, ...keys.map((key) => fields.get(key)))));
+  }
+  editor.append(dom("section", { className: "cover-group" }, dom("h3", {}, "Foto sampul"),
+    pictureEditor(project.cover, "foto sampul", () => workspace.projects.includes(project))),
+    dom("details", { className: "editor-settings" }, dom("summary", {}, "Ubah nama proyek di editor"),
+      field("Nama proyek di editor", project.name, (value) => {
+        project.name = value;
+        $("projects").selectedOptions[0].textContent = value;
+        save();
+      }, "text", project, "name")),
+    button(isTrial() ? "Lanjut ke pendahuluan →" : "Lanjut ke bagian awal →", () => {
+      active = "front";
+      render();
+      $("section-title").focus();
+    }, "primary"));
 }
 
 function approvalSignatoryFields(project) {
@@ -1414,7 +1434,8 @@ function renderFront(project) {
       const jump = (bi) => {
         active = index;
         render();
-        focusTextField(editor.querySelector(bi === undefined ? "input" : "#edit-block-" + bi + " input"));
+        if (bi === undefined) $("section-title").focus();
+        else focusEditorBlock(bi);
       };
       const entry = dom("li", {}, button(chapterLabel(project, index), () => jump(), "quiet"));
       if (titles.length) entry.append(dom("ul", { className: "sub-outline" }, ...titles.map(([bi, info]) =>
@@ -1501,17 +1522,25 @@ function renderChapter(project) {
     save();
     render();
   }, "danger"));
-  editor.append(boundField(chapter, "title", "Judul bab", "text", () => {
+  const settings = dom("details", { className: "editor-settings" }, dom("summary", {}, "Pengaturan bab"),
+    boundField(chapter, "title", "Judul bab", "text", () => {
     title("Bab " + roman(index + 1), chapter.title || "Bab tanpa judul");
     renderOutline();
     save();
   }));
-  if (!isTrial()) editor.append(chapterActions);
+  if (!isTrial()) settings.append(chapterActions);
+  editor.append(settings);
+  const headings = headingEntries(chapter, index);
+  if (headings.size) {
+    const select = dom("select", { id: "subchapter-picker" });
+    for (const [bi, info] of headings) select.add(new Option(info.number + " · " + (chapter.blocks[bi].text.trim() || "Tanpa judul"), String(bi)));
+    editor.append(dom("div", { className: "subchapter-jump" }, dom("label", { htmlFor: select.id }, "Langsung ke subbab"), select,
+      button("Buka", () => focusEditorBlock(select.value))));
+  }
   editor.append(introductionEditor(chapter, introductionText(chapter), "Pengantar bab"));
   editor.append(sectionPhotoEditor(chapter, "Unggah foto bab", () => workspace.projects.includes(project) && project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
   editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
-  const headings = headingEntries(chapter, index);
   const checklist = readChecklist(project.id);
   const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
@@ -1544,7 +1573,9 @@ function renderChapter(project) {
       chapter.blocks.push(data);
       save();
       render();
-      focusTextField(editor.querySelector(".block:last-of-type input, .block:last-of-type textarea"));
+      const added = focusEditorBlock(chapter.blocks.length - 1);
+      if (type === "heading" || type === "table") added.querySelector(".block-settings").open = true;
+      if (type !== "photo") focusTextField(added.querySelector("input, textarea"));
     }));
   }
   editor.append(actions);
@@ -1601,16 +1632,12 @@ function tableEditor(block) {
     const heading = dom("th", { scope: "col" });
     const editor = field("Kolom " + (index + 1), value, (text) => {
       block.headers[index] = text;
-      if (guidedHealth) heading.textContent = text;
+      heading.textContent = text;
       refreshLinkedFields();
       save();
     }, "text", block, "header:" + block.columnIds[index]);
-    if (guidedHealth) {
-      heading.textContent = value;
-      columnFields.push(editor);
-    } else {
-      heading.append(editor);
-    }
+    heading.textContent = value;
+    columnFields.push(editor);
     header.append(heading);
   }
   header.append(dom("th", {}, "Baris"));
@@ -1718,9 +1745,9 @@ function tableEditor(block) {
     });
   }));
   const editor = dom("div", {}, ...(guidedHealth ? [dom("p", { className: "hint" },
-    "Pilih atau ketik nama ruang, tentukan acuan, lalu isi hasil ukur. Gunakan ＋ Ruang lain untuk menambah pemeriksaan pada aspek yang sama."),
+    "Pilih atau ketik nama ruang, tentukan acuan, lalu isi hasil ukur. Gunakan ＋ Ruang lain untuk menambah pemeriksaan pada aspek yang sama.")] : []),
     dom("details", { className: "health-column-settings" }, dom("summary", {}, "Sunting judul kolom"),
-      dom("div", { className: "form-grid" }, ...columnFields))] : []), ...(followUps ? [followUps] : []), matrix, actions);
+      dom("div", { className: "form-grid" }, ...columnFields)), ...(followUps ? [followUps] : []), matrix, actions);
   if (team) {
     const select = dom("select");
     const hint = dom("p", { className: "hint" });
@@ -2009,10 +2036,20 @@ function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
 }
 
 
+function focusEditorBlock(index) {
+  const target = $("edit-block-" + index);
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "start" });
+  return target;
+}
+
 function blockEditor(chapter, block, index, headingInfo, sources) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
-  const bar = dom("div", { className: "block-head" }, dom("strong", {}, marker));
+  const named = block.type === "heading" || block.type === "table";
+  const name = dom("h3", {}, named ? block.text.trim() || "Tanpa judul" : marker);
+  const bar = dom("div", { className: "block-head" }, dom("div", {},
+    named ? dom("span", { className: "block-marker" }, marker) : "", name));
   const controls = dom("div", { className: "button-row" });
   for (const [delta, name] of [[-1, "Naikkan blok"], [1, "Turunkan blok"]]) {
     const control = button(name, () => {
@@ -2030,11 +2067,20 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     save();
     render();
   }, "danger"));
-  bar.append(controls);
-  const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index }, bar);
+  const settings = dom("details", { className: "editor-settings block-settings" }, dom("summary", {}, "Atur " + labels[block.type].toLocaleLowerCase("id")));
+  if (named) settings.append(boundField(block, "text", block.type === "heading" ? "Judul subbab" : "Judul tabel", "text", () => {
+    name.textContent = block.text.trim() || "Tanpa judul";
+    const option = $("subchapter-picker")?.querySelector('option[value="' + index + '"]');
+    if (option && headingInfo) option.textContent = headingInfo.number + " · " + name.textContent;
+    save();
+  }));
+  settings.append(controls);
+  bar.append(settings);
+  const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index, tabIndex: -1 }, bar);
+  name.id = "block-title-" + index;
+  wrapper.setAttribute("aria-labelledby", name.id);
   const linked = (key, label) => linkedText(current(), block, key, label, () => block.links ?? {}, (links) => { block.links = links; }, sources);
   if (block.type === "heading") {
-    wrapper.append(boundField(block, "text", "Judul subbab"));
     if (!inspectionIntroductions.has(block.body) || Object.hasOwn(block, "introduction")) {
       wrapper.append(introductionEditor(block, introductionText(chapter, block), "Pengantar subbab"));
     }
@@ -2043,7 +2089,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
       () => project.chapters.includes(chapter) && chapter.blocks.includes(block)));
   }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
-  if (block.type === "table") wrapper.append(boundField(block, "text", "Judul tabel"), tableEditor(block));
+  if (block.type === "table") wrapper.append(tableEditor(block));
   if (block.type === "photo") {
     const project = current();
     wrapper.append(sectionPhotoEditor(block, "Unggah foto dokumentasi",
