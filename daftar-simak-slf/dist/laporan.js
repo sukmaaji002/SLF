@@ -336,7 +336,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
           ...areaObservationParagraphs(block.environmentAreas, "Bukti pendukung"));
         appendPhotos(section, (block.photos ?? []).map((photo, i) => [photo, id + "-photo-" + i]));
         if (showIntensity && intensityTarget?.chapter === index && intensityTarget.block === bi) appendIntensity(section);
-        appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
+        if (!isArchitectureHealthTable(chapter.blocks[bi + 1])) {
+          appendSummary(section, index + ":" + bi, "Daftar simak terkait · " + block.text);
+        }
       }
       if (block.type === "text") section.append(...reportParagraphs(block.text, getTextFormat(block, "text"), resolveToken(block.links)));
       if (block.type === "table") {
@@ -362,6 +364,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         });
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
+        if (isArchitectureHealthTable(block) && chapter.blocks[bi - 1]?.type === "heading") {
+          appendSummary(section, index + ":" + (bi - 1), "Daftar simak terkait · " + chapter.blocks[bi - 1].text);
+        }
       }
     }
     if (pendingPhotos.length) appendPhotos(section, pendingPhotos);

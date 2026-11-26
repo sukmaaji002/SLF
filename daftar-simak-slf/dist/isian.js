@@ -181,7 +181,12 @@ function tableCellValue(block, row, column, sources) {
   return isDocumentReviewTable(block) && /^\[[^\[\]\r\n]+\]$/.test(value ?? "") ? "" : value;
 }
 
-function tableSourceAvailable(id) {
+function isArchitectureHealthTable(block) {
+  return block?.type === "table" && tokenName(block.text) === tokenName(architectureHealthTableTitle);
+}
+
+function tableSourceAvailable(id, block) {
+  if (isArchitectureHealthTable(block)) return true;
   return !id.startsWith("document:") && (!id.startsWith("project:") ||
     ["project:purpose", "project:scope", "project:application", "project:chapter-order",
       "project:land-area", "project:kdb", "project:klb", "project:kdh", "project:ktb", "project:kbg", "project:gsb", "project:saluran", "project:sungai"].includes(id) || comparisonMetrics.some(({ key }) => id === "project:measurement-" + key));
@@ -338,7 +343,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const [index, chapter] of project.chapters.entries()) {
     for (const block of chapter.blocks) {
       if ((block.type === "heading" || block.type === "text") && block.sourceId) {
-        addNarrativeSources(add, block.sourceId, block.type === "heading" ? block.body : block.text, block.links,
+        const text = block.body === architectureHealthIntro ? previousArchitectureHealth :
+          block.type === "heading" ? block.body : block.text;
+        addNarrativeSources(add, block.sourceId, text, block.links,
           chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
       }
       if (block.type !== "table") continue;

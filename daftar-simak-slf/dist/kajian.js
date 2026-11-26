@@ -46,7 +46,7 @@ function heading(text) {
 function draft(name, template) {
   return {
     id: crypto.randomUUID(), name, template,
-    ...(template === "disiplin" ? { narrativeRevision: disciplineNarrativeRevision } : {}),
+    ...(template === "disiplin" ? { narrativeRevision: architectureHealthTableRevision } : {}),
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
     front: { ...frontDefaults },
     chapters: reportTemplates[template].chapters.map(([title, ...sections]) => ({
@@ -594,6 +594,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   function update(nextSources = reportSources(project)) {
     sources = nextSources;
     updatePreview();
+    details.hidden = key === "body" && data[key] === architectureHealthIntro;
     if (!details.open) return;
     entries.clear();
     const fields = reportTokens(data[key] || "");
@@ -1463,7 +1464,8 @@ function renderChapter(project) {
   for (const [bi, block] of chapter.blocks.entries()) {
     editor.append(blockEditor(chapter, block, bi, headings.get(bi), sources));
     if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
-    appendChecklist(bi);
+    if (isArchitectureHealthTable(block) && chapter.blocks[bi - 1]?.type === "heading") appendChecklist(bi - 1);
+    if (block.type !== "heading" || !isArchitectureHealthTable(chapter.blocks[bi + 1])) appendChecklist(bi);
   }
   const actions = dom("div", { className: "button-row add-block" });
   for (const [type, label] of Object.entries({ heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto" })) {
@@ -1631,7 +1633,7 @@ function tableCellField(block, row, column, sources, options) {
     pick.replaceChildren(new Option("Isi manual", ""));
     const groups = new Map();
     for (const [id, entry] of registry) {
-      if (!entry.value || !tableSourceAvailable(id) || id === "cell:" + block.sourceId + ":" + key) continue;
+      if (!entry.value || !tableSourceAvailable(id, block) || id === "cell:" + block.sourceId + ":" + key) continue;
       if (!groups.has(entry.group)) groups.set(entry.group, []);
       groups.get(entry.group).push(new Option(entry.label, id));
     }
@@ -1964,7 +1966,7 @@ function validateBackup(data) {
         if (clean.rowIds && clean.columnIds && block.cellLinks && typeof block.cellLinks === "object") {
           const keys = new Set(clean.rowIds.flatMap((row) => clean.columnIds.map((column) => row + ":" + column)));
           clean.cellLinks = Object.fromEntries(Object.entries(block.cellLinks).filter(([key, id]) =>
-            keys.has(key) && validReportSource(id) && tableSourceAvailable(id)));
+            keys.has(key) && validReportSource(id) && tableSourceAvailable(id, block)));
         }
       }
       const tableFormatKeys = clean.columnIds?.map((id) => "header:" + id) ?? [];
@@ -1979,7 +1981,8 @@ function validateBackup(data) {
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
-    ...(source.narrativeRevision === disciplineNarrativeRevision ? { narrativeRevision: disciplineNarrativeRevision } : {}),
+    ...([disciplineNarrativeRevision, architectureHealthTableRevision].includes(source.narrativeRevision) ?
+      { narrativeRevision: source.narrativeRevision } : {}),
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
     front: pickText(source.front, frontFields.map(([key]) => key)),
     frontLinks: { preface: importLinks(source.frontLinks?.preface), approval: importLinks(source.frontLinks?.approval) },

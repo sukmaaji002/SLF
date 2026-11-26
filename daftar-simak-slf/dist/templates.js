@@ -105,6 +105,15 @@ const environmentLegacyFields = [
   ["hasil observasi", "Hasil telaah"],
   ["denah situasi, foto, atau pengukuran", "Bukti pendukung"],
 ];
+const architectureChapterTitle = "Laporan pengkajian teknis bidang arsitektur";
+const previousArchitectureHealth = "Pemeriksaan aspek kesehatan mencakup [parameter yang diperiksa] pada [ruang atau sistem]. Hasil observasi atau pengukuran dirujuk pada [tabel, gambar, atau lampiran] dan dibandingkan dengan [acuan yang digunakan]. Ringkasan temuan untuk bidang ini adalah [temuan kesehatan].";
+const architectureHealthIntro = [
+  "Pemeriksaan aspek kesehatan bangunan meninjau kondisi ruang dan sistem yang memengaruhi kesehatan pengguna. Penelaahan meliputi penghawaan, pencahayaan, penyediaan air bersih, dan sanitasi sejauh berkaitan dengan ruang dan fungsi bangunan yang dikaji. Pengamatan lapangan, hasil pengukuran, serta dokumen pendukung menjadi dasar untuk memahami kondisi yang ada dan membandingkannya dengan acuan yang relevan.",
+  "Tabel berikut merangkum pemeriksaan per parameter dan lokasi agar setiap temuan dapat ditelusuri ke ruang atau sistem yang diperiksa. Hasil dicatat bersama acuan dan bukti pendukung yang tersedia. Jika suatu bagian belum dapat diperiksa atau datanya belum cukup, keterbatasannya dicatat pada baris terkait sebagai dasar pemeriksaan lanjutan.",
+].join("\n\n");
+const architectureHealthTableTitle = "Hasil pemeriksaan aspek kesehatan";
+const architectureHealthColumns = ["Parameter pemeriksaan", "Ruang / sistem", "Acuan", "Hasil / temuan", "Bukti / gambar"];
+const architectureHealthTokens = ["parameter yang diperiksa", "ruang atau sistem", "acuan yang digunakan", "temuan kesehatan", "tabel, gambar, atau lampiran"];
 const revisedStandardNarratives = new Map([
   [previousSafetyNarrative, safetyNarrative],
   [previousHealthNarrative, healthNarrative],
@@ -177,7 +186,7 @@ const reportTemplates = {
         ["Kesenjangan dan tindak lanjut", { body: documentFollowUp, previous: "[Sebutkan dokumen yang kurang, data yang berbeda, dan siapa yang perlu menindaklanjutinya.]" }],
       ],
       [
-        "Laporan pengkajian teknis bidang arsitektur",
+        architectureChapterTitle,
         [
           "Pemeriksaan persyaratan tata bangunan gedung",
           {"body":"Kondisi tata bangunan dibandingkan dengan [dokumen pembanding] untuk menilai peruntukan, intensitas, penampilan, tata ruang dalam, dan hubungan dengan lingkungan. Hasil penilaian disajikan menurut ruang lingkup dan bukti yang tersedia pada bagian berikut.","previous":"[Ringkas hasil perbandingan desain dengan kondisi bangunan.]"},
@@ -187,7 +196,8 @@ const reportTemplates = {
           ["Tata ruang dalam", { body: "", previous: "[Uraikan susunan, luasan, fungsi, dan kondisi ruang.]" }],
           ["Keselarasan dengan lingkungan", { body: "", previous: "[Uraikan ruang terbuka, sirkulasi, parkir, dan kondisi area luar.]" }],
         ],
-        ["Kesehatan", {"body":"Pemeriksaan aspek kesehatan mencakup [parameter yang diperiksa] pada [ruang atau sistem]. Hasil observasi atau pengukuran dirujuk pada [tabel, gambar, atau lampiran] dan dibandingkan dengan [acuan yang digunakan]. Ringkasan temuan untuk bidang ini adalah [temuan kesehatan].","previous":"[Catat hasil pemeriksaan pencahayaan atau aspek kesehatan yang dibahas dalam disiplin arsitektur.]"}],
+        ["Kesehatan", { body: architectureHealthIntro, previous: "[Catat hasil pemeriksaan pencahayaan atau aspek kesehatan yang dibahas dalam disiplin arsitektur.]" }],
+        { table: architectureHealthTableTitle, columns: architectureHealthColumns },
         ["Kenyamanan", {"body":"Pemeriksaan kenyamanan mencakup [parameter yang diperiksa] pada [area sampel]. Hasil pengamatan atau pengukuran menunjukkan [hasil terverifikasi], dengan acuan [standar atau dokumen pembanding] dan keterbatasan [batasan yang relevan].","previous":"[Jelaskan ruang gerak, tata perabot, dan pandangan dari atau ke bangunan.]"}],
         ["Kemudahan", {"body":"Pemeriksaan kemudahan mencakup [jalur akses, fasilitas, atau peralatan yang diperiksa] untuk pengguna [kelompok pengguna]. Kondisi yang tercatat adalah [temuan], didukung oleh [hasil ukur, foto, atau daftar simak] dan dibandingkan dengan [acuan].","previous":"[Catat akses horizontal, vertikal, fasilitas sanitasi, dan aksesibilitas.]"}],
         ["Kesimpulan bidang arsitektur", {"body":"Berdasarkan ruang lingkup dan bukti yang tersedia, hasil penilaian arsitektur adalah [kesimpulan pengkaji]. Ketidaksesuaian atau bagian yang masih memerlukan verifikasi meliputi [temuan]. Rekomendasi terkait dirujuk pada [nomor rekomendasi].","previous":"[Ringkas bukti, ketidaksesuaian, dan rujukan tindak lanjut.]"}],
@@ -408,6 +418,7 @@ function templateBlocks(sections, depth = 1, previous = false) {
 }
 
 const disciplineNarrativeRevision = 1;
+const architectureHealthTableRevision = 2;
 
 function upgradeDisciplineDraft(project) {
   if (project.template !== "disiplin" || project.narrativeRevision >= disciplineNarrativeRevision) return;
@@ -435,8 +446,44 @@ function upgradeDisciplineDraft(project) {
   project.narrativeRevision = disciplineNarrativeRevision;
 }
 
+function upgradeArchitectureHealthDraft(project) {
+  if (project.template !== "disiplin" || project.narrativeRevision >= architectureHealthTableRevision) return;
+  for (const chapter of project.chapters) {
+    const index = chapter.blocks.findIndex((block) => block.type === "heading" &&
+      (block.body === previousArchitectureHealth ||
+        (chapter.title === architectureChapterTitle && tokenName(block.text) === "kesehatan")));
+    if (index < 0) continue;
+    const heading = chapter.blocks[index];
+    const previous = heading.body === previousArchitectureHealth || heading.body === architectureHealthIntro;
+    const links = previous ? architectureHealthTokens.map((token) => heading.links?.[token]) : [];
+    const hasValues = links.some((link) => link?.source || link?.value?.trim());
+    if (heading.body === previousArchitectureHealth) {
+      updateTextFormat(heading, "body", heading.body, architectureHealthIntro);
+      heading.body = architectureHealthIntro;
+    }
+    let table = chapter.blocks[index + 1];
+    if (table?.type !== "table" || table.text !== architectureHealthTableTitle ||
+        (hasValues && JSON.stringify(table.headers) !== JSON.stringify(architectureHealthColumns))) {
+      table = { type: "table", text: architectureHealthTableTitle, headers: [...architectureHealthColumns],
+        rows: hasValues ? [] : [architectureHealthColumns.map(() => "")] };
+      chapter.blocks.splice(index + 1, 0, table);
+    }
+    if (!hasValues) continue;
+    const row = table.rows.length;
+    table.rows.push(links.map((link) => link?.value ?? ""));
+    ensureReportReferences({ chapters: [{ blocks: [table] }] });
+    for (const [column, link] of links.entries()) {
+      const cell = tableCellKey(table, row, column);
+      if (link?.source) (table.cellLinks ??= {})[cell] = link.source;
+      else if (link) setTextFormat(table, "cell:" + cell, getTextFormat(link, "value"));
+    }
+  }
+  project.narrativeRevision = architectureHealthTableRevision;
+}
+
 function upgradeReportDraft(project) {
   upgradeDisciplineDraft(project);
+  upgradeArchitectureHealthDraft(project);
   for (const chapter of project.chapters) for (const block of chapter.blocks) {
     let revisedNarrative = block.type === "heading" ? revisedStandardNarratives.get(block.body) : undefined;
     if (block.type === "heading" && block.body.endsWith(appearanceEvidenceParagraph)) {
