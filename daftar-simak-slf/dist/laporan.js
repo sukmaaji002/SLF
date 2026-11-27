@@ -312,7 +312,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   if (trial) project = { ...project, chapters: project.chapters.slice(0, trialChapterCount) };
   const checklist = readChecklist(project.id);
   const sources = reportSources(project, checklist);
-  const resolveToken = (links) => (original, name) => resolveReportLink(original, name, sources, links);
+  const resolveToken = (links, structural) => (original, name) => resolveReportLink(original, name, sources, links, structural);
   const coverFormat = (key, token) => key === "consultant" ? sources.get("cover:consultant")?.format :
     getTextFormat(project.cover, key) || (token ? sources.get(automaticSource(token, sources))?.format : undefined);
   const data = {
@@ -435,7 +435,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         if ((!structureInspection || hasLegacyStructureInspection(block)) &&
             (!structureTesting || hasLegacyStructureTesting(block))) {
           if (structureTesting && block.structureTest?.status) section.append(dom("h4", {}, "Catatan pengujian sebelumnya"));
-          section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+          section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links, isStructureConclusion(block))));
         }
         if (structureTesting) {
           const content = structureTestingContent(block.structureTest);

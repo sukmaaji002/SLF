@@ -152,6 +152,12 @@ function ensureReportReferences(project) {
     for (const block of chapter.blocks) {
       if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();
       for (const area of block.environmentAreas ?? []) area.id ??= crypto.randomUUID();
+      if (block.structureTest && !Array.isArray(block.structureTest.items)) {
+        block.structureTest.items = structureTestingItems(block.structureTest);
+      }
+      for (const entry of [...(block.structureComponents ?? []), ...(block.structureTest?.items ?? [])]) {
+        entry.id ??= crypto.randomUUID();
+      }
       if (block.type !== "table") continue;
       if (block.rowIds?.length !== block.rows.length) {
         block.rowIds = block.rows.map((_, index) => block.rowIds?.[index] ?? crypto.randomUUID());
@@ -307,7 +313,21 @@ function recordedPermitNumbers(project, beforeBlock, sources) {
   return recorded;
 }
 
+function isStructureConclusion(block) {
+  return block?.type === "heading" && (tokenName(block.text) === "kesimpulan bidang struktur" ||
+    (reportTokens(block.body ?? "").has("dokumen, observasi, atau hasil uji") &&
+      reportTokens(block.body ?? "").has("nomor rekomendasi")));
+}
+
+function recommendationsFor(sources, structural) {
+  return new Map([...(sources.recommendations ?? [])].filter(([id, entry]) =>
+    structural ? entry.structural : !id.startsWith("structure:")));
+}
+
 function reportSources(project, checklist = readChecklist(project.id)) {
+  ensureReportReferences(project);
+  const structuralChapters = new Set(project.chapters.flatMap((chapter, index) =>
+    chapter.blocks.some(isStructureConclusion) ? [index] : []));
   const sources = new Map();
   sources.recommendations = new Map();
   sources.healthRows = healthMeasurementReferences(project);
@@ -377,6 +397,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   for (const item of checklistItems) {
     const check = checklist.checks[item.id];
     if (!check || check.na) continue;
+    const structural = structuralChapters.has(checklistDestination(project, item)?.chapter);
     for (const row of check.rows) {
       if (cleanValue(row.location) && tokenName(item.title) !== "jarak antar bangunan") locations.add(cleanValue(row.location));
       if (row.photo || row.ndtPhoto) hasPhotos = true;
@@ -385,8 +406,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       if (conformity || issue) {
         const label = [item.title, cleanValue(row.location), cleanValue(row.label)].filter(Boolean).join(" · ");
         const actionable = conformity ? tokenName(conformity) === "tidak sesuai" : Boolean(issue);
-        addFinding("finding:check:" + item.id + ":" + row.key, "Daftar simak", label,
-          [conformity, actionable ? issue : ""], "report-check-" + item.id, actionable);
+        const id = "finding:check:" + item.id + ":" + row.key;
+        addFinding(id, "Daftar simak", label, [conformity, actionable ? issue : ""], "report-check-" + item.id, actionable);
+        sources.get(id).structural = structural;
       }
       for (const [key, label] of Object.entries(checklistLabels)) {
         if (!cleanValue(row[key]) || key === "photo" || key === "ndtPhoto") continue;
@@ -412,8 +434,20 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         const label = [chapterNumber, block.text, area.area, area.location].filter(Boolean).join(" · ");
         sources.recommendations.set("area:" + block.sourceId + ":" + area.id, { label, action, chapter: chapterNumber, topic: cleanValue(area.area) });
       }
+      const addStructureNote = (entry, topic, action) => {
+        if (!cleanValue(action)) return;
+        const label = [chapterNumber, block.text, topic].filter(Boolean).join(" · ");
+        sources.recommendations.set("structure:" + block.sourceId + ":" + entry.id,
+          { label, action: cleanValue(action), chapter: chapterNumber, topic, structural: true, assessment: true });
+      };
+      for (const entry of block.structureComponents ?? []) {
+        addStructureNote(entry, [entry.component, entry.location].filter(Boolean).join(" · "), entry.analysis);
+      }
+      if (block.structureTest?.status === "available") {
+        for (const entry of block.structureTest.items) addStructureNote(entry, entry.parameter || "", entry.assessment);
+      }
       if (block.type !== "table") continue;
-      if (block.sourceId || isDocumentReviewTable(block)) tables.push([block, chapterNumber]);
+      if (block.sourceId || isDocumentReviewTable(block)) tables.push([block, chapterNumber, structuralChapters.has(index)]);
       if (!block.sourceId) continue;
       for (const [ri, row] of block.rows.entries()) {
         const rowId = block.rowIds?.[ri];
@@ -439,7 +473,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   const presetDocuments = new Set(oldDocumentReviewNames.map(tokenName));
-  for (const [block, chapterNumber] of tables) {
+  for (const [block, chapterNumber, structuralChapter] of tables) {
     const title = tokenName(block.text);
     const columns = block.headers.map(tokenName);
     const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
@@ -455,7 +489,11 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         const rowLabel = label + " (baris " + (ri + 1) + ")";
         const measurement = block.healthMeasurements?.[block.rowIds[ri]];
         const status = measurement ? healthMeasurement(resolvedHealthMeasurement(measurement, sources)).status : "";
-        sources.recommendations.set(id, { label: rowLabel, action, chapter: chapterNumber, status, topic: cleanValue(values[0]) });
+        const finding = sources.get(block.cellLinks?.[tableCellKey(block, ri, 0)]);
+        const markedStructure = /^(?:(?:aspek|bidang) )?struktur(?:$|[ .:–—/-])/i.test(cleanValue(values[0]));
+        const structural = !block.healthMeasurements && (structuralChapter ||
+          (isFollowUpMatrix(block) && (finding ? finding.structural === true : markedStructure)));
+        sources.recommendations.set(id, { label: rowLabel, action, chapter: chapterNumber, status, topic: cleanValue(values[0]), structural });
       }
     }
     if (isTeamTable(block)) {
@@ -560,7 +598,8 @@ function recommendationSummary(refs) {
   if (!refs.length) return "";
   const chapters = [...new Set(refs.map((ref) => ref.chapter))];
   const place = chapters.length <= 3 ? scopeList.format(chapters) : chapters.length + " bab";
-  const sentences = [refs.length + " catatan tindak lanjut di " + place];
+  const hasAssessments = refs.some((ref) => ref.assessment);
+  const sentences = [refs.length + (hasAssessments ? " catatan struktur di " : " catatan tindak lanjut di ") + place];
   const outside = refs.filter((ref) => ref.status === "Di luar acuan");
   const within = refs.filter((ref) => ref.status === "Memenuhi parameter ini");
   const pending = refs.filter((ref) => ref.status && ref.status !== "Di luar acuan" && ref.status !== "Memenuhi parameter ini");
@@ -576,19 +615,22 @@ function recommendationSummary(refs) {
   const actions = [...new Set([...outside, ...refs.filter((ref) => !ref.status), ...pending, ...within].map((ref) => ref.action))];
   // Quote complete instructions so a condition or exception stays with the action.
   const examples = actions.filter((action) => action.length <= 190).slice(0, 2);
-  if (examples.length) sentences.push("Tindakan yang dicatat " + (examples.length < actions.length ? "antara lain " : "meliputi ") +
+  if (examples.length) sentences.push((hasAssessments ? "Penilaian dan tindak lanjut yang dicatat " : "Tindakan yang dicatat ") + (examples.length < actions.length ? "antara lain " : "meliputi ") +
     scopeList.format(examples.map((action) => "“" + action.replace(/[.]$/, "") + "”")));
-  else sentences.push("Rincian tindakan tercantum pada catatan pemeriksaan yang dirujuk");
+  else sentences.push("Rincian tercantum pada catatan pemeriksaan yang dirujuk");
   return sentences.join(". ");
 }
 
-function resolveReportLink(original, label, sources, links) {
+function resolveReportLink(original, label, sources, links, structural = false) {
   const key = tokenName(label);
   const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
   if (key === "nomor rekomendasi" && link?.recommendationIds?.length) {
-    const refs = link.recommendationIds.map((id) => sources.recommendations?.get(id)).filter(Boolean);
-    return { value: recommendationSummary(refs) || original };
+    const options = recommendationsFor(sources, structural);
+    const refs = link.recommendationIds.map((id) => options.get(id)).filter(Boolean);
+    if (refs.length || !structural) return { value: recommendationSummary(refs) || original };
   }
+  if (structural && key === "nomor rekomendasi") return { value: link?.value?.trim() || original,
+    format: getTextFormat(link, "value") };
   const source = sources.get(link?.source ?? automaticSource(key, sources));
   const value = link ? (link.source ? source?.value : link.value) : automaticValue(key, sources);
   const format = link && !link.source ? getTextFormat(link, "value") : source?.format;
@@ -626,7 +668,7 @@ function importLinks(links) {
     const picked = tokenName(token) === "nomor rekomendasi" && Array.isArray(link.recommendationIds) ?
       [...new Set(link.recommendationIds.filter((id) => typeof id === "string" && (
         (id.startsWith("cell:") && id.split(":").length === 4) ||
-        (id.startsWith("area:") && id.split(":").length === 3)) &&
+        (/^(?:area|structure):/.test(id) && id.split(":").length === 3)) &&
         id.split(":").slice(1).every((part) => sourceUuid.test(part))))] : [];
     if (typeof link.value === "string") {
       const key = tokenName(token);

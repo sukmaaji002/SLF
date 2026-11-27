@@ -536,6 +536,7 @@ function areaObservationEditor(project, block, sources, areaKey, changed) {
 }
 
 function linkedText(project, data, key, label, getLinks, setLinks, initialSources) {
+  const structural = key === "body" && isStructureConclusion(data);
   const summary = dom("summary");
   const content = dom("div", { className: "linked-content" });
   const details = dom("details", { className: "linked-fields" }, summary, content);
@@ -612,9 +613,10 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       ["kesimpulan bidang arsitektur", "kesimpulan bidang struktur"].includes(tokenName(data.text ?? "")));
     if (!recommendationAction.hidden) {
       recommendationAction.textContent = hasRecommendation ? "Ambil rekomendasi dari isian" : "Tambahkan rujukan rekomendasi";
-      if (sources.recommendations.size) recommendationAction.textContent += " (" + sources.recommendations.size + ")";
+      const count = recommendationsFor(sources, structural).size;
+      if (count) recommendationAction.textContent += " (" + count + ")";
     }
-    const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links).value === "[" + name + "]").length;
+    const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links, structural).value === "[" + name + "]").length;
     summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
       fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";
     if (areaKey) {
@@ -626,7 +628,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const format = getTextFormat(data, key);
     styleTextBlock(preview, format);
     preview.replaceChildren(text.trim() ? formattedText(text, format, (original, name) => {
-      const resolved = resolveReportLink(original, name, sources, links);
+      const resolved = resolveReportLink(original, name, sources, links, structural);
       if (resolved.value !== original) return resolved;
       const token = tokenName(name);
       const link = Object.hasOwn(links, token) ? links[token] : undefined;
@@ -704,7 +706,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       const sampleLocation = token === sampleLocationToken;
       const technicalDocuments = token === technicalDocumentsToken;
       const fieldTitle = guideField?.[0] ?? repeated?.label ?? name[0].toLocaleUpperCase("id") + name.slice(1);
-      const manualOnly = token === "daftar alat pemeriksaan";
+      const manualOnly = token === "daftar alat pemeriksaan" || (structural && token === recommendationToken);
       const select = dom("select", { ariaLabel: repeated?.label ?? "[" + name + "]" });
       const combined = token === "nama dan alamat bangunan";
       const autoLabel = auto ? "Otomatis · " + sources.get(auto).label :
@@ -887,7 +889,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (token === "nomor rekomendasi") {
         const controls = dom("div", { className: "recommendation-manual" });
         while (entry.children.length > 1) controls.append(entry.children[1]);
-        const selected = new Set(saved?.recommendationIds || []);
+        const recommendations = recommendationsFor(sources, structural);
+        const previousIds = saved?.recommendationIds ?? [];
+        const selected = new Set(structural ? previousIds.filter((id) => recommendations.has(id)) : previousIds);
         const choices = dom("div", { className: "recommendation-list" });
         const pickerTitle = dom("summary");
         const available = new Map();
@@ -906,7 +910,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           controls.hidden = selected.size > 0;
           pickerTitle.textContent = selected.size ? "Rekomendasi dari isian · " + selected.size + " dipilih" : "Pilih rekomendasi dari isian kajian";
           if (!selected.size) return updateValue();
-          const missing = [...selected].filter((id) => !sources.recommendations.has(id)).length;
+          const missing = [...selected].filter((id) => !recommendations.has(id)).length;
           badge.dataset.filled = String(!missing);
           badge.textContent = missing ? missing + " sumber perlu ditinjau" : "Tertaut";
         };
@@ -920,8 +924,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           refreshLinkedFields(details);
           save();
         }
-        for (const id of new Set([...sources.recommendations.keys(), ...selected])) {
-          const source = sources.recommendations.get(id);
+        for (const id of new Set([...recommendations.keys(), ...selected])) {
+          const source = recommendations.get(id);
           const check = dom("input", { type: "checkbox", checked: selected.has(id) });
           if (source) available.set(id, check);
           choices.append(dom("label", { className: "scope-choice" }, check, dom("span", {},
@@ -934,7 +938,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           });
         }
         if (!choices.childElementCount) choices.append(dom("p", { className: "hint" },
-          "Belum ada rekomendasi yang terisi. Catat tindak lanjut per area atau isi rekomendasi pada tabel pemeriksaan atau matriks rekomendasi."));
+          structural ? "Belum ada catatan struktur yang bisa diambil. Isi analisis di 6.2, penilaian hasil uji di 6.3, atau tulis rujukan manual." :
+            "Belum ada rekomendasi yang terisi. Catat tindak lanjut per area atau isi rekomendasi pada tabel pemeriksaan atau matriks rekomendasi."));
         entry.classList.add("wide");
         entry.firstElementChild.querySelector("strong").textContent = "Rujukan rekomendasi";
         entry.append(recommendationPicker, controls);
@@ -2146,7 +2151,7 @@ function structureComponentsEditor(block, isAttached) {
   function componentCard(entry) {
     const fields = structureComponentFields.map(([key, label, example]) => {
       const multiline = key === "observation" || key === "analysis";
-      const control = boundField(entry, key, label, multiline ? "area" : "text", () => save(), false);
+      const control = boundField(entry, key, label, multiline ? "area" : "text", () => { save(); refreshLinkedFields(); }, false);
       control.querySelector("input, textarea").placeholder = example;
       return control;
     });
@@ -2161,6 +2166,7 @@ function structureComponentsEditor(block, isAttached) {
       card.remove();
       add.focus();
       save();
+      refreshLinkedFields();
     }, "quiet"));
     return card;
   }
@@ -2188,7 +2194,7 @@ function structureTestingEditor(block, isAttached) {
     preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"),
       dom("div", { className: "structure-test-scroll" }, ...content));
   };
-  const changed = () => { block.structureTest = data; update(); save(); };
+  const changed = () => { block.structureTest = data; update(); save(); refreshLinkedFields(); };
   const rows = dom("tbody");
   const table = dom("table", { ariaLabel: "Hasil pengujian dan analisis" },
     dom("thead", {}, dom("tr", {}, ...structureTestColumns.map((label) => dom("th", { scope: "col" }, label)),
@@ -2382,7 +2388,7 @@ function validateBackup(data) {
           const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
           data.items = structureTestingItems(block.structureTest)
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-            .map((entry) => restorePhotos(pickText(entry, keys), entry));
+            .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
           const status = block.structureTest.status;
           if (status === "available" || status === "unavailable") data.status = status;
           clean.structureTest = data;
@@ -2391,7 +2397,7 @@ function validateBackup(data) {
           const keys = structureComponentFields.map(([key]) => key);
           clean.structureComponents = block.structureComponents
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-            .map((entry) => restorePhotos(pickText(entry, keys), entry));
+            .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
         }
         if (Array.isArray(block.appearanceSections)) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
