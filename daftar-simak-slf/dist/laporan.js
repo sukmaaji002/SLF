@@ -168,20 +168,31 @@ function structureTestingItems(data) {
   return Object.values(item).some((value) => value.trim()) ? [item] : [];
 }
 
-function structureTestingParagraphs(data) {
+const structureTestColumns = ["Item / parameter", "Uji atau analisis", "Hasil", "Pembanding", "Penilaian", "Foto"];
+
+function hasStructureTestItem(item) {
+  return Boolean(item.photos?.length || item.parameter?.trim() ||
+    structureTestFields.some(([key]) => item[key]?.trim()));
+}
+
+function structureTestingContent(data) {
   if (data?.status === "unavailable") {
     const note = data.pendingNote?.trim();
     return reportParagraphs("Pengujian atau analisis struktur belum tersedia." + (note ? "\n\n" + note : ""));
   }
   if (data?.status !== "available") return [];
-  const labels = { method: "Pengujian atau analisis", result: "Hasil", reference: "Pembanding", assessment: "Penilaian pengkaji" };
-  return structureTestingItems(data).flatMap((item, index) => {
-    const paragraphs = structureTestFields.flatMap(([key]) =>
-      item[key]?.trim() ? reportParagraphs(labels[key] + " — " + item[key].trim()) : []);
-    const parameter = item.parameter?.trim();
-    if (!parameter && !paragraphs.length) return [];
-    return [dom("h4", {}, parameter || "Item uji " + (index + 1)), ...paragraphs];
+  const rows = structureTestingItems(data).filter(hasStructureTestItem).map((item, index) => {
+    const photos = (item.photos ?? []).filter((photo) => imageSource.test(photo.image)).map((photo, photoIndex) => {
+      const caption = photo.text?.trim() || "";
+      return dom("div", {},
+        dom("img", { className: "report-table-image", src: photo.image, alt: caption || "Foto hasil uji " + (photoIndex + 1) }),
+        formattedValue(caption, getTextFormat(photo, "text")));
+    });
+    return [item.parameter?.trim() || "Item uji " + (index + 1),
+      ...structureTestFields.map(([key]) => item[key]?.trim() || ""),
+      dom("div", { className: "structure-test-photos" }, ...photos)];
   });
+  return rows.length ? [reportTable(structureTestColumns, rows)] : [];
 }
 
 function isStructureRecap(block) {
@@ -416,7 +427,16 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
           if (structureTesting && block.structureTest?.status) section.append(dom("h4", {}, "Catatan pengujian sebelumnya"));
           section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         }
-        if (structureTesting) section.append(...structureTestingParagraphs(block.structureTest));
+        if (structureTesting) {
+          const content = structureTestingContent(block.structureTest);
+          if (content[0]?.tagName === "TABLE") {
+            const testId = id + "-tests";
+            const caption = "Tabel " + (tableEntries.length + 1) + " · Hasil pengujian dan analisis struktur";
+            tableEntries.push([testId, caption]);
+            section.append(dom("div", { id: testId, className: "report-block" },
+              dom("p", { className: "caption" }, caption), ...content));
+          } else section.append(...content);
+        }
         for (const [componentIndex, entry] of (block.structureComponents ?? []).filter(hasStructureComponentContent).entries()) {
           const name = [entry.component?.trim() || "Komponen " + (componentIndex + 1), entry.location?.trim()]
             .filter(Boolean).join(" · ");

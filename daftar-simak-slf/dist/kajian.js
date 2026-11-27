@@ -2071,7 +2071,7 @@ function pictureEditor(block, label, isAttached = () => true) {
   return dom("div", {}, dom("label", {}, "Pilih " + label, upload), feedback, image, remove);
 }
 
-function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
+function sectionPhotoEditor(owner, label, isAttached, firstCaption = "", onChange = save) {
   if (isTrial()) return dom("div", { className: "section-photos" }, lockedUpload(label));
   const upload = dom("input", { type: "file", accept: "image/*", multiple: true, hidden: true, ariaLabel: label });
   const add = button(label, () => upload.click());
@@ -2083,12 +2083,12 @@ function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
     const photos = owner.photos ?? [];
     add.textContent = photos.length ? label.replace("Unggah", "Tambah") + " (" + photos.length + ")" : label;
     list.replaceChildren(...photos.map((photo, index) => {
-      const caption = boundField(photo, "text", "Keterangan foto " + (index + 1));
+      const caption = boundField(photo, "text", "Keterangan foto " + (index + 1), "text", onChange);
       const remove = button("Hapus foto " + (index + 1), () => {
         owner.photos = owner.photos.filter((entry) => entry !== photo);
         if (!owner.photos.length) delete owner.photos;
         renderPhotos();
-        save();
+        onChange();
         add.focus();
       }, "quiet");
       return dom("div", { className: "section-photo-card" },
@@ -2110,8 +2110,9 @@ function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
     if (isAttached() && photos.length) {
       if (!owner.photos?.length && firstCaption) photos[0].text = firstCaption;
       (owner.photos ??= []).push(...photos);
-      photoEditors.get(owner)?.();
-      save();
+      const refreshPhotos = photoEditors.get(owner);
+      if (refreshPhotos) refreshPhotos();
+      else save();
     }
     const failed = files.length - photos.length;
     feedback.textContent = [photos.length ? photos.length + " foto ditambahkan." : "",
@@ -2119,7 +2120,7 @@ function sectionPhotoEditor(owner, label, isAttached, firstCaption = "") {
     upload.value = "";
     add.disabled = false;
   });
-  photoEditors.set(owner, renderPhotos);
+  photoEditors.set(owner, () => { renderPhotos(); onChange(); });
   renderPhotos();
   return gallery;
 }
@@ -2169,11 +2170,12 @@ function structureComponentsEditor(block, isAttached) {
     dom("div", { className: "button-row" }, add), list);
 }
 
-function structureTestingEditor(block) {
+function structureTestingEditor(block, isAttached) {
   const previous = block.structureTest;
   const items = [...structureTestingItems(previous)];
   if (!Array.isArray(previous?.items) && !items.length) items.push({});
   const data = { status: previous?.status, pendingNote: previous?.pendingNote, items };
+  if (previous) block.structureTest = data;
   const status = dom("select", {}, new Option("Pilih status", ""),
     new Option("Belum ada hasil uji atau analisis", "unavailable"),
     new Option("Ada hasil uji atau analisis", "available"));
@@ -2181,22 +2183,28 @@ function structureTestingEditor(block) {
   const update = () => {
     details.hidden = status.value !== "available";
     note.hidden = status.value !== "unavailable";
-    const paragraphs = structureTestingParagraphs(data);
-    preview.hidden = !paragraphs.length;
-    preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"), ...paragraphs);
+    const content = structureTestingContent(data);
+    preview.hidden = !content.length;
+    preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"),
+      dom("div", { className: "structure-test-scroll" }, ...content));
   };
   const changed = () => { block.structureTest = data; update(); save(); };
-  const list = dom("div", { className: "appearance-sections" });
+  const rows = dom("tbody");
+  const table = dom("table", { ariaLabel: "Hasil pengujian dan analisis" },
+    dom("thead", {}, dom("tr", {}, ...structureTestColumns.map((label) => dom("th", { scope: "col" }, label)),
+      dom("th", { scope: "col" }, "Tindakan"))), rows);
   const add = button("＋ Tambah item atau parameter uji", () => {
     const item = {};
     items.push(item);
-    const card = itemCard(item);
-    list.append(card);
-    card.querySelector("input").focus();
+    const row = itemRow(item);
+    rows.append(row);
+    row.querySelector("input").focus();
     changed();
   });
-  const details = dom("div", { className: "appearance-sections" }, dom("div", { className: "button-row" }, add), list);
-  function itemCard(item) {
+  const details = dom("div", { className: "appearance-sections structure-test-details" }, dom("div", { className: "button-row" }, add),
+    dom("p", { className: "hint structure-test-scroll-hint" }, "Geser tabel untuk melihat semua kolom."),
+    dom("div", { className: "structure-test-scroll structure-test-editor", tabIndex: 0, ariaLabel: "Tabel hasil uji" }, table));
+  function itemRow(item) {
     const parameter = boundField(item, "parameter", "Item atau parameter yang diuji", "text", changed, false);
     parameter.querySelector("input").placeholder = "Contoh: kuat tekan beton pada kolom K-03";
     const fields = structureTestFields.map(([key, label, example]) => {
@@ -2204,23 +2212,23 @@ function structureTestingEditor(block) {
       input.querySelector("textarea").placeholder = example;
       return input;
     });
-    const card = dom("fieldset", { className: "link-entry" },
-      dom("legend", {}, "Item pengujian"), parameter,
-      dom("div", { className: "form-grid" }, ...fields));
-    card.append(button("Hapus item uji", () => {
-      if (Object.values(item).some((value) => typeof value === "string" && value.trim()) &&
-          !confirm("Hapus item uji beserta hasilnya?")) return;
+    const photo = sectionPhotoEditor(item, "Unggah foto hasil uji", () =>
+      isAttached() && block.structureTest?.items?.includes(item), "", changed);
+    const row = dom("tr", {}, ...[parameter, ...fields, photo].map((cell) => dom("td", {}, cell)));
+    row.append(dom("td", {}, button("Hapus item uji", () => {
+      if (hasStructureTestItem(item) && !confirm("Hapus item uji beserta hasil dan fotonya?")) return;
       items.splice(items.indexOf(item), 1);
-      card.remove();
+      photoEditors.delete(item);
+      row.remove();
       add.focus();
       changed();
-    }, "quiet"));
-    return card;
+    }, "quiet")));
+    return row;
   }
-  list.append(...items.map(itemCard));
+  rows.append(...items.map(itemRow));
   const note = boundField(data, "pendingNote", "Catatan (jika ada)", "area", changed, false);
   note.querySelector("textarea").placeholder = "Contoh: laporan uji belum diterima dari pengelola";
-  const preview = dom("div", { className: "narrative-preview" });
+  const preview = dom("div", { className: "narrative-preview structure-test-preview" });
   status.addEventListener("change", () => { data.status = status.value; changed(); });
   update();
   return dom("div", { className: "guided-narrative" },
@@ -2277,7 +2285,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
           linked("body", "Isi subbab")));
       }
     } else if (isStructureTesting(block)) {
-      wrapper.append(structureTestingEditor(block));
+      wrapper.append(structureTestingEditor(block, isAttached));
       if (hasLegacyStructureTesting(block)) {
         wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Catatan pengujian sebelumnya"),
           linked("body", "Isi subbab")));
@@ -2374,7 +2382,7 @@ function validateBackup(data) {
           const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
           data.items = structureTestingItems(block.structureTest)
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-            .map((entry) => pickText(entry, keys));
+            .map((entry) => restorePhotos(pickText(entry, keys), entry));
           const status = block.structureTest.status;
           if (status === "available" || status === "unavailable") data.status = status;
           clean.structureTest = data;

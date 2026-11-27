@@ -95,3 +95,23 @@
   .recommendation-list .scope-choice span span { display: block; font-weight: 400; }
   .recommendation-manual { display: grid; gap: 6px; }
 }
+
+.structure-test-details, .structure-test-preview { min-width: 0; }
+.structure-test-scroll-hint { display: none; }
+@media (max-width: 1100px) { .structure-test-scroll-hint { display: block; } }
+.structure-test-scroll { min-width: 0; overflow-x: auto; }
+.structure-test-scroll table { width: 100%; border-collapse: collapse; }
+.structure-test-scroll th, .structure-test-scroll td {
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.structure-test-scroll th { background: var(--panel); }
+.structure-test-scroll td { min-width: 115px; }
+.structure-test-editor td { min-width: 155px; }
+.structure-test-editor td:last-child { min-width: 110px; }
+.structure-test-editor .section-photos { margin: 0; }
+.structure-test-scroll img.report-table-image { display: block; max-width: 100%; max-height: 85px; margin-top: 4px; }
