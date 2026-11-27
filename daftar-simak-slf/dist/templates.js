@@ -1,5 +1,6 @@
 "use strict";
 
+const structuralTestingNarrative = "Pengujian atau analisis struktur yang tersedia berupa [metode atau status pengujian]. Hasil yang dapat ditelusuri adalah [hasil dan satuan], dibandingkan dengan [parameter pembanding]. Interpretasi pengkaji serta batasan penggunaannya adalah [interpretasi dan batasan].";
 const structuralInspectionNarrative = "Pemeriksaan visual dilakukan pada [elemen dan lokasi sampel] untuk mencatat kondisi yang dapat diamati. Temuan pada elemen tersebut adalah [kondisi, lokasi, dan ukuran kerusakan bila ada]. Lokasi dan bukti temuan ditunjukkan pada [tabel, denah, atau foto].";
 
 const oldDocumentReviewNames = ["Bukti penguasaan tanah", "PBG / IMB", "Gambar rencana / terbangun", "Dokumen pendukung lainnya"];
@@ -231,7 +232,7 @@ const reportTemplates = {
         "Laporan pengkajian teknis bidang struktur",
         ["Data sistem struktur", {"body":"Sistem struktur bangunan terdiri atas [sistem utama dan material] menurut [gambar atau dokumen teknis]. Bagian yang dapat diamati meliputi [daftar elemen yang dapat diakses]. Informasi yang belum didukung dokumen atau belum terverifikasi adalah [batasan data].","previous":"[Identifikasi sistem struktur, material, gambar, dan bagian yang dapat diakses.]"}],
         ["Pemeriksaan elemen struktur", {"body":structuralInspectionNarrative,"previous":"[Catat kondisi, lokasi sampel, kerusakan teramati, dan foto unsur yang diperiksa.]"}],
-        ["Hasil pengujian dan analisis", {"body":"Pengujian atau analisis struktur yang tersedia berupa [metode atau status pengujian]. Hasil yang dapat ditelusuri adalah [hasil dan satuan], dibandingkan dengan [parameter pembanding]. Interpretasi pengkaji serta batasan penggunaannya adalah [interpretasi dan batasan].","previous":"[Masukkan metode, hasil, satuan, dasar pembanding, dan batasan bila dilakukan pengujian.]"}],
+        ["Hasil pengujian dan analisis", {"body":structuralTestingNarrative,"previous":"[Masukkan metode, hasil, satuan, dasar pembanding, dan batasan bila dilakukan pengujian.]"}],
         {"table":"Rekap hasil pemeriksaan struktur","columns":["Elemen / lokasi","Observasi atau hasil uji","Satuan / acuan","Temuan"],"rows":[["[Elemen dan lokasi sampel]","[Kondisi atau hasil uji]","[Satuan / acuan]","[Temuan terverifikasi]"]]},
         ["Kesimpulan bidang struktur", {"body":"Penilaian bidang struktur dalam lingkup ini menghasilkan [kesimpulan pengkaji] berdasarkan [dokumen, observasi, atau hasil uji]. Elemen yang masih memerlukan konfirmasi atau pemeriksaan lanjutan adalah [elemen atau lokasi], dengan tindak lanjut pada [nomor rekomendasi].","previous":"[Ringkas temuan dan keterbatasan berdasarkan hasil pemeriksaan.]"}],
       ],

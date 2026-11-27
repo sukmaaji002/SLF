@@ -143,6 +143,38 @@ function hasLegacyStructureInspection(block) {
     Object.values(block.links ?? {}).some((link) => link?.value?.trim() || link?.source)));
 }
 
+const structureTestFields = [
+  ["method", "Uji atau analisis apa yang dipakai?", "Contoh: telaah laporan uji beton No. 05 untuk kolom K-03"],
+  ["result", "Apa hasilnya?", "Contoh: hasil uji, satuan, dan lokasi pengujian"],
+  ["reference", "Apa pembandingnya? (jika ada)", "Contoh: nilai rencana pada gambar struktur S-02"],
+  ["assessment", "Apa arti hasilnya? (jika ada)", "Contoh: hasil hanya mewakili sampel kolom yang diuji"],
+];
+
+function isStructureTesting(block) {
+  return tokenName(block.text) === "hasil pengujian dan analisis" ||
+    block.body === structuralTestingNarrative || Boolean(block.structureTest);
+}
+
+function hasLegacyStructureTesting(block) {
+  return Boolean(block.body?.trim() && (block.body !== structuralTestingNarrative ||
+    Object.values(block.links ?? {}).some((link) => link?.value?.trim() || link?.source)));
+}
+
+function structureTestingParagraphs(data) {
+  if (data?.status === "unavailable") {
+    const note = data.pendingNote?.trim();
+    return reportParagraphs("Pengujian atau analisis struktur belum tersedia." + (note ? "\n\n" + note : ""));
+  }
+  if (data?.status !== "available") return [];
+  const labels = { method: "Pengujian atau analisis", result: "Hasil", reference: "Pembanding", assessment: "Penilaian pengkaji" };
+  return structureTestFields.flatMap(([key]) =>
+    data[key]?.trim() ? reportParagraphs(labels[key] + " — " + data[key].trim()) : []);
+}
+
+function isStructureRecap(block) {
+  return tokenName(block.text) === "rekap hasil pemeriksaan struktur";
+}
+
 function appearanceSectionParagraphs(block) {
   return (block.appearanceSections ?? []).flatMap(({ area, part, condition }) => {
     const location = area?.trim();
@@ -365,9 +397,13 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(introductionText(chapter, block)));
         const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
-        if (!structureInspection || hasLegacyStructureInspection(block)) {
+        const structureTesting = isStructureTesting(block);
+        if ((!structureInspection || hasLegacyStructureInspection(block)) &&
+            (!structureTesting || hasLegacyStructureTesting(block))) {
+          if (structureTesting && block.structureTest?.status) section.append(dom("h4", {}, "Catatan pengujian sebelumnya"));
           section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
         }
+        if (structureTesting) section.append(...structureTestingParagraphs(block.structureTest));
         for (const [componentIndex, entry] of (block.structureComponents ?? []).filter(hasStructureComponentContent).entries()) {
           const name = [entry.component?.trim() || "Komponen " + (componentIndex + 1), entry.location?.trim()]
             .filter(Boolean).join(" · ");
@@ -389,18 +425,21 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
       }
       if (block.type === "text") section.append(...reportParagraphs(block.text, getTextFormat(block, "text"), resolveToken(block.links)));
       if (block.type === "table") {
+        const structureRecap = isStructureRecap(block);
         const prefix = "Tabel " + (tableEntries.length + 1) + " · ";
         const title = block.text || "Tabel kajian";
-        tableEntries.push([id, prefix + title]);
         const columns = block.headers.map((text, ci) => formattedValue(text, getTextFormat(block, "header:" + block.columnIds?.[ci]), resolveToken()));
         const documentReview = isDocumentReviewTable(block);
         const rows = block.rows.flatMap((row, ri) => {
-          const values = row.map((_, ci) => tableCellValue(block, ri, ci, sources));
+          const values = row.map((_, ci) => {
+            const value = tableCellValue(block, ri, ci, sources);
+            return structureRecap && /^\[[^\[\]\r\n]+\]$/.test(value?.trim() ?? "") ? "" : value;
+          });
           const measurement = block.healthMeasurements?.[block.rowIds?.[ri]];
           const reference = measurement?.healthSource && getHealthMeasurementReference(measurement, sources);
           const image = block.rowImages?.[block.rowIds?.[ri]];
           const hasImage = imageSource.test(image || "");
-          if ((documentReview || block.healthMeasurements?.[block.rowIds?.[ri]]) &&
+          if ((structureRecap || documentReview || block.healthMeasurements?.[block.rowIds?.[ri]]) &&
               !hasImage && !values.some((value) => value?.trim())) return [];
           return [values.map((text, ci) => {
             const key = tableCellKey(block, ri, ci);
@@ -418,6 +457,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
               dom("div", {}, value, dom("img", { className: "report-table-image", src: image, alt: "Gambar baris " + (ri + 1) })) : value;
           })];
         });
+        if (structureRecap && !rows.length) continue;
+        tableEntries.push([id, prefix + title]);
         section.append(dom("div", { id, className: "report-block" },
           reportFormatted(dom("p", { className: "caption" }), title, getTextFormat(block, "text"), prefix), reportTable(columns, rows)));
         if (architectureInspectionKind(block) && chapter.blocks[bi - 1]?.type === "heading") {

@@ -584,13 +584,6 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const useGuide = key === "body" && (tokenName(data.text ?? "") === "peruntukan bangunan" ||
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
   const structureGuide = key === "body" && tokenName(data.text ?? "") === "data sistem struktur";
-  if (key === "body") {
-    const instructions = {
-      "hasil pengujian dan analisis": "Catat hasil uji lapangan, laporan uji yang ditelaah, atau perhitungan yang tersedia. Tulis metode, hasil beserta satuan bila ada, acuan, dan batas penilaiannya. Jika belum ada pengujian atau analisis, catat statusnya dan bagian yang belum dapat dinilai.",
-    };
-    const chapterGuide = instructions[tokenName(data.text ?? "")];
-    if (chapterGuide) wrapper.prepend(dom("p", { className: "hint" }, chapterGuide));
-  }
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
   const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
     data[key] === appearanceNarrative || Array.isArray(data.appearanceSections));
@@ -2176,6 +2169,34 @@ function structureComponentsEditor(block, isAttached) {
     dom("div", { className: "button-row" }, add), list);
 }
 
+function structureTestingEditor(block) {
+  const data = block.structureTest ?? {};
+  const status = dom("select", {}, new Option("Pilih status", ""),
+    new Option("Belum ada hasil uji atau analisis", "unavailable"),
+    new Option("Ada hasil uji atau analisis", "available"));
+  status.value = data.status ?? "";
+  const update = () => {
+    details.hidden = status.value !== "available";
+    note.hidden = status.value !== "unavailable";
+    const paragraphs = structureTestingParagraphs(data);
+    preview.hidden = !paragraphs.length;
+    preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"), ...paragraphs);
+  };
+  const changed = () => { block.structureTest = data; update(); save(); };
+  const details = dom("div", { className: "form-grid" }, ...structureTestFields.map(([key, label, example]) => {
+    const input = boundField(data, key, label, "area", changed, false);
+    input.querySelector("textarea").placeholder = example;
+    return input;
+  }));
+  const note = boundField(data, "pendingNote", "Catatan (jika ada)", "area", changed, false);
+  note.querySelector("textarea").placeholder = "Contoh: laporan uji belum diterima dari pengelola";
+  const preview = dom("div", { className: "narrative-preview" });
+  status.addEventListener("change", () => { data.status = status.value; changed(); });
+  update();
+  return dom("div", { className: "guided-narrative" },
+    dom("label", {}, "Apakah ada hasil pengujian atau analisis struktur?", status), details, note, preview);
+}
+
 function blockEditor(chapter, block, index, headingInfo, sources) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
@@ -2225,13 +2246,25 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
         wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Catatan pemeriksaan sebelumnya"),
           linked("body", "Isi subbab")));
       }
+    } else if (isStructureTesting(block)) {
+      wrapper.append(structureTestingEditor(block));
+      if (hasLegacyStructureTesting(block)) {
+        wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Catatan pengujian sebelumnya"),
+          linked("body", "Isi subbab")));
+      }
     } else {
       wrapper.append(linked("body", "Isi subbab"));
     }
     wrapper.append(sectionPhotoEditor(block, "Unggah foto subbab", isAttached));
   }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
-  if (block.type === "table") wrapper.append(tableEditor(block));
+  if (block.type === "table") {
+    const table = tableEditor(block);
+    wrapper.append(isStructureRecap(block) ? dom("details", { className: "narrative-editor" },
+      dom("summary", {}, "Buka tabel rekap (opsional)"),
+      dom("p", { className: "hint" }, "Gunakan tabel jika ada rincian tambahan atau rekap yang sudah diisi. Entri pada Subbab 6.3 langsung masuk ke laporan."),
+      table) : table);
+  }
   if (block.type === "photo") {
     const project = current();
     wrapper.append(sectionPhotoEditor(block, "Unggah foto dokumentasi",
@@ -2306,6 +2339,12 @@ function validateBackup(data) {
         clean.body = block.body;
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
+        if (block.structureTest && typeof block.structureTest === "object" && !Array.isArray(block.structureTest)) {
+          const data = pickText(block.structureTest, ["pendingNote", ...structureTestFields.map(([key]) => key)]);
+          const status = block.structureTest.status;
+          if (status === "available" || status === "unavailable") data.status = status;
+          clean.structureTest = data;
+        }
         if (Array.isArray(block.structureComponents)) {
           const keys = structureComponentFields.map(([key]) => key);
           clean.structureComponents = block.structureComponents
