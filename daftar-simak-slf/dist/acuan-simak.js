@@ -108,8 +108,15 @@ function checklistDestination(project, item) {
   const originalTitle = reportTemplates[project.template].chapters[templateIndex]?.[0];
   const chapter = project.chapters.findIndex((entry) => !entry.checklist && entry.title === originalTitle);
   if (chapter < 0) return null;
-  const block = project.chapters[chapter].blocks.findIndex((entry) => entry.type === "heading" && entry.text === title);
-  return { chapter, block, title: block < 0 ? originalTitle : title };
+  const blocks = project.chapters[chapter].blocks;
+  let block = blocks.findIndex((entry) => entry.type === "heading" && entry.text === title);
+  if (project.template === "disiplin" && defaultIndex === 6 && item.category.code === "K.2") {
+    const preset = blocks.findIndex(entry => entry.mepSafetyPreset === title);
+    if (preset >= 0) block = preset;
+    const parent = blocks.findIndex(entry => entry.mepSafety);
+    if (parent >= 0 && (block < 0 || blocks[block].mepSafetySelected === false)) block = parent;
+  }
+  return { chapter, block, title: blocks[block]?.text ?? originalTitle };
 }
 
 const checklistSummaryOrder = ["nonconformity", "measurement", "note", "observation", "test", "ndt", "damage", "presence",

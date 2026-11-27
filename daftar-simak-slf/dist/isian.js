@@ -148,6 +148,7 @@ function reportTokens(text) {
 }
 
 function ensureReportReferences(project) {
+  initializeMepSafety(project);
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
       if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();

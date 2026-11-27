@@ -589,6 +589,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     appendSummary(section, index + ":-1", "Hasil daftar simak terkait");
     const pendingPhotos = [];
     for (const [bi, block] of chapter.blocks.entries()) {
+      if (block.mepSafetySelected === false) continue;
       const id = section.id + "-block-" + bi;
       if (block.type === "photo") {
         if (block.image) pendingPhotos.push([block, id]);
@@ -602,7 +603,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(...reportParagraphs(introductionText(chapter, block)));
         const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
         const structureTesting = isStructureTesting(block);
-        if (isStructureConclusion(block)) {
+        if (block.mepSafety) {
+          section.append(...mepSafetySummary(chapter, block, resolveToken(block.links)));
+        } else if (isStructureConclusion(block)) {
           section.append(...structureConclusionContent(chapter, block, sources));
         } else if ((!structureInspection || hasLegacyStructureInspection(block)) &&
             (!structureTesting || hasLegacyStructureTesting(block))) {
