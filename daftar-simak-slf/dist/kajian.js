@@ -713,7 +713,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         focusManual();
       }, "quiet");
       const simpleChoices = safetyParameters || comfortParameters || repeated?.method;
-      const example = simpleChoices || repeated?.label || guideField ? "" : inputExample(token);
+      const example = simpleChoices || repeated?.label || guideField || token === "nomor rekomendasi" ? "" : inputExample(token);
       const hint = simpleChoices || !Object.hasOwn(inputHints, token) ? "" : inputHints[token];
       const previousValue = manualOnly || permitDocuments ? resolveReportLink("", token, sources, links).value : "";
       const manualData = { value: saved?.value ?? previousValue, _format: saved?._format };
@@ -745,7 +745,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         save();
       };
       const choiceLegend = multipleChoiceLegends.get(token);
-      const manualLabel = choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
+      const manualLabel = token === "nomor rekomendasi" ? "Rujukan manual" : choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const presetGroups = comfortParameters ? comfortParameterGroups :
         repeated?.method === "comfortAssessment" ? comfortAspectGroups : inputChoiceGroups.get(token);
@@ -780,7 +780,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         if (input) focusTextField(input);
         else manual.querySelector("button")?.focus();
       };
-      const choices = repeated || token === "tanggal pemeriksaan" || (guideField && !showDocumentChoices) ? [] : presets;
+      const choices = repeated || token === "nomor rekomendasi" || token === "tanggal pemeriksaan" || (guideField && !showDocumentChoices) ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
         manualInput.value = text;
@@ -862,11 +862,56 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (!manualOnly) entry.append(value, useManual, source);
       if (example) entry.append(dom("details", { className: "narrative-example" }, dom("summary", {}, "Lihat contoh isian"),
         dom("p", { className: "field-example" }, example)));
+      let recommendationPicker;
+      if (token === "nomor rekomendasi") {
+        const controls = dom("div", { className: "recommendation-manual" });
+        while (entry.children.length > 1) controls.append(entry.children[1]);
+        const selected = new Set(saved?.recommendationIds || []);
+        const choices = dom("div", { className: "recommendation-list" });
+        const pickerTitle = dom("summary");
+        recommendationPicker = dom("details", { className: "recommendation-picker" }, pickerTitle, choices);
+        const sync = () => {
+          controls.hidden = selected.size > 0;
+          pickerTitle.textContent = selected.size ? "Rekomendasi dari isian · " + selected.size + " dipilih" : "Pilih rekomendasi dari isian kajian";
+          if (!selected.size) return updateValue();
+          const missing = [...selected].filter((id) => !sources.recommendations.has(id)).length;
+          badge.dataset.filled = String(!missing);
+          badge.textContent = missing ? missing + " sumber perlu ditinjau" : "Tertaut";
+        };
+        for (const id of new Set([...sources.recommendations.keys(), ...selected])) {
+          const source = sources.recommendations.get(id);
+          const check = dom("input", { type: "checkbox", checked: selected.has(id) });
+          choices.append(dom("label", { className: "scope-choice" }, check, dom("span", {},
+            dom("strong", {}, source?.label || "Sumber dihapus atau dikosongkan"),
+            dom("span", {}, source?.action || "Lepaskan pilihan ini atau isi rujukan secara manual."))));
+          check.addEventListener("change", () => {
+            if (check.checked) selected.add(id);
+            else selected.delete(id);
+            const link = { ...(getLinks()[token] ?? { value: "" }) };
+            if (selected.size) link.recommendationIds = [...selected];
+            else delete link.recommendationIds;
+            setLinks({ ...getLinks(), [token]: link });
+            sync();
+            updatePreview();
+            refreshLinkedFields(details);
+            save();
+          });
+        }
+        if (!choices.childElementCount) choices.append(dom("p", { className: "hint" },
+          "Belum ada rekomendasi yang terisi. Catat tindak lanjut per area atau isi rekomendasi pada tabel pemeriksaan atau matriks rekomendasi."));
+        entry.classList.add("wide");
+        entry.firstElementChild.querySelector("strong").textContent = "Rujukan rekomendasi";
+        entry.append(recommendationPicker, controls);
+        sync();
+      }
       entries.set(token, () => {
         const extra = entry.closest(".intensity-narrative-details, .room-layout-legacy");
         if (extra) extra.open = true;
         entry.scrollIntoView({ block: "nearest" });
-        if (!manual.hidden) focusManual();
+        if (recommendationPicker) {
+          recommendationPicker.open = true;
+          recommendationPicker.querySelector("summary").focus();
+        } else if (!manual.hidden) focusManual();
         else if (!useManual.hidden) useManual.focus();
         else source.querySelector("summary").focus();
       });
@@ -899,7 +944,11 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       if (grid.childElementCount === 1) grid.firstElementChild.classList.add("wide");
       content.replaceChildren(instructions, grid, ...extra, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (areaKey) {
-      const areas = areaObservationEditor(project, data, sources, areaKey, () => { updatePreview(); save(); });
+      const areas = areaObservationEditor(project, data, sources, areaKey, () => {
+        updatePreview();
+        save();
+        if (environmentGuide) refreshLinkedFields(details);
+      });
       content.replaceChildren(areas, ...(grid.childElementCount ? [dom("details", { className: "narrative-source room-layout-legacy" },
         dom("summary", {}, "Isian narasi yang sudah ada"), grid)] : []));
     } else if (appearanceGuide) {
@@ -2173,6 +2222,7 @@ function validateBackup(data) {
           if (!Array.isArray(block[key])) continue;
           clean[key] = block[key].filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => ({ ...pickText(entry, key === "environmentAreas" ? environmentObservationFields : areaObservationFields),
+              ...(key === "environmentAreas" && sourceUuid.test(entry.id) ? { id: entry.id } : {}),
               selected: entry.selected === true, manual: entry.manual === true }));
         }
       }

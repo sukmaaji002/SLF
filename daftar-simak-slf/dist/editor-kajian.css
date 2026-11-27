@@ -84,3 +84,11 @@
   #slf-editor-view :is(.surface,.editor,.block,.matrix,.matrix > table,.block > div) { min-width: 0; }
   #slf-editor-view .editor input[type="file"] { max-width: 100%; }
 }
+
+@media screen {
+  .recommendation-picker > summary { padding-block: 8px; color: #245b40; font-weight: 650; cursor: pointer; }
+  .recommendation-list { display: grid; gap: 6px; max-height: 22rem; overflow-y: auto; }
+  .recommendation-list .scope-choice { display: flex; gap: 8px; align-items: start; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
+  .recommendation-list .scope-choice span span { display: block; font-weight: 400; }
+  .recommendation-manual { display: grid; gap: 6px; }
+}

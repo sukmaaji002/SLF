@@ -141,6 +141,7 @@ function ensureReportReferences(project) {
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
       if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();
+      for (const area of block.environmentAreas ?? []) area.id ??= crypto.randomUUID();
       if (block.type !== "table") continue;
       if (block.rowIds?.length !== block.rows.length) {
         block.rowIds = block.rows.map((_, index) => block.rowIds?.[index] ?? crypto.randomUUID());
@@ -220,7 +221,7 @@ function tableSourceAvailable(id, block) {
 function addNarrativeSources(add, id, text, links, label) {
   for (const [token, name] of reportTokens(text)) {
     const value = links?.[token]?.value;
-    if (cleanValue(value)) add(narrativeReference(id, token), "Isian bagian lain", label + " · " + name, value, getTextFormat(links[token], "value"));
+    if (cleanValue(value) && !links[token].recommendationIds?.length) add(narrativeReference(id, token), "Isian bagian lain", label + " · " + name, value, getTextFormat(links[token], "value"));
   }
 }
 
@@ -298,6 +299,7 @@ function recordedPermitNumbers(project, beforeBlock, sources) {
 
 function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
+  sources.recommendations = new Map();
   sources.healthRows = healthMeasurementReferences(project);
   const teamLeads = new Set();
   const designatedLeads = new Set();
@@ -386,6 +388,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   for (const [index, chapter] of project.chapters.entries()) {
+    const chapterNumber = "Bab " + roman(index + 1);
     for (const [bi, block] of chapter.blocks.entries()) {
       if ((block.type === "heading" || block.type === "text") && block.sourceId) {
         const text = inspectionIntroductions.get(block.body) ??
@@ -393,8 +396,14 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         addNarrativeSources(add, block.sourceId, text, block.links,
           chapterLabel(project, index) + (block.type === "heading" ? " · " + block.text : " · Paragraf"));
       }
+      for (const area of block.environmentAreas ?? []) {
+        const action = cleanValue(area.followUp);
+        if (!area.selected || !area.id || !action) continue;
+        const label = [chapterNumber, block.text, area.area, area.location].filter(Boolean).join(" · ");
+        sources.recommendations.set("area:" + block.sourceId + ":" + area.id, { label, action });
+      }
       if (block.type !== "table") continue;
-      if (block.sourceId || isDocumentReviewTable(block)) tables.push(block);
+      if (block.sourceId || isDocumentReviewTable(block)) tables.push([block, chapterNumber]);
       if (!block.sourceId) continue;
       for (const [ri, row] of block.rows.entries()) {
         const rowId = block.rowIds?.[ri];
@@ -420,10 +429,23 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     }
   }
   const presetDocuments = new Set(oldDocumentReviewNames.map(tokenName));
-  for (const block of tables) {
+  for (const [block, chapterNumber] of tables) {
     const title = tokenName(block.text);
     const columns = block.headers.map(tokenName);
     const rows = block.rows.map((row, ri) => row.map((_, ci) => tableCellValue(block, ri, ci, sources)));
+    const actionColumn = block.healthMeasurements ? 4 : columns.findIndex((column) =>
+      ["tindakan", "tindak lanjut", "rekomendasi", "keterangan / rekomendasi"].includes(column));
+    if (actionColumn >= 0 && block.sourceId) {
+      for (const [ri, values] of rows.entries()) {
+        const action = cleanValue(values[actionColumn]);
+        if (!action) continue;
+        const context = block.healthMeasurements ? values.slice(0, 2) : values.slice(0, Math.min(actionColumn, 1));
+        const label = [chapterNumber, block.text || "Tabel", ...context.map(cleanValue)].filter(Boolean).join(" · ");
+        const id = "cell:" + block.sourceId + ":" + tableCellKey(block, ri, actionColumn);
+        const rowLabel = label + " (baris " + (ri + 1) + ")";
+        sources.recommendations.set(id, { label: rowLabel, reference: block.healthMeasurements ? label : rowLabel, action });
+      }
+    }
     if (isTeamTable(block)) {
       const role = columns.indexOf("peran / bidang");
       const leadRoles = ["penanggung jawab", "penanggung jawab kajian", "penanggung jawab teknis", "ketua tim pengkaji teknis"];
@@ -525,6 +547,10 @@ function automaticValue(token, sources) {
 function resolveReportLink(original, label, sources, links) {
   const key = tokenName(label);
   const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
+  if (key === "nomor rekomendasi" && link?.recommendationIds?.length) {
+    const refs = link.recommendationIds.map((id) => sources.recommendations?.get(id)).filter(Boolean);
+    return { value: scopeList.format(refs.map(({ label, reference, action }) => (reference || label) + " (“" + action + "”)")) || original };
+  }
   const source = sources.get(link?.source ?? automaticSource(key, sources));
   const value = link ? (link.source ? source?.value : link.value) : automaticValue(key, sources);
   const format = link && !link.source ? getTextFormat(link, "value") : source?.format;
@@ -559,6 +585,11 @@ function importLinks(links) {
   const pairs = [];
   for (const [token, link] of Object.entries(links)) {
     if (!token || typeof link !== "object" || !link) continue;
+    const picked = tokenName(token) === "nomor rekomendasi" && Array.isArray(link.recommendationIds) ?
+      [...new Set(link.recommendationIds.filter((id) => typeof id === "string" && (
+        (id.startsWith("cell:") && id.split(":").length === 4) ||
+        (id.startsWith("area:") && id.split(":").length === 3)) &&
+        id.split(":").slice(1).every((part) => sourceUuid.test(part))))] : [];
     if (typeof link.value === "string") {
       const key = tokenName(token);
       const data = importTextFormats({ value: link.value }, link, ["value"]);
@@ -583,10 +614,11 @@ function importLinks(links) {
         if (field.numberKey) data[field.numberKey] = numbers;
         if (groupKey) data[groupKey] = groups.map(({ name, fixed, entries }) => ({ name, fixed, entries: [...entries] }));
       }
+      if (picked.length) data.recommendationIds = picked;
       pairs.push([key, data]);
     }
     else if (validReportSource(link.source)) {
-      pairs.push([tokenName(token), { source: link.source }]);
+      pairs.push([tokenName(token), picked.length ? { source: link.source, recommendationIds: picked } : { source: link.source }]);
     }
   }
   return Object.fromEntries(pairs);
