@@ -14,6 +14,13 @@ const reportLayoutStyle = `
   .report-print h4 { margin: 6px 0 3px; break-after: avoid; }
   .report-print .front-doc { font-size: 11pt; line-height: 1.4; }
   .report-print .report-text { white-space: pre-wrap; margin: 0 0 9px; orphans: 3; widows: 3; }
+  .report-print .structure-conclusion h4 { margin: 10px 0 5px; border-bottom: 1px solid #c7d4cf; }
+  .report-print .structure-conclusion h5, .report-print .structure-conclusion h6 { font-size: 11pt; margin: 7px 0 4px; break-after: avoid; }
+  .report-print .structure-conclusion h6 { font-size: 10.5pt; }
+  .report-print .structure-conclusion-record { border-inline-start: 1px solid #c7d4cf; padding-inline-start: 8px; margin: 5px 0 8px; }
+  .report-print .structure-conclusion-fields { margin: 0 0 6px; }
+  .report-print .structure-conclusion-fields dt { font-size: 10pt; font-weight: 650; break-after: avoid; }
+  .report-print .structure-conclusion-fields dd { margin: 0 0 4px; }
   .report-print .front-doc .report-text { margin-bottom: 10px; }
   .report-print #report-approval { font-size: 10.8pt; line-height: 1.37; }
   .report-print #report-approval .report-text { margin-bottom: 8px; }

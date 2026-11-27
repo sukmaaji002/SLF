@@ -1032,7 +1032,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
 }
 
 function refreshLinkedFields(except) {
-  const narratives = [...editor.querySelectorAll(".linked-fields")];
+  const narratives = [...editor.querySelectorAll(".linked-fields, .structure-conclusion-preview")];
   const tableFields = [...editor.querySelectorAll(".table-link[data-linked], .table-link[data-automatic]")];
   const leadFields = [...editor.querySelectorAll(".team-lead")];
   const measurementFields = [...editor.querySelectorAll(".health-source-field")];
@@ -2292,7 +2292,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
           linked("body", "Isi subbab")));
       }
     } else if (isStructureConclusion(block)) {
-      const preview = dom("div", { className: "narrative-preview linked-fields" });
+      const preview = dom("div", { className: "structure-conclusion-preview" });
       preview.refreshSources = registry => preview.replaceChildren(...structureConclusionContent(chapter, block, registry));
       preview.refreshSources(sources);
       wrapper.append(dom("p", { className: "hint" }, "Kesimpulan dan rekomendasi diperbarui otomatis dari data sistem struktur, pemeriksaan elemen, hasil uji, dan tindak lanjut struktur."), preview);
