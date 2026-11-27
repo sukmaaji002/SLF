@@ -209,6 +209,103 @@ function isStructureRecap(block) {
   return tokenName(block.text) === "rekap hasil pemeriksaan struktur";
 }
 
+function structureConclusionContent(chapter, conclusion, sources) {
+  const sections = [];
+  const findings = [];
+  const tests = [];
+  const notes = [];
+  const pushNote = (label, value) => {
+    if (value?.trim()) notes.push([label, value.trim()]);
+  };
+  const pair = (...parts) => parts.map(part => part?.trim()).filter(Boolean).join(" — ");
+  const field = (block, key) => resolveReportLink("", key, sources, block.links).value;
+  for (const block of chapter.blocks) {
+    if (block === conclusion) break;
+    if (block.type === "table" && isStructureRecap(block)) {
+      for (const [ri, row] of block.rows.entries()) {
+        const values = row.map((_, ci) => cleanValue(tableCellValue(block, ri, ci, sources)));
+        if (values.some(Boolean)) findings.push(pair(...values));
+      }
+    }
+    if (block.type !== "heading") continue;
+    if (tokenName(block.text) === "data sistem struktur" || reportTokens(block.body ?? "").has("sistem utama dan material")) {
+      for (const [key, label] of [["sistem utama dan material", "Sistem struktur"], ["gambar atau dokumen teknis", "Dokumen"],
+        ["daftar elemen yang dapat diakses", "Elemen yang dapat diperiksa"], ["batasan data", "Batasan pemeriksaan"]]) {
+        pushNote(label, field(block, key));
+      }
+    }
+    if (block.structureComponents || tokenName(block.text) === "pemeriksaan elemen struktur" || block.body === structuralInspectionNarrative) {
+      for (const entry of block.structureComponents ?? []) {
+        if (entry.observation?.trim() || entry.analysis?.trim()) {
+          findings.push(pair(entry.component, entry.location, entry.observation, entry.analysis));
+        }
+      }
+      const observation = field(block, "kondisi, lokasi, dan ukuran kerusakan bila ada");
+      if (observation) findings.push(pair(field(block, "elemen dan lokasi sampel"), observation));
+    }
+    if (isStructureTesting(block)) {
+      const data = block.structureTest;
+      if (data?.status === "unavailable") {
+        pushNote("Pengujian", pair("Hasil uji atau analisis belum tersedia", data.pendingNote));
+      } else {
+        if (data?.status === "available") {
+          for (const item of structureTestingItems(data)) {
+            if (item.result?.trim() || item.assessment?.trim()) tests.push(pair(item.parameter, item.result, item.assessment));
+          }
+        }
+        const legacy = pair(field(block, "hasil dan satuan"), field(block, "interpretasi dan batasan"));
+        if (legacy) tests.push(pair(field(block, "metode atau status pengujian"), legacy));
+      }
+    }
+  }
+  function summarize(values, detail) {
+    const unique = [...new Set(values)];
+    const shown = unique.slice(0, 2).map(value => /[.!?]$/.test(value) ? value : value + ".");
+    if (unique.length > shown.length) shown.push((unique.length - shown.length) + " catatan lainnya tercantum pada " + detail + ".");
+    return shown.join(" ");
+  }
+  pushNote("Hasil pemeriksaan", summarize(findings, "pemeriksaan elemen dan tabel rekap struktur"));
+  pushNote("Hasil pengujian", summarize(tests, "hasil pengujian dan analisis struktur"));
+  sections.push(dom("h4", {}, "Kesimpulan"), ...reportParagraphs(notes.length ?
+    notes.map(([label, value]) => label + " — " + value.replace(/[.]$/, "") + ".").join(" ") :
+    "Data struktur untuk menyusun kesimpulan belum tersedia."));
+
+  const refs = [...recommendationsFor(sources, true).values()];
+  const actions = refs.filter(ref => !ref.assessment);
+  const assessments = refs.filter(ref => ref.assessment);
+  sections.push(dom("h4", {}, "Rekomendasi"));
+  if (actions.length) {
+    sections.push(...reportParagraphs(summarize(actions.map(ref => pair(ref.topic, ref.action)), "tabel tindak lanjut struktur")));
+  } else if (assessments.length) {
+    sections.push(...reportParagraphs("Penilaian pengkaji sebagai dasar tindak lanjut — " +
+      summarize(assessments.map(ref => pair(ref.topic, ref.action)), "pemeriksaan dan pengujian struktur")));
+  } else {
+    sections.push(...reportParagraphs("Belum ada rekomendasi struktur yang tercatat."));
+  }
+  const additional = hasWrittenStructureConclusion(conclusion) ? writtenStructureConclusion(conclusion, sources) : [];
+  if (conclusion.structureConclusionNote?.trim()) additional.push(...reportParagraphs(conclusion.structureConclusionNote));
+  if (additional.length) sections.push(dom("h4", {}, "Catatan tambahan pengkaji"), ...additional);
+  return sections;
+}
+
+function hasWrittenStructureConclusion(block) {
+  return Boolean(block.body.trim() && block.body !== structuralConclusionNarrative ||
+    Object.values(block.links ?? {}).some(link => link?.value?.trim() || link?.source));
+}
+
+function writtenStructureConclusion(block, sources) {
+  const resolve = (original, name) => resolveReportLink(original, name, sources, block.links, true);
+  if (block.body !== structuralConclusionNarrative) return reportParagraphs(block.body, getTextFormat(block, "body"), resolve);
+  const paragraphs = [];
+  for (const [key, name] of reportTokens(block.body)) {
+    const link = block.links?.[key];
+    if (!link) continue;
+    const text = key === "nomor rekomendasi" ? link.value?.trim() : resolve("", name).value;
+    if (text) paragraphs.push(...reportParagraphs(name[0].toUpperCase() + name.slice(1) + " — " + text));
+  }
+  return paragraphs;
+}
+
 function appearanceSectionParagraphs(block) {
   return (block.appearanceSections ?? []).flatMap(({ area, part, condition }) => {
     const location = area?.trim();
@@ -432,7 +529,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(...reportParagraphs(introductionText(chapter, block)));
         const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
         const structureTesting = isStructureTesting(block);
-        if ((!structureInspection || hasLegacyStructureInspection(block)) &&
+        if (isStructureConclusion(block)) {
+          section.append(...structureConclusionContent(chapter, block, sources));
+        } else if ((!structureInspection || hasLegacyStructureInspection(block)) &&
             (!structureTesting || hasLegacyStructureTesting(block))) {
           if (structureTesting && block.structureTest?.status) section.append(dom("h4", {}, "Catatan pengujian sebelumnya"));
           section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links, isStructureConclusion(block))));

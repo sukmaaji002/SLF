@@ -548,6 +548,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     boundField(data, key, label, "area", () => {
       if (data[key] !== lastText) { lastText = data[key]; update(); }
       else updatePreview();
+      if (structural) refreshLinkedFields(details);
       save();
     }));
   const wrapper = dom("div", { className: "wide guided-narrative" },
@@ -2290,6 +2291,23 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
         wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Catatan pemeriksaan sebelumnya"),
           linked("body", "Isi subbab")));
       }
+    } else if (isStructureConclusion(block)) {
+      const preview = dom("div", { className: "narrative-preview linked-fields" });
+      preview.refreshSources = registry => preview.replaceChildren(...structureConclusionContent(chapter, block, registry));
+      preview.refreshSources(sources);
+      wrapper.append(dom("p", { className: "hint" }, "Kesimpulan dan rekomendasi diperbarui otomatis dari data sistem struktur, pemeriksaan elemen, hasil uji, dan tindak lanjut struktur."), preview);
+      wrapper.append(dom("details", { className: "narrative-editor" },
+        dom("summary", {}, "Tambah atau ubah catatan pengkaji"),
+        boundField(block, "structureConclusionNote", "Catatan tambahan (opsional)", "area",
+          () => { refreshLinkedFields(); save(); }, false)));
+      if (hasWrittenStructureConclusion(block)) {
+        const previous = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Sunting isian terdahulu"));
+        previous.addEventListener("toggle", () => {
+          if (previous.open && previous.childElementCount === 1) previous.append(linkedText(project, block, "body", "Isi subbab",
+            () => block.links ?? {}, links => { block.links = links; }, reportSources(project)));
+        });
+        wrapper.append(previous);
+      }
     } else if (isStructureTesting(block)) {
       wrapper.append(structureTestingEditor(block, isAttached));
       if (hasLegacyStructureTesting(block)) {
@@ -2381,6 +2399,7 @@ function validateBackup(data) {
       if (block.type === "heading") {
         valid(typeof block.body === "string");
         clean.body = block.body;
+        if (typeof block.structureConclusionNote === "string") clean.structureConclusionNote = block.structureConclusionNote;
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
         if (block.structureTest && typeof block.structureTest === "object" && !Array.isArray(block.structureTest)) {
