@@ -586,7 +586,6 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const structureGuide = key === "body" && tokenName(data.text ?? "") === "data sistem struktur";
   if (key === "body") {
     const instructions = {
-      "pemeriksaan elemen struktur": "Catat apa yang terlihat di lapangan. Tulis elemen, lokasi, kondisi, dan bukti foto atau denah. Contoh pengamatan: retak terlihat pada kolom K-03 di koridor lantai dasar.",
       "hasil pengujian dan analisis": "Catat hasil uji lapangan, laporan uji yang ditelaah, atau perhitungan yang tersedia. Tulis metode, hasil beserta satuan bila ada, acuan, dan batas penilaiannya. Jika belum ada pengujian atau analisis, catat statusnya dan bagian yang belum dapat dinilai.",
     };
     const chapterGuide = instructions[tokenName(data.text ?? "")];
@@ -2140,6 +2139,43 @@ function focusEditorBlock(index) {
   return target;
 }
 
+function structureComponentsEditor(block, isAttached) {
+  const list = dom("div", { className: "appearance-sections" });
+  const add = button("＋ Tambah komponen", () => {
+    const entry = {};
+    (block.structureComponents ??= []).push(entry);
+    const card = componentCard(entry);
+    list.append(card);
+    card.querySelector("input").focus();
+    save();
+  });
+  function componentCard(entry) {
+    const fields = structureComponentFields.map(([key, label, example]) => {
+      const multiline = key === "observation" || key === "analysis";
+      const control = boundField(entry, key, label, multiline ? "area" : "text", () => save(), false);
+      control.querySelector("input, textarea").placeholder = example;
+      return control;
+    });
+    const card = dom("fieldset", { className: "link-entry" }, dom("legend", {}, "Komponen yang diperiksa"),
+      dom("div", { className: "form-grid" }, ...fields),
+      sectionPhotoEditor(entry, "Unggah foto komponen", () =>
+        isAttached() && block.structureComponents.includes(entry)));
+    card.append(button("Hapus komponen", () => {
+      if (hasStructureComponentContent(entry) && !confirm("Hapus komponen beserta catatan dan fotonya?")) return;
+      block.structureComponents.splice(block.structureComponents.indexOf(entry), 1);
+      photoEditors.delete(entry);
+      card.remove();
+      add.focus();
+      save();
+    }, "quiet"));
+    return card;
+  }
+  list.append(...(block.structureComponents ?? []).map(componentCard));
+  return dom("div", { className: "appearance-sections" },
+    dom("p", { className: "hint" }, "Tambahkan satu entri untuk setiap komponen di lokasi yang diperiksa. Jika komponen sejenis diperiksa di lokasi lain, buat entri baru untuk catatan dan fotonya."),
+    dom("div", { className: "button-row" }, add), list);
+}
+
 function blockEditor(chapter, block, index, headingInfo, sources) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
@@ -2182,8 +2218,17 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
       wrapper.append(introductionEditor(block, introductionText(chapter, block), "Pengantar subbab"));
     }
     const project = current();
-    wrapper.append(linked("body", "Isi subbab"), sectionPhotoEditor(block, "Unggah foto subbab",
-      () => project.chapters.includes(chapter) && chapter.blocks.includes(block)));
+    const isAttached = () => workspace.projects.includes(project) && project.chapters.includes(chapter) && chapter.blocks.includes(block);
+    if (tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents) {
+      wrapper.append(structureComponentsEditor(block, isAttached));
+      if (hasLegacyStructureInspection(block)) {
+        wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Catatan pemeriksaan sebelumnya"),
+          linked("body", "Isi subbab")));
+      }
+    } else {
+      wrapper.append(linked("body", "Isi subbab"));
+    }
+    wrapper.append(sectionPhotoEditor(block, "Unggah foto subbab", isAttached));
   }
   if (block.type === "text") wrapper.append(linked("text", "Isi paragraf"));
   if (block.type === "table") wrapper.append(tableEditor(block));
@@ -2261,6 +2306,12 @@ function validateBackup(data) {
         clean.body = block.body;
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
+        if (Array.isArray(block.structureComponents)) {
+          const keys = structureComponentFields.map(([key]) => key);
+          clean.structureComponents = block.structureComponents
+            .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+            .map((entry) => restorePhotos(pickText(entry, keys), entry));
+        }
         if (Array.isArray(block.appearanceSections)) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
           clean.appearanceSections = block.appearanceSections.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))

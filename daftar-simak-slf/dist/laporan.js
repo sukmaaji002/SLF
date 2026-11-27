@@ -126,6 +126,23 @@ function reportParagraphs(text, format, resolveToken) {
   return paragraphs;
 }
 
+const structureComponentFields = [
+  ["component", "Komponen", "Kolom K-03"],
+  ["location", "Lokasi", "Koridor lantai dasar"],
+  ["observation", "Hasil pengamatan", "Retak terlihat di sisi kolom dekat pintu"],
+  ["analysis", "Analisis pengkaji", "Lokasi dan ukuran retak perlu diperiksa lebih lanjut"],
+];
+
+function hasStructureComponentContent(component) {
+  return structureComponentFields.some(([key]) => component[key]?.trim()) || Boolean(component.photos?.length);
+}
+
+function hasLegacyStructureInspection(block) {
+  const text = block.body?.trim();
+  return Boolean(text && (text !== structuralInspectionNarrative ||
+    Object.values(block.links ?? {}).some((link) => link?.value?.trim() || link?.source)));
+}
+
 function appearanceSectionParagraphs(block) {
   return (block.appearanceSections ?? []).flatMap(({ area, part, condition }) => {
     const location = area?.trim();
@@ -347,7 +364,20 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         const { number, nested } = headings.get(bi);
         if (block.text.trim()) section.append(reportFormatted(dom(nested ? "h4" : "h3", { id, className: "chapter-heading" }), block.text, getTextFormat(block, "text"), number + " "));
         section.append(...reportParagraphs(introductionText(chapter, block)));
-        section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+        const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
+        if (!structureInspection || hasLegacyStructureInspection(block)) {
+          section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+        }
+        for (const [componentIndex, entry] of (block.structureComponents ?? []).filter(hasStructureComponentContent).entries()) {
+          const name = [entry.component?.trim() || "Komponen " + (componentIndex + 1), entry.location?.trim()]
+            .filter(Boolean).join(" · ");
+          section.append(dom("h4", {}, name));
+          for (const [key, label] of structureComponentFields.slice(2)) {
+            if (entry[key]?.trim()) section.append(...reportParagraphs(label + " — " + entry[key].trim()));
+          }
+          appendPhotos(section, (entry.photos ?? []).map((photo, photoIndex) =>
+            [photo, id + "-component-" + componentIndex + "-photo-" + photoIndex]));
+        }
         section.append(...appearanceSectionParagraphs(block));
         section.append(...areaObservationParagraphs(block.roomLayoutAreas, "Denah"),
           ...environmentObservationParagraphs(block.environmentAreas));

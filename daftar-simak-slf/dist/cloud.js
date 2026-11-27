@@ -37,6 +37,7 @@ function* slfReportPhotos(project) {
     for (const block of chapter.blocks) {
       if (block.type === "photo") yield block;
       yield* block.photos ?? [];
+      for (const entry of block.structureComponents ?? []) yield* entry.photos ?? [];
     }
   }
 }
