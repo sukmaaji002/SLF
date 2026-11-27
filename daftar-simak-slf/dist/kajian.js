@@ -584,6 +584,14 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
   const useGuide = key === "body" && (tokenName(data.text ?? "") === "peruntukan bangunan" ||
     reportTokens(data[key] || "").has("kesesuaian atau perbedaan beserta rujukan bukti"));
   const structureGuide = key === "body" && tokenName(data.text ?? "") === "data sistem struktur";
+  if (key === "body") {
+    const instructions = {
+      "pemeriksaan elemen struktur": "Catat apa yang terlihat di lapangan. Tulis elemen, lokasi, kondisi, dan bukti foto atau denah. Contoh pengamatan: retak terlihat pada kolom K-03 di koridor lantai dasar.",
+      "hasil pengujian dan analisis": "Catat hasil uji lapangan, laporan uji yang ditelaah, atau perhitungan yang tersedia. Tulis metode, hasil beserta satuan bila ada, acuan, dan batas penilaiannya. Jika belum ada pengujian atau analisis, catat statusnya dan bagian yang belum dapat dinilai.",
+    };
+    const chapterGuide = instructions[tokenName(data.text ?? "")];
+    if (chapterGuide) wrapper.prepend(dom("p", { className: "hint" }, chapterGuide));
+  }
   const intensityGuide = key === "body" && tokenName(data.text ?? "") === "intensitas bangunan";
   const appearanceGuide = key === "body" && (tokenName(data.text ?? "") === "penampilan bangunan" ||
     data[key] === appearanceNarrative || Array.isArray(data.appearanceSections));
@@ -678,6 +686,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       title, tip, fields: dom("div", { className: "form-grid narrative-fields" }),
     })) : [];
     const methodHeading = key === "body" ? tokenName(data.text ?? "") : "";
+    const structuralTests = methodHeading === "hasil pengujian dan analisis";
     const methods = {
       structure: structureGuide,
       health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
@@ -770,7 +779,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         token === comfortRoomToken ? "Pilihan fungsi ruang" :
         token === existingAreaToken ? "Pilihan area atau unit" :
           roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
-      const presets = choicesForInput(token);
+      const presets = structuralTests && token === "metode atau status pengujian" ?
+        choicesForInput(token).filter((option) => option !== "observasi visual") : choicesForInput(token);
       const groupsForChoices = repeated?.choiceKey ? [...(presetGroups ?? (ownerDocuments ? [] : [[choicesLegend, presets]]))] : [];
       const roomTokens = token === existingAreaToken ?
         [sampleLocationToken, "nama gedung atau blok", "lantai atau area", "nama unit"] : [sampleLocationToken];
