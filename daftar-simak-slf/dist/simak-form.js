@@ -10,6 +10,8 @@ const simakFormStyle = `
   .simak-form .simak-item { margin: 0 0 5pt 8pt; }
   .simak-form table { width: 100%; table-layout: fixed; margin: 0; border-collapse: collapse; }
   .simak-form th, .simak-form td { border: .65pt solid #222; color: #111; background: #fff; padding: 2.4pt 3pt; vertical-align: top; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .simak-form td { text-align: justify; }
+  .simak-form td .formatted-value { text-align: inherit !important; }
   .simak-form th { background: #ffff9a; color: #111; text-align: center; vertical-align: middle; font-weight: normal; }
   .simak-form thead { display: table-header-group; break-after: avoid; }
   .simak-form tr { break-inside: avoid; }

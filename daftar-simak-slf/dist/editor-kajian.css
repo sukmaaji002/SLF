@@ -111,6 +111,8 @@
 }
 .structure-test-scroll th { background: var(--panel); }
 .structure-test-scroll td { min-width: 115px; }
+.structure-test-preview td { text-align: justify; }
+.structure-test-preview td .formatted-value { text-align: inherit !important; }
 .structure-test-editor td { min-width: 155px; }
 .structure-test-editor td:last-child { min-width: 110px; }
 .structure-test-editor .section-photos { margin: 0; }

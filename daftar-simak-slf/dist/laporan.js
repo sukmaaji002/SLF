@@ -144,7 +144,6 @@ function hasLegacyStructureInspection(block) {
 }
 
 const structureTestFields = [
-  ["method", "Uji atau analisis apa yang dipakai?", "Contoh: telaah laporan uji beton No. 05 untuk kolom K-03"],
   ["result", "Apa hasilnya?", "Contoh: hasil uji, satuan, dan lokasi pengujian"],
   ["reference", "Apa pembandingnya? (jika ada)", "Contoh: nilai rencana pada gambar struktur S-02"],
   ["assessment", "Apa arti hasilnya? (jika ada)", "Contoh: hasil hanya mewakili sampel kolom yang diuji"],
@@ -161,14 +160,25 @@ function hasLegacyStructureTesting(block) {
 }
 
 function structureTestingItems(data) {
-  if (Array.isArray(data?.items)) return data.items;
-  // Older projects stored the first test result directly on the section.
-  const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
-  const item = Object.fromEntries(keys.filter((key) => typeof data?.[key] === "string").map((key) => [key, data[key]]));
-  return Object.values(item).some((value) => value.trim()) ? [item] : [];
+  if (!data) return [];
+  const items = Array.isArray(data.items) ? data.items : [data];
+  return items.filter((item) => item && typeof item === "object" && !Array.isArray(item)).map((item) => {
+    if (!Object.hasOwn(item, "method") && item !== data) return item;
+    const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
+    const migrated = item === data
+      ? Object.fromEntries(keys.filter((key) => typeof item[key] === "string").map((key) => [key, item[key]]))
+      : { ...item };
+    const method = typeof item.method === "string" ? item.method.trim() : "";
+    const reference = typeof migrated.reference === "string" ? migrated.reference.trim() : "";
+    if (method && reference !== method) {
+      migrated.reference = [reference, "Metode uji sebelumnya — " + method].filter(Boolean).join("\n");
+    }
+    delete migrated.method;
+    return migrated;
+  }).filter((item) => Array.isArray(data.items) || hasStructureTestItem(item));
 }
 
-const structureTestColumns = ["Item / parameter", "Uji atau analisis", "Hasil", "Pembanding", "Penilaian", "Foto"];
+const structureTestColumns = ["Item / parameter", "Hasil", "Pembanding", "Penilaian", "Foto"];
 
 function hasStructureTestItem(item) {
   return Boolean(item.photos?.length || item.parameter?.trim() ||

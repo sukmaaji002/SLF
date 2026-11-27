@@ -33,6 +33,8 @@ const reportLayoutStyle = `
   .report-print .contents-index { margin: 0 0 13px; }
   .report-print table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 8px 0 12px; }
   .report-print th, .report-print td { padding: 6px; border: 1px solid #c7d4cf; text-align: left; vertical-align: top; white-space: pre-wrap; }
+  .report-print td { text-align: justify; }
+  .report-print td .formatted-value { text-align: inherit !important; }
   .report-print th { background: #e8efeb; }
   .report-print td img.report-table-image { width: auto; height: auto; max-width: min(100%, 36mm); max-height: 26mm; margin: 4px auto 0; }
   .report-print thead { display: table-header-group; break-inside: avoid; break-after: avoid; }
