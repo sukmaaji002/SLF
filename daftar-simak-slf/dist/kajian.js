@@ -679,6 +679,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     })) : [];
     const methodHeading = key === "body" ? tokenName(data.text ?? "") : "";
     const methods = {
+      structure: structureGuide,
       health: fields.has(healthParameterToken) || (methodHeading === "kesehatan" && fields.has(healthReferenceToken)),
       comfort: fields.has(comfortReferenceToken) || (methodHeading === "kenyamanan" && fields.has(parameterReferenceToken)),
       comfortAssessment: methodHeading === "kenyamanan" && fields.has("hasil terverifikasi"),
@@ -765,7 +766,8 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const presetGroups = comfortParameters ? comfortParameterGroups :
         repeated?.method === "comfortAssessment" ? comfortAspectGroups : inputChoiceGroups.get(token);
-      const choicesLegend = token === comfortRoomToken ? "Pilihan fungsi ruang" :
+      const choicesLegend = repeated?.method === "structure" ? "Centang satu atau lebih pilihan" :
+        token === comfortRoomToken ? "Pilihan fungsi ruang" :
         token === existingAreaToken ? "Pilihan area atau unit" :
           roomField ? "Pilihan ruang atau sistem" : "Pilih satu atau beberapa jenis acuan";
       const presets = choicesForInput(token);
@@ -796,8 +798,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         if (input) focusTextField(input);
         else manual.querySelector("button")?.focus();
       };
-      const showStructureChoices = structureGuide && Object.hasOwn(inputChoices, token);
-      const showChoices = !guideField || showDocumentChoices || showStructureChoices;
+      const showChoices = !guideField || showDocumentChoices;
       const choices = repeated || token === "nomor rekomendasi" || token === "tanggal pemeriksaan" || !showChoices ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
@@ -814,7 +815,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       } else if (choices.length) {
         const pick = dom("select", { ariaLabel: "Pilihan isian " + name },
           new Option(isExample ? "Pilih contoh untuk diedit" : "Pilih isian", ""), ...choices.map((option) => new Option(option, option)));
-        choiceField = dom("label", {}, showStructureChoices ? "Tambahkan dari daftar (opsional)" : "Pilihan isian", pick);
+        choiceField = dom("label", {}, "Pilihan isian", pick);
         pick.addEventListener("change", () => {
           if (!pick.value) return;
           const previousValue = manualInput.value.trim();
@@ -960,7 +961,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       content.replaceChildren(instructions, grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (structureGuide) {
       content.replaceChildren(dom("p", { className: "hint" },
-        "Isi berdasarkan dokumen dan pengamatan lapangan. Sebutkan lokasi bagian yang bisa diperiksa. Jika dokumen belum tersedia atau bagian tertutup, catat alasannya di kolom terakhir."),
+        "Centang pilihan yang sesuai atau gunakan Tambah isian sendiri untuk menulis jawaban, nomor dokumen, atau lokasi. Catat bagian yang belum bisa dipastikan pada isian terakhir."),
         grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
     } else if (intensityGuide) {
       const lookUp = button("Lihat tabel perbandingan", () => {

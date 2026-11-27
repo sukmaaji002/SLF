@@ -57,6 +57,16 @@ const repeatedNarrativeFields = new Map([
   [parameterReferenceToken,
     { key: "parameters", choiceKey: "parameterStandardChoices", item: "Isian tambahan", minimumRows: 0 }],
 ]);
+for (const [token, item] of [
+  ["sistem utama dan material", "Sistem atau bahan tambahan"],
+  ["gambar atau dokumen teknis", "Nama atau nomor dokumen"],
+  ["daftar elemen yang dapat diakses", "Elemen dan lokasi"],
+  ["batasan data", "Keterbatasan tambahan"],
+]) {
+  repeatedNarrativeFields.set(token, { key: "structureEntries", choiceKey: "structureChoices", item,
+    method: "structure", addLabel: "Tambah isian sendiri", minimumRows: 0 });
+}
+
 const tokenAliases = {
   "tujuan kajian": ["project:purpose"],
   "luas persil": ["project:land-area"],
