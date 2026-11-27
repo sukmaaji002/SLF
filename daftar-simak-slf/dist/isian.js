@@ -400,7 +400,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         const action = cleanValue(area.followUp);
         if (!area.selected || !area.id || !action) continue;
         const label = [chapterNumber, block.text, area.area, area.location].filter(Boolean).join(" · ");
-        sources.recommendations.set("area:" + block.sourceId + ":" + area.id, { label, action });
+        sources.recommendations.set("area:" + block.sourceId + ":" + area.id, { label, action, chapter: chapterNumber, topic: cleanValue(area.area) });
       }
       if (block.type !== "table") continue;
       if (block.sourceId || isDocumentReviewTable(block)) tables.push([block, chapterNumber]);
@@ -443,7 +443,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
         const label = [chapterNumber, block.text || "Tabel", ...context.map(cleanValue)].filter(Boolean).join(" · ");
         const id = "cell:" + block.sourceId + ":" + tableCellKey(block, ri, actionColumn);
         const rowLabel = label + " (baris " + (ri + 1) + ")";
-        sources.recommendations.set(id, { label: rowLabel, reference: block.healthMeasurements ? label : rowLabel, action });
+        const measurement = block.healthMeasurements?.[block.rowIds[ri]];
+        const status = measurement ? healthMeasurement(resolvedHealthMeasurement(measurement, sources)).status : "";
+        sources.recommendations.set(id, { label: rowLabel, action, chapter: chapterNumber, status, topic: cleanValue(values[0]) });
       }
     }
     if (isTeamTable(block)) {
@@ -544,12 +546,38 @@ function automaticValue(token, sources) {
   return sources.get(automaticSource(token, sources))?.value || "";
 }
 
+function recommendationSummary(refs) {
+  if (!refs.length) return "";
+  const chapters = [...new Set(refs.map((ref) => ref.chapter))];
+  const place = chapters.length <= 3 ? scopeList.format(chapters) : chapters.length + " bab";
+  const sentences = [refs.length + " catatan tindak lanjut di " + place];
+  const outside = refs.filter((ref) => ref.status === "Di luar acuan");
+  const within = refs.filter((ref) => ref.status === "Memenuhi parameter ini");
+  const pending = refs.filter((ref) => ref.status && ref.status !== "Di luar acuan" && ref.status !== "Memenuhi parameter ini");
+  const results = [];
+  if (outside.length) results.push(outside.length + " hasil di luar acuan");
+  if (within.length) results.push(within.length + " hasil memenuhi acuan");
+  if (pending.length) results.push(pending.length + " hasil masih perlu dikonfirmasi");
+  if (results.length) sentences.push("Pada pemeriksaan yang dirujuk, terdapat " + scopeList.format(results));
+  const topics = [...new Set((outside.length ? outside : refs).map((ref) => ref.topic).filter((topic) => topic && topic.length <= 60))];
+  if (topics.length) sentences.push((outside.length ? "Temuan di luar acuan" : "Catatan terpilih") +
+    (topics.length > 3 ? " antara lain mengenai " : " mencakup ") +
+    scopeList.format(topics.slice(0, 3)));
+  const actions = [...new Set([...outside, ...refs.filter((ref) => !ref.status), ...pending, ...within].map((ref) => ref.action))];
+  // Quote complete instructions so a condition or exception stays with the action.
+  const examples = actions.filter((action) => action.length <= 190).slice(0, 2);
+  if (examples.length) sentences.push("Tindakan yang dicatat " + (examples.length < actions.length ? "antara lain " : "meliputi ") +
+    scopeList.format(examples.map((action) => "“" + action.replace(/[.]$/, "") + "”")));
+  else sentences.push("Rincian tindakan tercantum pada catatan pemeriksaan yang dirujuk");
+  return sentences.join(". ");
+}
+
 function resolveReportLink(original, label, sources, links) {
   const key = tokenName(label);
   const link = Object.hasOwn(links ?? {}, key) ? links[key] : undefined;
   if (key === "nomor rekomendasi" && link?.recommendationIds?.length) {
     const refs = link.recommendationIds.map((id) => sources.recommendations?.get(id)).filter(Boolean);
-    return { value: scopeList.format(refs.map(({ label, reference, action }) => (reference || label) + " (“" + action + "”)")) || original };
+    return { value: recommendationSummary(refs) || original };
   }
   const source = sources.get(link?.source ?? automaticSource(key, sources));
   const value = link ? (link.source ? source?.value : link.value) : automaticValue(key, sources);
