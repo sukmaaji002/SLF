@@ -884,8 +884,19 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         const selected = new Set(saved?.recommendationIds || []);
         const choices = dom("div", { className: "recommendation-list" });
         const pickerTitle = dom("summary");
-        recommendationPicker = dom("details", { className: "recommendation-picker" }, pickerTitle, choices);
+        const available = new Map();
+        const selectAll = button("Pilih semua", () => {
+          for (const [id, check] of available) {
+            selected.add(id);
+            check.checked = true;
+          }
+          saveSelection();
+        });
+        const actions = dom("div", { className: "button-row recommendation-actions" }, selectAll);
+        recommendationPicker = dom("details", { className: "recommendation-picker" }, pickerTitle, actions, choices);
         const sync = () => {
+          actions.hidden = !available.size;
+          selectAll.disabled = [...available.keys()].every((id) => selected.has(id));
           controls.hidden = selected.size > 0;
           pickerTitle.textContent = selected.size ? "Rekomendasi dari isian · " + selected.size + " dipilih" : "Pilih rekomendasi dari isian kajian";
           if (!selected.size) return updateValue();
@@ -893,23 +904,27 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
           badge.dataset.filled = String(!missing);
           badge.textContent = missing ? missing + " sumber perlu ditinjau" : "Tertaut";
         };
+        function saveSelection() {
+          const link = { ...(getLinks()[token] ?? { value: "" }) };
+          if (selected.size) link.recommendationIds = [...selected];
+          else delete link.recommendationIds;
+          setLinks({ ...getLinks(), [token]: link });
+          sync();
+          updatePreview();
+          refreshLinkedFields(details);
+          save();
+        }
         for (const id of new Set([...sources.recommendations.keys(), ...selected])) {
           const source = sources.recommendations.get(id);
           const check = dom("input", { type: "checkbox", checked: selected.has(id) });
+          if (source) available.set(id, check);
           choices.append(dom("label", { className: "scope-choice" }, check, dom("span", {},
             dom("strong", {}, source?.label || "Sumber dihapus atau dikosongkan"),
             dom("span", {}, source?.action || "Lepaskan pilihan ini atau isi rujukan secara manual."))));
           check.addEventListener("change", () => {
             if (check.checked) selected.add(id);
             else selected.delete(id);
-            const link = { ...(getLinks()[token] ?? { value: "" }) };
-            if (selected.size) link.recommendationIds = [...selected];
-            else delete link.recommendationIds;
-            setLinks({ ...getLinks(), [token]: link });
-            sync();
-            updatePreview();
-            refreshLinkedFields(details);
-            save();
+            saveSelection();
           });
         }
         if (!choices.childElementCount) choices.append(dom("p", { className: "hint" },

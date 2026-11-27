@@ -87,6 +87,8 @@
 
 @media screen {
   .recommendation-action { justify-self: start; max-width: 100%; min-height: 42px; }
+  .recommendation-actions { margin-bottom: 8px; }
+  .recommendation-actions button { min-height: 42px; }
   .recommendation-picker > summary { padding-block: 8px; color: #245b40; font-weight: 650; cursor: pointer; }
   .recommendation-list { display: grid; gap: 6px; max-height: 22rem; overflow-y: auto; }
   .recommendation-list .scope-choice { display: flex; gap: 8px; align-items: start; padding: 8px; border: 1px solid var(--line); border-radius: 7px; }
