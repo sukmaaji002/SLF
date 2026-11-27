@@ -2170,7 +2170,10 @@ function structureComponentsEditor(block, isAttached) {
 }
 
 function structureTestingEditor(block) {
-  const data = block.structureTest ?? {};
+  const previous = block.structureTest;
+  const items = [...structureTestingItems(previous)];
+  if (!Array.isArray(previous?.items) && !items.length) items.push({});
+  const data = { status: previous?.status, pendingNote: previous?.pendingNote, items };
   const status = dom("select", {}, new Option("Pilih status", ""),
     new Option("Belum ada hasil uji atau analisis", "unavailable"),
     new Option("Ada hasil uji atau analisis", "available"));
@@ -2183,11 +2186,38 @@ function structureTestingEditor(block) {
     preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"), ...paragraphs);
   };
   const changed = () => { block.structureTest = data; update(); save(); };
-  const details = dom("div", { className: "form-grid" }, ...structureTestFields.map(([key, label, example]) => {
-    const input = boundField(data, key, label, "area", changed, false);
-    input.querySelector("textarea").placeholder = example;
-    return input;
-  }));
+  const list = dom("div", { className: "appearance-sections" });
+  const add = button("＋ Tambah item atau parameter uji", () => {
+    const item = {};
+    items.push(item);
+    const card = itemCard(item);
+    list.append(card);
+    card.querySelector("input").focus();
+    changed();
+  });
+  const details = dom("div", { className: "appearance-sections" }, dom("div", { className: "button-row" }, add), list);
+  function itemCard(item) {
+    const parameter = boundField(item, "parameter", "Item atau parameter yang diuji", "text", changed, false);
+    parameter.querySelector("input").placeholder = "Contoh: kuat tekan beton pada kolom K-03";
+    const fields = structureTestFields.map(([key, label, example]) => {
+      const input = boundField(item, key, label, "area", changed, false);
+      input.querySelector("textarea").placeholder = example;
+      return input;
+    });
+    const card = dom("fieldset", { className: "link-entry" },
+      dom("legend", {}, "Item pengujian"), parameter,
+      dom("div", { className: "form-grid" }, ...fields));
+    card.append(button("Hapus item uji", () => {
+      if (Object.values(item).some((value) => typeof value === "string" && value.trim()) &&
+          !confirm("Hapus item uji beserta hasilnya?")) return;
+      items.splice(items.indexOf(item), 1);
+      card.remove();
+      add.focus();
+      changed();
+    }, "quiet"));
+    return card;
+  }
+  list.append(...items.map(itemCard));
   const note = boundField(data, "pendingNote", "Catatan (jika ada)", "area", changed, false);
   note.querySelector("textarea").placeholder = "Contoh: laporan uji belum diterima dari pengelola";
   const preview = dom("div", { className: "narrative-preview" });
@@ -2340,7 +2370,11 @@ function validateBackup(data) {
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
         if (block.structureTest && typeof block.structureTest === "object" && !Array.isArray(block.structureTest)) {
-          const data = pickText(block.structureTest, ["pendingNote", ...structureTestFields.map(([key]) => key)]);
+          const data = pickText(block.structureTest, ["pendingNote"]);
+          const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
+          data.items = structureTestingItems(block.structureTest)
+            .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+            .map((entry) => pickText(entry, keys));
           const status = block.structureTest.status;
           if (status === "available" || status === "unavailable") data.status = status;
           clean.structureTest = data;

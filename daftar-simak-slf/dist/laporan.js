@@ -160,6 +160,14 @@ function hasLegacyStructureTesting(block) {
     Object.values(block.links ?? {}).some((link) => link?.value?.trim() || link?.source)));
 }
 
+function structureTestingItems(data) {
+  if (Array.isArray(data?.items)) return data.items;
+  // Older projects stored the first test result directly on the section.
+  const keys = ["parameter", ...structureTestFields.map(([key]) => key)];
+  const item = Object.fromEntries(keys.filter((key) => typeof data?.[key] === "string").map((key) => [key, data[key]]));
+  return Object.values(item).some((value) => value.trim()) ? [item] : [];
+}
+
 function structureTestingParagraphs(data) {
   if (data?.status === "unavailable") {
     const note = data.pendingNote?.trim();
@@ -167,8 +175,13 @@ function structureTestingParagraphs(data) {
   }
   if (data?.status !== "available") return [];
   const labels = { method: "Pengujian atau analisis", result: "Hasil", reference: "Pembanding", assessment: "Penilaian pengkaji" };
-  return structureTestFields.flatMap(([key]) =>
-    data[key]?.trim() ? reportParagraphs(labels[key] + " — " + data[key].trim()) : []);
+  return structureTestingItems(data).flatMap((item, index) => {
+    const paragraphs = structureTestFields.flatMap(([key]) =>
+      item[key]?.trim() ? reportParagraphs(labels[key] + " — " + item[key].trim()) : []);
+    const parameter = item.parameter?.trim();
+    if (!parameter && !paragraphs.length) return [];
+    return [dom("h4", {}, parameter || "Item uji " + (index + 1)), ...paragraphs];
+  });
 }
 
 function isStructureRecap(block) {
