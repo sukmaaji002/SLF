@@ -15,6 +15,13 @@ const buildingUseFields = new Map([
   ["kesesuaian atau perbedaan beserta rujukan bukti", ["Apakah penggunaannya sesuai?", "Hasil dan bukti", "sesuai dengan fungsi pada PBG, sebagaimana terlihat pada Foto 5.1", 2]],
 ]);
 
+const structuralSystemFields = new Map([
+  ["sistem utama dan material", ["Apa jenis struktur utama bangunan?", "Sistem dan bahan struktur", "rangka beton bertulang dengan rangka atap baja"]],
+  ["gambar atau dokumen teknis", ["Dokumen apa yang Anda lihat?", "Nama atau nomor dokumen struktur", "gambar struktur S-02. Jika belum ada dokumen, catat keterbatasannya di kolom terakhir"]],
+  ["daftar elemen yang dapat diakses", ["Bagian mana yang bisa Anda periksa?", "Elemen dan lokasi yang dapat diperiksa", "kolom dan balok di gudang lantai 1"]],
+  ["batasan data", ["Apa yang belum bisa dipastikan?", "Dokumen yang belum tersedia atau bagian yang belum bisa diperiksa", "detail fondasi belum tersedia sehingga jenis fondasi belum dapat dipastikan"]],
+]);
+
 const intensityGuideFields = new Map([
   [intensityFinding, ["Apa yang perlu dicatat dari tabel?", "Catatan hasil pemeriksaan",
     "jarak bangunan dari as jalan masih perlu diukur ulang karena titik ukurnya belum pasti"]],
