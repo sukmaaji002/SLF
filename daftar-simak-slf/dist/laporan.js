@@ -209,105 +209,155 @@ function isStructureRecap(block) {
   return tokenName(block.text) === "rekap hasil pemeriksaan struktur";
 }
 
-function structureConclusionFields(fields) {
-  return dom("dl", { className: "structure-conclusion-fields" }, ...fields.flatMap(([label, value]) =>
-    value?.trim() ? [dom("dt", {}, label), dom("dd", { className: "report-text" }, value.trim())] : []));
-}
-
-function structureConclusionRecord(title, fields) {
-  return dom("div", { className: "structure-conclusion-record" }, dom("h6", {}, title),
-    structureConclusionFields(fields));
+// Compare only a single reported value with an explicit minimum in the same notation.
+function structureMinimumComparison(result, reference) {
+  const reading = (text) => {
+    const matches = [...(text || "").matchAll(/\bK\s*-\s*(\d+(?:[.,]\d+)?)\b|\b(\d+(?:[.,]\d+)?)\s*(MPa|mm|kN)\b/gi)];
+    if (matches.length !== 1 || /[<>≤≥±%]|\d\s*[-–/]\s*\d/.test(text) ||
+        (text.match(/\d+(?:[.,]\d+)?/g) || []).length !== 1) return null;
+    const [, grade, measure, unit] = matches[0];
+    return { value: Number((grade || measure).replace(",", ".")), unit: grade ? "K" : unit.toLowerCase(), label: matches[0][0] };
+  };
+  if (!/\b(?:minimal|minimum|paling rendah|sekurang-kurangnya)\b/i.test(reference) ||
+      /\b(?:tidak|bukan|maksimum|maksimal|sekitar|antara|hingga)\b/i.test(reference + " " + result)) return "";
+  if (/kurang dari|lebih dari|setidaknya|minimum|maksimal|minimal|±|[<>≤≥]/i.test(result)) return "";
+  const actual = reading(result);
+  const limit = reading(reference);
+  if (!actual || !limit || actual.unit !== limit.unit) return "";
+  return actual.label + (actual.value < limit.value ? " di bawah minimum " : " memenuhi minimum ") + limit.label;
 }
 
 function structureConclusionContent(chapter, conclusion, sources) {
-  const basis = [];
-  const limits = [];
-  const findings = [];
-  const tests = [];
-  const recap = [];
   const field = (block, key) => resolveReportLink("", key, sources, block.links).value;
+  const themes = new Map();
+  const results = new Map();
+  const actions = new Map();
+  const limits = new Set();
+  const systems = new Set();
+  const basis = new Set();
+  function group(map, text, subject) {
+    if (!text?.trim()) return;
+    const key = text.trim().replace(/[.]$/, "");
+    if (!map.has(key)) map.set(key, new Set());
+    if (subject?.trim()) map.get(key).add(subject.trim());
+  }
+  function addFinding(subject, observation, analysis) {
+    if (!observation?.trim() && !analysis?.trim()) return;
+    const observed = observation?.trim() || "";
+    const assessed = analysis?.trim() || "";
+    // Match affirmative field observations only. Ambiguous wording stays attributed to the assessor.
+    const crack = /\bretak(?:an)?\b/i.test(observed) && !/\b(tidak|tak|tanpa|belum|bukan|nihil|bekas|sudah|telah|kemungkinan|diduga)\b/i.test(observed);
+    const finish = crack && /\b(plester(an)?|acian)\b/i.test(observed);
+    const reinforcement = /^(?:perlu |diperlukan |disarankan |direkomendasikan ).*\b(perkuatan|penguatan)\b/i.test(assessed) &&
+      !/\b(tidak|belum|bukan|kecuali|jika|apabila)\b/i.test(assessed);
+    if (crack) {
+      const finding = finish ? "Retak teramati pada lapisan finishing" : "Retak teramati pada elemen";
+      const position = observed.match(/\b(?:bagian|sisi|serat)\s+(bawah|atas|tarik|tekan)\b/i);
+      const detail = position ? " di " + position[0].toLowerCase() : "";
+      group(themes, finding + detail + (reinforcement ? ". Usulan pengkaji — " + assessed :
+        assessed ? ". Penilaian pengkaji — " + assessed : ""), subject);
+      group(actions, finish ? "Periksa apakah retak terbatas pada finishing. Jika terbatas pada lapisan tersebut, tangani penyebabnya sebelum memperbaiki permukaan" :
+        "Petakan pola dan ukur lebar retak, lalu pantau perubahannya pada titik ukur yang sama", subject);
+      if (/\d/.test(observed)) group(themes, observed, subject);
+    } else {
+      group(themes, [observed, assessed && assessed !== observed ? assessed : ""].filter(Boolean).join(". "), subject);
+    }
+    if (/^(?:terlihat |teramati |terdapat )?(?:korosi|karat)\b/i.test(observed)) {
+      group(actions, "Petakan bagian yang terkorosi dan ukur penampang tersisa untuk menilai pengaruh kehilangan material terhadap kapasitas elemen", subject);
+    }
+    if (/^(?:terlihat |teramati |terdapat )?(?:lendutan|deformasi)\b/i.test(observed)) {
+      group(actions, "Ukur perubahan geometri terhadap titik acuan tetap, catat kondisi beban saat pengukuran, lalu bandingkan dengan kriteria layan elemen", subject);
+    }
+    if (reinforcement) group(actions, "Verifikasi kebutuhan perkuatan terhadap beban aktual dan kapasitas elemen. Gunakan hasil verifikasi untuk menetapkan detail perkuatan sebelum pelaksanaan", subject);
+  }
+  function addTest(subject, result, reference, assessment) {
+    if (!result?.trim() && !assessment?.trim()) return;
+    const comparison = structureMinimumComparison(result || "", reference || "");
+    const finding = comparison || result?.trim();
+    let interpretation = assessment?.trim();
+    // Condense an explicit load assessment only when no qualifications follow it.
+    if (comparison && !/[;\n]|[.!?]\s+\D/.test(interpretation) && /(?:masih )?mampu menerima beban yang ada(?: sesuai dengan perencanaan)?[.]?$/i.test(interpretation) &&
+        !/\b(tidak|belum|bukan|jika|apabila|asalkan|kecuali|namun|tetapi|hanya|terbatas|selama|syarat)\b/i.test(interpretation)) {
+      interpretation = /perhitungan.*ulang/i.test(interpretation) ?
+        "Menurut perhitungan ulang pengkaji, kapasitas masih mencukupi untuk beban yang ditelaah" :
+        "Pengkaji menilai kapasitas mencukupi untuk beban yang ditelaah";
+    }
+    group(results, [finding, interpretation].filter(Boolean).join(". "), subject);
+    if (comparison.includes(" di bawah minimum ")) {
+      group(actions, "Telusuri elemen yang diwakili sampel dan dokumentasikan kapasitasnya berdasarkan mutu hasil uji, beban aktual, serta asumsi perhitungan", subject);
+    } else if (!assessment?.trim()) {
+      group(actions, reference?.trim() ? "Nilai hasil terhadap kriteria pembanding dan catat implikasinya untuk elemen yang diuji" :
+        "Tetapkan acuan yang sesuai dengan metode dan satuan uji sebelum menilai hasilnya", subject);
+    }
+  }
   for (const block of chapter.blocks) {
     if (block === conclusion) break;
     if (block.type === "table" && isStructureRecap(block)) {
       for (const [ri, row] of block.rows.entries()) {
         const values = row.map((_, ci) => cleanValue(tableCellValue(block, ri, ci, sources)));
-        if (values.some(Boolean)) recap.push(structureConclusionRecord(values[0] || "Entri rekap " + (ri + 1),
-          values.slice(1).map((value, ci) => [block.headers[ci + 1], value])));
+        addFinding(values[0], values[1], values[3]);
       }
     }
     if (block.type !== "heading") continue;
     if (tokenName(block.text) === "data sistem struktur" || reportTokens(block.body ?? "").has("sistem utama dan material")) {
-      basis.push(["Sistem dan material", field(block, "sistem utama dan material")],
-        ["Dokumen teknis", field(block, "gambar atau dokumen teknis")],
-        ["Elemen yang dapat diperiksa", field(block, "daftar elemen yang dapat diakses")]);
-      limits.push(["Akses dan kelengkapan data", field(block, "batasan data")]);
+      systems.add(field(block, "sistem utama dan material"));
+      if (field(block, "gambar atau dokumen teknis")) basis.add("dokumen teknis");
+      if (field(block, "daftar elemen yang dapat diakses")) basis.add("data elemen yang dapat diakses");
+      const limitation = field(block, "batasan data");
+      if (limitation) limits.add(limitation);
     }
-    if (block.structureComponents || tokenName(block.text) === "pemeriksaan elemen struktur" || block.body === structuralInspectionNarrative) {
-      for (const [index, entry] of (block.structureComponents ?? []).entries()) {
-        if (!entry.observation?.trim() && !entry.analysis?.trim()) continue;
-        findings.push(structureConclusionRecord(entry.component?.trim() || "Komponen " + (index + 1), [
-          ["Lokasi", entry.location], ["Pengamatan", entry.observation], ["Analisis pengkaji", entry.analysis],
-        ]));
-      }
-      const observation = field(block, "kondisi, lokasi, dan ukuran kerusakan bila ada");
-      if (observation) findings.push(structureConclusionRecord(field(block, "elemen dan lokasi sampel") || "Catatan pemeriksaan sebelumnya", [
-        ["Pengamatan", observation], ["Bukti", field(block, "tabel, denah, atau foto")],
-      ]));
+    for (const entry of block.structureComponents ?? []) {
+      addFinding([entry.component, entry.location].filter(Boolean).join(" · "), entry.observation, entry.analysis);
+    }
+    if (block.body === structuralInspectionNarrative || tokenName(block.text) === "pemeriksaan elemen struktur") {
+      addFinding(field(block, "elemen dan lokasi sampel"), field(block, "kondisi, lokasi, dan ukuran kerusakan bila ada"), "");
     }
     if (isStructureTesting(block)) {
       const data = block.structureTest;
       if (data?.status === "unavailable") {
-        limits.push(["Pengujian", ["Hasil uji atau analisis belum tersedia.", data.pendingNote?.trim()].filter(Boolean).join(" ")]);
+        limits.add(["Hasil uji atau analisis belum tersedia.", data.pendingNote?.trim()].filter(Boolean).join(" "));
         continue;
       }
-      if (data?.status === "available") {
-        for (const [index, item] of structureTestingItems(data).entries()) {
-          if (!item.result?.trim() && !item.assessment?.trim()) continue;
-          tests.push(structureConclusionRecord(item.parameter?.trim() || "Item uji " + (index + 1), [
-            ["Hasil uji", item.result], ["Pembanding", item.reference], ["Penilaian pengkaji", item.assessment],
-          ]));
-        }
+      if (data?.status === "available") for (const item of structureTestingItems(data)) {
+        addTest(item.parameter, item.result, item.reference, item.assessment);
       }
-      const result = field(block, "hasil dan satuan");
-      const assessment = field(block, "interpretasi dan batasan");
-      if (result || assessment) tests.push(structureConclusionRecord("Catatan pengujian sebelumnya", [
-        ["Metode atau status", field(block, "metode atau status pengujian")], ["Hasil uji", result],
-        ["Pembanding", field(block, "parameter pembanding")], ["Penilaian dan batasan", assessment],
-      ]));
+      addTest(field(block, "metode atau status pengujian"), field(block, "hasil dan satuan"),
+        field(block, "parameter pembanding"), field(block, "interpretasi dan batasan"));
     }
   }
-
-  const summary = [];
-  function addGroup(target, title, children) {
-    if (children.length) target.push(dom("div", { className: "structure-conclusion-group" }, dom(target === summary ? "h5" : "h4", {}, title), ...children));
+  for (const ref of recommendationsFor(sources, true).values()) {
+    if (!ref.assessment) group(actions, ref.action, ref.topic);
   }
-  if (basis.some(([, value]) => value)) addGroup(summary, "Dasar pemeriksaan", [structureConclusionFields(basis)]);
-  addGroup(summary, "Temuan per komponen", findings);
-  addGroup(summary, "Hasil uji dan penilaian", tests);
-  addGroup(summary, "Rekap pemeriksaan", recap);
-  if (limits.some(([, value]) => value)) addGroup(summary, "Batasan pemeriksaan", [structureConclusionFields(limits)]);
-
-  const refs = [...recommendationsFor(sources, true).values()];
-  const actions = refs.filter(ref => !ref.assessment);
-  const recommendations = [];
-  if (actions.length) {
-    for (const ref of actions) {
-      const text = dom("p", { className: "report-text" }, ref.action);
-      recommendations.push(dom("div", { className: "structure-conclusion-record" },
-        ref.topic ? dom("h5", {}, ref.topic) : "", text));
-    }
-  } else {
-    recommendations.push(...reportParagraphs(refs.length ?
-      "Tindak lanjut dapat dirumuskan dari analisis pengkaji pada temuan per komponen dan penilaian hasil uji di atas." :
-      "Belum ada rekomendasi struktur yang tercatat."));
+  if (limits.size && [...limits].some(value => /\b(belum|tertutup|terbatas|tidak tersedia|tidak dapat)\b/i.test(value))) {
+    group(actions, "Lengkapi bukti pada bagian yang belum terverifikasi dan tentukan kebutuhan inspeksi atau pengujian lanjutan pada bagian tersebut");
   }
+  if (!actions.size && themes.size) group(actions, "Gunakan catatan lokasi dan kondisi elemen sebagai pembanding pada inspeksi berikutnya. Telaah penyebab dan pengaruhnya terhadap kapasitas bila kondisi berubah");
 
+  function paragraphs(map) {
+    return [...map].map(([text, subjects]) => {
+      const labels = [...subjects];
+      const subject = labels.length > 3 ? labels.slice(0, 2).join(", ") + " dan " + (labels.length - 2) + " titik lain" : scopeList.format(labels);
+      return dom("p", { className: "report-text" }, subject ? dom("strong", {}, subject + ". ") : "", text + ".");
+    });
+  }
   const groups = [];
-  addGroup(groups, "Kesimpulan", summary.length ? summary : reportParagraphs("Data struktur untuk menyusun kesimpulan belum tersedia."));
-  addGroup(groups, "Rekomendasi", recommendations);
+  function section(title, content) {
+    if (content.length) groups.push(dom("div", { className: "structure-conclusion-group" }, dom("h4", {}, title), ...content));
+  }
+  const context = [...systems].filter(Boolean).join(", ");
+  const summary = [];
+  if (context || basis.size) summary.push(...reportParagraphs((context ? "Kajian mencakup " + context : "Kajian struktur disusun") +
+    (basis.size ? " berdasarkan " + scopeList.format([...basis]) : "") + "."));
+  summary.push(...paragraphs(themes));
+  section("Ringkasan pemeriksaan", summary.length ? summary : !results.size && !limits.size ? reportParagraphs("Data struktur untuk menyusun kesimpulan belum tersedia.") : []);
+  section("Makna hasil uji", paragraphs(results));
+  section("Batas penilaian", [...limits].flatMap(value => reportParagraphs(value)));
+  section("Rekomendasi teknis", actions.size ? paragraphs(actions) : reportParagraphs(results.size ?
+    "Simpan hubungan antara sampel, lokasi elemen, hasil uji, dan penilaian pengkaji sebagai dasar evaluasi berikutnya." :
+    "Belum ada rekomendasi struktur yang tercatat."));
   const additional = hasWrittenStructureConclusion(conclusion) ? writtenStructureConclusion(conclusion, sources) : [];
   if (conclusion.structureConclusionNote?.trim()) additional.push(...reportParagraphs(conclusion.structureConclusionNote));
-  addGroup(groups, "Catatan tambahan pengkaji", additional);
+  section("Catatan tambahan pengkaji", additional);
   return [dom("div", { className: "structure-conclusion" }, ...groups)];
 }
 
