@@ -553,6 +553,15 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     dom("div", { className: "narrative-preview" }, dom("h4", {}, "Tampilan di laporan"), preview, extraPreview), details, textEditor);
   wrapper.openNarrativeField = openField;
   const control = textEditor.querySelector("textarea");
+  const recommendationToken = "nomor rekomendasi";
+  const recommendationAction = button("", () => {
+    if (!reportTokens(control.value).has(recommendationToken)) {
+      control.value += (control.value.trim() ? "\n\n" : "") + "Rekomendasi terkait dirujuk pada [nomor rekomendasi].";
+      control.dispatchEvent(new Event("input"));
+    }
+    openField(recommendationToken);
+  }, "primary recommendation-action");
+  details.before(recommendationAction);
   const insertPurpose = button("Tambahkan isian Tujuan Kajian", () => {
     if (reportTokens(control.value).has("tujuan kajian")) return;
     const separator = control.value.trim() ? "\n\n" : "";
@@ -587,10 +596,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : undefined;
 
   function openField(token) {
-    if (!details.open) {
-      details.open = true;
-      update();
-    }
+    const refresh = !details.open || !entries.has(token) || token === recommendationToken;
+    details.open = true;
+    if (refresh) update();
     entries.get(token)?.();
   }
 
@@ -598,6 +606,13 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     const text = data[key] || "";
     const links = getLinks();
     const fields = reportTokens(text);
+    const hasRecommendation = fields.has(recommendationToken);
+    recommendationAction.hidden = !hasRecommendation && !(key === "body" &&
+      ["kesimpulan bidang arsitektur", "kesimpulan bidang struktur"].includes(tokenName(data.text ?? "")));
+    if (!recommendationAction.hidden) {
+      recommendationAction.textContent = hasRecommendation ? "Ambil rekomendasi dari isian" : "Tambahkan rujukan rekomendasi";
+      if (sources.recommendations.size) recommendationAction.textContent += " (" + sources.recommendations.size + ")";
+    }
     const missing = [...fields].filter(([token, name]) => resolveReportLink("[" + name + "]", token, sources, links).value === "[" + name + "]").length;
     summary.textContent = missing ? "Lengkapi isian · " + missing + " belum terisi" :
       fields.size ? "Lihat atau ubah isian · " + fields.size + " terisi" : "Tambahkan isian otomatis";

@@ -452,7 +452,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
       const members = teamMembers(block, sources);
       if (block.teamLead) {
         hasDesignation = true;
-        const designated = block.teamLead === "director" ? director :
+        const designated = block.teamLead === "director" ? sources.get("project:consultant-director")?.value :
           members.find(([id]) => id === block.teamLead)?.[1];
         if (designated) designatedLeads.add(designated);
       }
