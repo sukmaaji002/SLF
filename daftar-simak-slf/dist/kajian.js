@@ -6,6 +6,7 @@ const preset = "disiplin";
 const editor = $("editor");
 const narrowLayout = matchMedia("(max-width: 760px)");
 const status = $("save-status");
+const saveFailure = "Gagal menyimpan. Unduh cadangan sebelum menutup.";
 const dialog = $("preview-dialog");
 const reportUrls = [];
 const photoEditors = new Map();
@@ -80,12 +81,11 @@ async function save(markDirty = true, project = current()) {
   if (isTrial()) return;
   if (markDirty !== false) slfRememberEdit(project.id);
   const revision = ++saving;
-  status.textContent = "Menyimpan…";
   try {
     await storeValue(database, "workspace", slfWorkspaceKey(slfCloudOwner()), workspace);
-    if (revision === saving) status.textContent = "Tersimpan di browser ini";
+    if (revision === saving && status.textContent === saveFailure) status.textContent = "";
   } catch {
-    if (revision === saving) status.textContent = "Gagal menyimpan. Unduh cadangan sebelum menutup.";
+    if (revision === saving) status.textContent = saveFailure;
   }
 }
 

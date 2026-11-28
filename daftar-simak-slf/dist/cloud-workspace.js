@@ -15,7 +15,7 @@ let slfChecklistItem = "";
 const slfCloudOwner = () => slfAccount?.id ?? "";
 globalThis.slfCloudOwner = slfCloudOwner;
 const slfWorkspaceKey = (owner) => owner ? "drafts:" + owner : "drafts";
-const slfCloudStatus = (message) => { $("cloud-status").textContent = message; };
+const slfCloudStatus = (message = "") => { $("cloud-status").textContent = message; };
 
 function slfQueueCloud(action) {
   const next = slfCloudQueue.then(action);
@@ -77,7 +77,6 @@ function slfRequestCloudSync({ pull = true } = {}) {
 function slfRememberEdit(projectId) {
   if (!slfAccount) return;
   workspace.cloud[projectId] = { ...workspace.cloud[projectId], dirty: crypto.randomUUID() };
-  slfCloudStatus("Perubahan menunggu sinkronisasi.");
   clearTimeout(slfCloudTimer);
   slfCloudTimer = setTimeout(() => {
     slfRequestCloudSync({ pull: false });
@@ -126,7 +125,6 @@ async function slfSyncCloud({ pull = true } = {}) {
   const state = workspace;
   let failed;
   let remoteChanged = false;
-  slfCloudStatus("Menyinkronkan…");
   for (const [id, pending] of Object.entries(state.cloud)) {
     if (!pending.dirty || pending.conflict) continue;
     const local = state.projects.find((item) => item.id === id);
@@ -165,12 +163,8 @@ async function slfSyncCloud({ pull = true } = {}) {
     slfCloudStatus("Draf berubah di perangkat lain. Simpan perubahan sebagai salinan saat membuka draf yang konflik.");
   } else if (failed) {
     slfCloudStatus(slfCloudError(failed));
-  } else if (Object.values(state.cloud).some((entry) => entry.dirty)) {
-    slfCloudStatus("Perubahan menunggu sinkronisasi.");
-  } else if (!$("slf-dashboard").hidden) {
-    slfCloudStatus("Kajian tersinkron.");
   } else {
-    slfCloudStatus(state.cloud[state.current]?.revision ? "Draf tersinkron." : "Draf baru akan disinkronkan setelah diisi.");
+    slfCloudStatus();
   }
 }
 
@@ -237,6 +231,7 @@ async function slfChangeAccount(user) {
       slfReleaseAccount?.();
       slfReleaseAccount = undefined;
     }
+    slfCloudStatus();
     slfCloudRows = [];
     slfDraftStore = undefined;
     slfAccount = undefined;
@@ -275,7 +270,7 @@ async function slfChangeAccount(user) {
         slfChecklistItem = allChecklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
       }
     } else {
-      slfCloudStatus(user ? "Akun terbuka di tab lain. Sinkronisasi dilanjutkan otomatis setelah tab itu ditutup." : "Mode lokal");
+      slfCloudStatus(user ? "Akun terbuka di tab lain. Sinkronisasi dilanjutkan otomatis setelah tab itu ditutup." : "");
     }
     if (dialog.open) dialog.close();
     render();

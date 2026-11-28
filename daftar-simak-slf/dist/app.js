@@ -120,12 +120,12 @@ let state = (trialData ? structuredClone(trialData.checklist) : load(storageKey)
 function save() {
   if (trialData) {
     trialData.checklist = structuredClone(state);
-    byId("save-status").textContent = "Tersimpan selama tab terbuka";
+    byId("save-status").textContent = "";
     return;
   }
   try {
     localStorage.setItem(storageKey, JSON.stringify(state));
-    byId("save-status").textContent = "Tersimpan di browser ini";
+    byId("save-status").textContent = "";
   } catch {
     byId("save-status").textContent = "Penyimpanan browser gagal";
   }
@@ -640,7 +640,6 @@ function toggleGroups() {
 }
 
 if (trialMode) {
-  byId("save-status").textContent = "Versi coba · Data tersimpan selama tab terbuka";
   byId("check-title").after(el("p", "result", trialChecklistItems.length + " dari " + checklistItems.length +
     " butir dapat diisi. Butir lainnya · Perlu login."));
   byId("status-filter").add(new Option("Perlu login", "locked"));

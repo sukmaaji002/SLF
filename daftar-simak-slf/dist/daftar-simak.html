@@ -6,7 +6,7 @@
   <meta name="description" content="Form kajian pemeriksaan bangunan gedung untuk Sertifikat Laik Fungsi.">
   <meta name="theme-color" content="#f3f5f8">
   <title>Daftar Simak SLF</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="ponsel.css">
@@ -25,7 +25,7 @@
     const auth = params.has("trial") || embeddedAccount ? undefined : slfCloudClient()?.auth;
     const session = (await auth?.getSession().catch(() => null))?.data?.session;
     if (params.has("trial") || embeddedAccount || session) {
-      await import("./app.js?v=9");
+      await import("./app.js?v=10");
       document.body.hidden = false;
       auth?.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT") {
@@ -58,7 +58,7 @@
     <section class="panel identity" id="identitas" aria-labelledby="identity-title">
       <div class="section-head">
         <h2 id="identity-title">Identitas dan kondisi bangunan</h2>
-        <span id="save-status" role="status">Penyimpanan di browser ini</span>
+        <span id="save-status" role="status"></span>
       </div>
       <a class="simak-jump" href="#pemeriksaan">Langsung ke butir pemeriksaan ↓</a>
       <div class="identity-grid">
