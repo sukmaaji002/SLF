@@ -48,6 +48,7 @@ const checklistLabels = {
   ndt: "Uji non-destruktif", test: "Pengetesan", view: "Hasil pengamatan", disruption: "Uraian gangguan",
   note: "Keterangan", component: "Komponen", routine: "Rutin", periodic: "Berkala", unscheduled: "Tidak terjadwal",
   ndtPhoto: "Foto uji non-destruktif", photo: "Foto pemeriksaan",
+  criterion: "Acuan yang digunakan", followUp: "Rekomendasi teknis",
 };
 const checklistIdentityLabels = {
   ownerNameStatus: "Ketersediaan nama pemilik", ownerName: "Nama pemilik",
@@ -394,6 +395,12 @@ function structureConclusionContent(chapter, conclusion, sources) {
         field(block, "parameter pembanding"), field(block, "interpretasi dan batasan"));
     }
   }
+  for (const { subject, row } of sources.structureChecks ?? []) {
+    const observation = [row.damage, row.observation, row.nonconformity].filter(value => value?.trim()).join(". ");
+    addFinding(subject, observation, "");
+    addTest(subject, [row.test, row.ndt].filter(value => value?.trim()).join(". "), row.criterion, "");
+    group(actions, row.followUp, subject);
+  }
   for (const ref of recommendationsFor(sources, true).values()) {
     if (!ref.assessment) group(actions, ref.action, ref.topic);
   }
@@ -596,15 +603,19 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   }
   const summaryAnchors = new Map();
   const summaries = new Map();
+  const checklistSections = new Set();
   for (const item of items) {
+    const keys = checklistDestinations(project, item).map(to => to.chapter + ":" + to.block);
+    for (const key of keys) checklistSections.add(key);
     const summary = checklistSummary(item, checklist.checks[item.id]);
     if (!summary) continue;
-    const to = checklistDestination(project, item);
-    const key = to ? to.chapter + ":" + to.block : "fallback";
-    if (!summaries.has(key)) summaries.set(key, []);
-    const id = "report-summary-" + item.id;
-    summaryAnchors.set(item.id, id);
-    summaries.get(key).push({ item, summary, id });
+    if (!keys.length) keys.push("fallback");
+    const anchor = "report-summary-" + item.id;
+    summaryAnchors.set(item.id, anchor);
+    for (const [index, key] of keys.entries()) {
+      if (!summaries.has(key)) summaries.set(key, []);
+      summaries.get(key).push({ item, id: index ? anchor + "-" + index : anchor });
+    }
   }
   const intensity = calculateIntensity(project, checklist);
   const showIntensity = Boolean(intensity.data.land.trim() || intensity.data.region || intensity.data.diagram || intensity.data.additional.some((entry) => entry.name.trim()) ||
@@ -628,12 +639,15 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   function appendSummary(section, key, label) {
     const rows = summaries.get(key);
     if (!rows) return;
+    summaries.delete(key);
     const id = "report-checklist-summary-" + tableEntries.length;
     const caption = "Tabel " + (tableEntries.length + 1) + " · " + label;
     tableEntries.push([id, caption]);
     const table = reportTable(["Butir daftar simak", "Ringkasan hasil", "Dasar aturan atau acuan teknis"],
-      rows.map(({ item, summary }) => [reportJump("report-check-" + item.id, item.group.code + " · " + item.title),
-        checklistSummary(item, checklist.checks[item.id], true), checklistReference(item.id, intensity.data.region === "tegal")]));
+      rows.map(({ item }) => [reportJump("report-check-" + item.id, item.group.code + " · " + item.title),
+        project.workflowVersion === 2 ? checklistReportResult(item, checklist.checks[item.id]) :
+          checklistSummary(item, checklist.checks[item.id], true),
+        checklistReference(item.id, intensity.data.region === "tegal")]));
     for (const [i, row] of [...table.tBodies[0].rows].entries()) row.id = rows[i].id;
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, caption), table));
   }
@@ -674,7 +688,12 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         const structureTesting = isStructureTesting(block);
         const parameterGroup = mepParameterGroup(block);
         const locationInspection = mepLocationInspection(block);
-        if (locationInspection) {
+        if (parameterGroup) {
+          section.append(...mepParameterSummary(chapter, block, parameterGroup, resolveToken(block.links)));
+        } else if (project.workflowVersion === 2 && block.checklistKey && checklistSections.has(index + ":" + bi)) {
+          appendSummary(section, index + ":" + bi, "Hasil daftar simak · " + block.text);
+          section.append(...reportParagraphs(block.body, getTextFormat(block, "body")));
+        } else if (locationInspection) {
           const { locationsKey, photoKey } = locationInspection;
           const entries = locationsKey ?
             (block[locationsKey] ?? []).map((entry, index) => ({ entry, photoId: photoKey + "-" + index })) :
@@ -699,14 +718,22 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
             if (visible.length) section.append(dom("h5", {}, "Catatan pemeriksaan sebelumnya"));
             section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
           }
-        } else if (parameterGroup) {
-          section.append(...mepParameterSummary(chapter, block, parameterGroup, resolveToken(block.links)));
         } else if (isStructureConclusion(block)) {
           section.append(...structureConclusionContent(chapter, block, sources));
         } else if ((!structureInspection || hasLegacyStructureInspection(block)) &&
             (!structureTesting || hasLegacyStructureTesting(block))) {
           if (structureTesting && block.structureTest?.status) section.append(dom("h4", {}, "Catatan pengujian sebelumnya"));
           section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links, isStructureConclusion(block))));
+        }
+        if (project.workflowVersion === 2 && chapter.checklistKey === "Rekomendasi" && block.checklistKey === "Rekomendasi dan prioritas") {
+          const rows = checklistFollowUpRows(checklist, item => reportJump("report-check-" + item.id, item.title));
+          if (rows.length) {
+            const followUpId = id + "-checklist-follow-up";
+            const caption = "Tabel " + (tableEntries.length + 1) + " · Rekomendasi dari daftar simak";
+            tableEntries.push([followUpId, caption]);
+            section.append(dom("div", { id: followUpId, className: "report-block" },
+              dom("p", { className: "caption" }, caption), reportTable(checklistFollowUpColumns, rows)));
+          }
         }
         if (structureTesting) {
           const content = structureTestingContent(block.structureTest);

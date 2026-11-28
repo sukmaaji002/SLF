@@ -8,6 +8,7 @@ const trialMode = params.has("trial");
 const trialData = trialMode ? (window.parent !== window ? window.parent.slfTrialData?.(projectId) : undefined)
   ?? { checklist: { identity: {}, checks: {} } } : undefined;
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
+const checklistFirst = projectMode && params.get("versi") === "2";
 const cloudChecklist = !trialMode && projectMode && params.has("cloud");
 const cloudOwner = cloudChecklist && window.parent !== window ? window.parent.slfCloudOwner?.() || "" : "";
 if (cloudChecklist && !cloudOwner) {
@@ -380,7 +381,7 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
 }
 
 function definitionsFor(item) {
-  if (item.fields.includes("P")) return periodFields;
+  if (item.fields.includes("P")) return [...periodFields];
   const definitions = [];
   for (const code of "VDATMCENUGK") {
     if (!item.fields.includes(code)) continue;
@@ -400,7 +401,7 @@ function definitionsFor(item) {
 }
 
 function photosFor(item) {
-  if (!item.fields.includes("F")) return [];
+  if (!checklistFirst && !item.fields.includes("F")) return [];
   if (item.fields.includes("N")) {
     return [["ndtPhoto", "Foto hasil pengujian non-destruktif"], ["photo", "Foto hasil pengujian kekuatan dan material"]];
   }
@@ -425,7 +426,7 @@ function renderItem(item) {
     change();
   }, item.title, item).label;
   const rows = el("div", "sample-list");
-  const repeatable = item.fields.includes("S") || item.fields.includes("P");
+  const repeatable = checklistFirst || item.fields.includes("S") || item.fields.includes("P");
   const add = repeatable ? button(item.fields.includes("P") ? "Tambah komponen" : "Tambah sampel", () => {
     if (photoWrites) return;
     const key = String(check.nextRow++);
@@ -464,7 +465,13 @@ function renderItem(item) {
     if (item.title === "Jarak Antar Bangunan" && Number(row.key) > 3) {
       group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context, item).label);
     }
-    for (const definition of definitionsFor(item)) group.append(field(definition, row, onRowChange, context, item).label);
+    const definitions = definitionsFor(item);
+    if (checklistFirst) {
+      if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
+      definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
+        ["followUp", "Rekomendasi teknis (opsional)", "long"]);
+    }
+    for (const definition of definitions) group.append(field(definition, row, onRowChange, context, item).label);
     for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
     sample.append(group);
     if (Number(row.key) > item.initialCount) {
@@ -569,6 +576,7 @@ function exportCsv() {
     nonconformity, disruption, ["direction", "Arah bukaan"], ...periodFields,
     ["ndtPhoto", "Nama foto pengujian non-destruktif"], ["photo", "Nama foto"],
   ];
+  if (checklistFirst) rowFields.push(["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
   const uniqueFields = [...new Map(rowFields.map((definition) => [definition[0], definition])).values()];
   const lines = [
     [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],

@@ -18,22 +18,22 @@
   <script src="catalog.js" defer></script>
   <script src="templates.js?v=27" defer></script>
   <script src="pengantar.js?v=3" defer></script>
-  <script src="acuan-simak.js?v=2" defer></script>
+  <script src="acuan-simak.js?v=3" defer></script>
   <script src="simak-form.js?v=4" defer></script>
   <script src="intensitas.js" defer></script>
   <script src="skema-tapak.js" defer></script>
-  <script src="laporan.js?v=37" defer></script>
-  <script src="isian.js?v=44" defer></script>
+  <script src="laporan.js?v=38" defer></script>
+  <script src="isian.js?v=45" defer></script>
   <script src="kesehatan.js?v=13" defer></script>
   <script src="contoh-isian.js?v=27" defer></script>
   <script src="vendor/paged-0.4.3.min.js" defer></script>
   <script src="pagination.js?v=7" defer></script>
   <script src="vendor/supabase-2.119.2.min.js" defer></script>
   <script src="cloud-config.js" defer></script>
-  <script src="cloud.js?v=8" defer></script>
-  <script src="cloud-workspace.js?v=6" defer></script>
-  <script src="dashboard.js?v=1" defer></script>
-  <script src="kajian.js?v=78" defer></script>
+  <script src="cloud.js?v=9" defer></script>
+  <script src="cloud-workspace.js?v=7" defer></script>
+  <script src="dashboard.js?v=2" defer></script>
+  <script src="kajian.js?v=79" defer></script>
 </head>
 <body data-screen="kajian">
   <div id="slf-public" class="public-site">
@@ -330,7 +330,11 @@
     <form id="project-form">
       <h2 id="project-dialog-title">Proyek kajian baru</h2>
       <label>Nama proyek<input name="name" required maxlength="120" autocomplete="off"></label>
-      <label>Templat laporan<select name="template" required></select></label>
+      <label>Versi kajian<select name="workflowVersion" required>
+        <option value="1">Versi 1 · Isi per bab</option>
+        <option value="2">Versi 2 · Isi daftar simak dulu</option>
+      </select></label>
+      <label id="project-template">Templat laporan<select name="template" required></select></label>
       <p id="template-description"></p>
       <div class="button-row"><button id="project-cancel" type="button">Batal</button><button class="primary" type="submit">Buat proyek</button></div>
     </form>

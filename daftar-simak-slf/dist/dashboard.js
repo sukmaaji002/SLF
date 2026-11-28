@@ -22,6 +22,7 @@ function dashboardCalendar(value) {
 function dashboardEntries(state, rows) {
   const entries = new Map(rows.map((row) => [row.id, {
     id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at,
+    workflowVersion: String(row.workflow_version) === "2" ? 2 : 1,
   }]));
   for (const project of state.projects) {
     const remote = entries.get(project.id);
@@ -32,6 +33,7 @@ function dashboardEntries(state, rows) {
       name: !remote || saved?.dirty ? project.name : remote.name,
       createdAt: project.createdAt || remote?.createdAt,
       updatedAt: remote?.updatedAt || saved?.updatedAt,
+      workflowVersion: project.workflowVersion ?? 1,
     });
   }
   const timestamp = (entry) => Date.parse(entry.updatedAt || entry.createdAt) || 0;
@@ -109,7 +111,7 @@ function slfRenderDashboard() {
       (entry.updatedAt ? "Diperbarui " : "Dibuat ") + dashboardDate.format(new Date(date)) : "Kajian SLF";
     const open = dom("a", { href: url.href, className: "dashboard-project-link" },
       dom("span", { className: "dashboard-document", ariaHidden: "true" }),
-      dom("span", {}, dom("strong", {}, entry.name), dom("small", {}, subtitle)),
+      dom("span", {}, dom("strong", {}, entry.name), dom("small", {}, "Versi " + entry.workflowVersion + " · " + subtitle)),
       dom("span", { className: "dashboard-open-arrow", ariaHidden: "true" }, "›"));
     open.dataset.project = entry.id;
     open.dataset.action = "open";

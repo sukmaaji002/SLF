@@ -105,13 +105,19 @@ function checklistDestination(project, item) {
     title = group === "K.5-3" ? "Tindak lanjut dan lampiran pendukung" : group === "K.2-0" ? "Bidang struktur" :
       item.category.code === "K.1" || item.category.code === "K.5" ? "Bidang arsitektur" : "Bidang mekanikal, elektrikal, dan plambing";
   }
+  return checklistReportDestination(project, templateIndex, title, project.template === "disiplin" && defaultIndex === 6 ?
+    { "K.2": "mepSafety", "K.3": "mepHealth" }[item.category.code] : undefined);
+}
+
+function checklistReportDestination(project, templateIndex, title, parentFlag) {
   const originalTitle = reportTemplates[project.template].chapters[templateIndex]?.[0];
-  const chapter = project.chapters.findIndex((entry) => !entry.checklist && entry.title === originalTitle);
+  const chapter = project.chapters.findIndex(entry => !entry.checklist &&
+    (project.workflowVersion === 2 ? entry.checklistKey ?? entry.title : entry.title) === originalTitle);
   if (chapter < 0) return null;
   const blocks = project.chapters[chapter].blocks;
-  let block = blocks.findIndex((entry) => entry.type === "heading" && entry.text === title);
-  const parentFlag = { "K.2": "mepSafety", "K.3": "mepHealth" }[item.category.code];
-  if (project.template === "disiplin" && defaultIndex === 6 && parentFlag) {
+  let block = blocks.findIndex(entry => entry.type === "heading" &&
+    (project.workflowVersion === 2 ? entry.checklistKey ?? entry.text : entry.text) === title);
+  if (parentFlag) {
     const preset = blocks.findIndex(entry => entry.mepSafetyPreset === title);
     if (preset >= 0) block = preset;
     const parent = blocks.findIndex(entry => entry[parentFlag]);
@@ -120,8 +126,62 @@ function checklistDestination(project, item) {
   return { chapter, block, title: blocks[block]?.text ?? originalTitle };
 }
 
+function checklistDestinations(project, item) {
+  const primary = checklistDestination(project, item);
+  const destinations = primary ? [primary] : [];
+  if (project.workflowVersion !== 2) return destinations;
+  const group = item.id.slice(0, item.id.lastIndexOf("-"));
+  const sharedHeading = {
+    "K.3-0": "Kesehatan", "K.3-1": "Kesehatan", "K.3-2": "Kesehatan", "K.3-3": "Kesehatan",
+    "K.4-1": "Kenyamanan", "K.4-3": "Kenyamanan",
+    "K.5-0": "Kemudahan", "K.5-1": "Kemudahan", "K.5-2": "Kemudahan",
+  }[group];
+  if (sharedHeading) {
+    const shared = checklistReportDestination(project, 4, sharedHeading);
+    if (shared?.block >= 0) destinations.push(shared);
+  }
+  return destinations;
+}
+
+function checklistFollowUpRows(checklist, link) {
+  return checklistItems.flatMap(item => {
+    const check = checklist.checks[item.id];
+    if (!check || check.na) return [];
+    return check.rows.filter(row => row.followUp?.trim()).map(row => [
+      link(item), [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · "),
+      formattedValue(row.followUp, getTextFormat(row, "followUp")),
+    ]);
+  });
+}
+
+const checklistFollowUpColumns = ["Butir daftar simak", "Lokasi / komponen", "Rekomendasi teknis"];
+
+function checklistReportResult(item, check) {
+  if (check.na) return checklistSummary(item, check, true);
+  const result = document.createDocumentFragment();
+  const fields = checklistSummaryOrder.filter(key => !["location", "component", "photo", "ndtPhoto"].includes(key));
+  for (const row of check.rows) {
+    if (!checklistSummaryOrder.some(key => row[key]?.trim())) continue;
+    const location = [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · ");
+    const details = dom("div", {});
+    if (location) details.append(dom("strong", {}, location));
+    for (const key of fields) {
+      const value = row[key]?.trim();
+      if (!value) continue;
+      const format = getTextFormat(row, key);
+      const line = styleTextBlock(dom("div"), format);
+      line.append(checklistLabels[key] + " — ", formattedText(
+        key === "measurement" ? formatChecklistMeasurement(value, item.unit) : value, format));
+      details.append(line);
+    }
+    if (row.photo || row.ndtPhoto) details.append(dom("div", {}, "Foto di lampiran daftar simak"));
+    result.append(details);
+  }
+  return result;
+}
+
 const checklistSummaryOrder = ["nonconformity", "measurement", "note", "observation", "test", "ndt", "damage", "presence",
-  "conformity", "view", "disruption", "direction", "routine", "periodic", "unscheduled", "component", "location", "photo", "ndtPhoto"];
+  "conformity", "view", "disruption", "direction", "criterion", "followUp", "routine", "periodic", "unscheduled", "component", "location", "photo", "ndtPhoto"];
 
 function formatChecklistMeasurement(value, unit) {
   return unit && /^[-+−]?\d[\d.,\s]*$/.test(value.trim()) ? value.trim() + " " + unit : value;

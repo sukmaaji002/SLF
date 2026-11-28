@@ -270,7 +270,7 @@ async function slfChangeAccount(user) {
         workspace.current = requested;
         if (starter && starter !== requested) workspace.projects = workspace.projects.filter((project) => project.id !== starter);
       }
-      if (openRequested && query.get("bagian") === "simak") {
+      if (openRequested && (query.get("bagian") === "simak" || current().workflowVersion === 2)) {
         active = "checklist";
         slfChecklistItem = checklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
       }

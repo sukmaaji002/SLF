@@ -43,9 +43,9 @@ function heading(text) {
   return { type: "heading", text, body: "" };
 }
 
-function draft(name, template) {
+function draft(name, template, workflowVersion = 1) {
   const project = {
-    id: crypto.randomUUID(), name, template,
+    id: crypto.randomUUID(), name, template, workflowVersion,
     ...(template === "disiplin" ? { narrativeRevision: architectureInspectionRevision } : {}),
     cover: { title: "Laporan Kajian Teknis Sertifikat Laik Fungsi" },
     front: { ...frontDefaults },
@@ -55,7 +55,21 @@ function draft(name, template) {
     })),
   };
   initializeHealthMeasurements(project);
-  initializeMepParameters(project, true);
+  initializeMepParameters(project, workflowVersion === 1);
+  if (workflowVersion === 2) {
+    for (const chapter of project.chapters) {
+      chapter.checklistKey = chapter.title;
+      for (const block of chapter.blocks) {
+        if (block.type === "heading") block.checklistKey = block.text;
+      }
+      chapter.blocks = chapter.blocks.filter(block => !architectureInspectionKind(block));
+    }
+    const linkedHeadings = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
+      .map(({ chapter, block }) => project.chapters[chapter].blocks[block]));
+    for (const block of linkedHeadings) {
+      if (block && !mepParameterGroup(block)) block.body = "";
+    }
+  }
   return project;
 }
 
@@ -1101,7 +1115,7 @@ function purposeField(project) {
 function setCurrent(id, dirty = false) {
   const fromDashboard = !$("slf-dashboard").hidden;
   workspace.current = id;
-  active = "cover";
+  active = current().workflowVersion === 2 ? "checklist" : "cover";
   const url = new URL(location.href);
   url.searchParams.set("proyek", id);
   url.searchParams.delete("bagian");
@@ -1149,7 +1163,9 @@ function renderOutline() {
         dom("span", {}, chapter.title, dom("small", {}, "Perlu login"))));
     }
   }
-  if (trying || !project.chapters.some((chapter) => chapter.checklist)) {
+  if (project.workflowVersion === 2) {
+    nav.prepend(outlineEntry("Isi daftar simak", "checklist", ""));
+  } else if (trying || !project.chapters.some((chapter) => chapter.checklist)) {
     nav.append(outlineEntry(trying ? "Daftar simak (25% dapat diisi)" : "Daftar simak", "checklist", ""));
   }
 }
@@ -1167,7 +1183,7 @@ function render() {
   if (trying) status.textContent = "";
   $("projects").replaceChildren(...slfProjectOptions());
   $("projects").value = project.id;
-  $("template-label").textContent = trying ? "Kajian per disiplin · versi coba" : reportTemplates[project.template].label;
+  $("template-label").textContent = trying ? "Kajian per disiplin · versi coba" : "Versi " + (project.workflowVersion ?? 1) + " · " + reportTemplates[project.template].label;
   renderOutline();
   $("mobile-section-name").textContent = $("outline").querySelector("[aria-current=page]")?.lastElementChild.textContent ?? "Daftar simak";
   photoEditors.clear();
@@ -1366,6 +1382,7 @@ function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });
   if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
   if (embed) params.set("embed", "1");
+  if (project.workflowVersion === 2) params.set("versi", "2");
   if (isTrial()) params.set("trial", "1");
   if (slfCloudOwner()) params.set("cloud", "1");
   const anchor = item === "tanggal-pemeriksaan" ? "#tanggal-pemeriksaan" : item ? "#butir-" + item : "";
@@ -1400,19 +1417,18 @@ function renderChecklistMap(project) {
       const reference = checklistReference(item.id, project.intensity?.region === "tegal");
       const label = item.group.code + " · " + item.title;
       if (!tokenName(label + " " + reference).includes(term)) continue;
-      const to = checklistDestination(linkedProject, item);
+      const destinations = checklistDestinations(linkedProject, item);
       const locked = isTrial() && !trialChecklistIds.has(item.id);
       const summary = locked ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]) || "Belum diisi";
-      let jump = "Ringkasan teknis sebelum daftar simak";
-      if (to) {
+      const jump = destinations.length ? dom("div", { className: "button-row" }, ...destinations.map(to => {
         const destination = "Bab " + roman(to.chapter + 1) + " · " + to.title;
-        jump = to.chapter >= project.chapters.length ? destination + " · Perlu login" : button(destination, () => {
+        return to.chapter >= project.chapters.length ? destination + " · Perlu login" : button(destination, () => {
           active = to.chapter;
           render();
           const section = document.getElementById("checklist-links-" + to.block);
           if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
         }, "quiet");
-      }
+      })) : "Ringkasan teknis sebelum daftar simak";
       rows.push([checklistEditorLink(project, item.id, label), summary, reference, jump]);
     }
     list.replaceChildren(rows.length ? editorTable(["Butir", "Hasil di laporan", "Acuan", "Tujuan laporan"], rows) :
@@ -1442,22 +1458,31 @@ function refreshChecklistViews() {
   if (typeof active === "number") {
     const checklist = readChecklist(current().id);
     $("intensity-analysis-table")?.replaceChildren(intensityTable(calculateIntensity(current(), checklist), true));
+    $("checklist-follow-up-editor")?.replaceChildren(checklistFollowUpEditor(current(), checklist));
     for (const table of editor.querySelectorAll("[data-checklist-block]")) {
       table.replaceChildren(editorChecklistTable(current(), checklist, Number(table.dataset.checklistBlock)));
     }
   }
 }
 
+function checklistFollowUpEditor(project, checklist) {
+  const rows = checklistFollowUpRows(checklist, item => checklistEditorLink(project, item.id, item.title));
+  return rows.length ? editorTable(checklistFollowUpColumns, rows) : dom("p", { className: "hint" }, "Belum ada rekomendasi teknis yang dicatat di daftar simak.");
+}
+
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
   for (const item of checklistItems) {
-    const to = checklistDestination(project, item);
-    if (to?.chapter !== active || to.block !== blockIndex) continue;
+    if (!checklistDestinations(project, item).some(to => to.chapter === active && to.block === blockIndex)) continue;
     const summary = isTrial() && !trialChecklistIds.has(item.id) ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]);
+    if (project.workflowVersion === 2 && !summary) continue;
     rows.push([checklistEditorLink(project, item.id, item.title),
-      summary || "Belum diisi", checklistReference(item.id, project.intensity?.region === "tegal")]);
+      project.workflowVersion === 2 ? checklistReportResult(item, checklist.checks[item.id]) : summary || "Belum diisi",
+      checklistReference(item.id, project.intensity?.region === "tegal")]);
   }
-  return editorTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
+  return project.workflowVersion === 2 && !rows.length ?
+    dom("p", { className: "hint" }, "Belum ada hasil untuk bagian ini.") :
+    editorTable(["Butir daftar simak", "Hasil di laporan", "Dasar aturan atau acuan teknis"], rows);
 }
 
 function title(type, label) {
@@ -1557,13 +1582,19 @@ function renderFront(project) {
 
 function renderChecklistEditor(project) {
   const trying = isTrial();
-  if (active === "checklist") title("Lampiran", trying ? "Daftar simak kajian (25% dapat diisi)" : "Daftar simak kajian");
+  if (active === "checklist") title(project.workflowVersion === 2 ? "Versi 2" : "Lampiran", trying ? "Daftar simak kajian (25% dapat diisi)" : "Daftar simak kajian");
   const item = slfChecklistItem;
   slfChecklistItem = "";
   const head = dom("div", { className: "checklist-head" },
     dom("p", { className: "lead" }, trying
       ? trialChecklistItems.length + " dari " + checklistItems.length + " butir dapat diisi. Butir lainnya · Perlu login."
-      : "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."));
+      : project.workflowVersion === 2
+        ? "Isi hasil pemeriksaan per lokasi. Bab dan subbab terkait langsung mengikuti data di sini."
+        : "Isi hasil pemeriksaan. Perubahan pada daftar simak ikut masuk ke laporan proyek ini."));
+  if (project.workflowVersion === 2) head.append(button("Lihat tujuan tiap butir", () => {
+    active = "links";
+    render();
+  }), button("Pratinjau laporan", () => presentReport(false)));
   if (!trying) head.append(dom("a", { href: projectChecklistUrl(project), target: "_blank", rel: "noopener" }, "Buka layar penuh"));
   editor.append(head, dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
 }
@@ -1650,24 +1681,38 @@ function renderChapter(project) {
   editor.append(introductionEditor(chapter, introductionText(chapter), "Pengantar bab"));
   editor.append(sectionPhotoEditor(chapter, "Unggah foto bab", () => workspace.projects.includes(project) && project.chapters.includes(chapter)));
   if (chapter.checklist) return renderChecklistEditor(project);
-  editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
+  if (project.workflowVersion === 2) {
+    editor.append(dom("div", { className: "checklist-head" },
+      dom("p", { className: "lead" }, "Hasil pemeriksaan di bab ini mengikuti daftar simak. Lengkapi analisis dan kesimpulan sesuai bukti."),
+      button("Isi daftar simak", () => {
+        active = "checklist";
+        render();
+      })));
+  } else {
+    editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
+  }
   const checklist = readChecklist(project.id);
-  const mapped = new Set(checklistItems.map((item) => checklistDestination(project, item))
+  const mapped = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;
     const wrapper = dom("div", { className: "auto-checklist" });
     wrapper.dataset.checklistBlock = blockIndex;
     wrapper.append(editorChecklistTable(project, checklist, blockIndex));
-    editor.append(dom("details", { className: "block", id: "checklist-links-" + blockIndex },
-      dom("summary", {}, "Hasil daftar simak dan acuan untuk subbab ini"), wrapper));
+    editor.append(dom("details", { className: "block", id: "checklist-links-" + blockIndex, open: project.workflowVersion === 2 },
+      dom("summary", {}, project.workflowVersion === 2 ? "Hasil daftar simak dan acuan" : "Hasil daftar simak dan acuan untuk subbab ini"), wrapper));
   }
   const intensity = intensityDestination(project);
   const sources = reportSources(project, checklist);
   appendChecklist(-1);
   for (const [bi, block] of chapter.blocks.entries()) {
     if (block.mepSafetySelected === false) continue;
-    editor.append(blockEditor(chapter, block, bi, headings.get(bi), sources));
+    editor.append(blockEditor(chapter, block, bi, headings.get(bi), sources, project.workflowVersion === 2 && mapped.has(bi)));
+    if (project.workflowVersion === 2 && chapter.checklistKey === "Rekomendasi" && block.checklistKey === "Rekomendasi dan prioritas") {
+      editor.append(dom("details", { className: "block", open: true },
+        dom("summary", {}, "Rekomendasi dari daftar simak"),
+        dom("div", { id: "checklist-follow-up-editor", className: "auto-checklist" }, checklistFollowUpEditor(project, checklist))));
+    }
     if (intensity?.chapter === index && intensity.block === bi) editor.append(renderIntensityAnalysis(project, checklist));
     if (architectureInspectionKind(block) && chapter.blocks[bi - 1]?.type === "heading") appendChecklist(bi - 1);
     if (block.type !== "heading" || !architectureInspectionKind(chapter.blocks[bi + 1])) appendChecklist(bi);
@@ -2482,7 +2527,7 @@ function mepParameterEditor(chapter, parent, group, sources) {
   return dom("div", { className: "guided-narrative" }, choices, extra, preview, edit);
 }
 
-function blockEditor(chapter, block, index, headingInfo, sources) {
+function blockEditor(chapter, block, index, headingInfo, sources, fromChecklist) {
   const labels = { heading: "Subbab", text: "Paragraf", table: "Tabel", photo: "Foto dokumentasi" };
   const marker = headingInfo ? labels[block.type] + " " + headingInfo.number : labels[block.type];
   const named = block.type === "heading" || block.type === "table";
@@ -2537,6 +2582,9 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     const locationInspection = mepLocationInspection(block);
     if (parameterGroup) {
       wrapper.append(mepParameterEditor(chapter, block, parameterGroup, sources));
+    } else if (fromChecklist) {
+      wrapper.append(dom("details", { className: "narrative-editor" }, dom("summary", {}, "Tambah atau ubah analisis pengkaji"),
+        boundField(block, "body", "Analisis pengkaji (opsional)", "area", () => save(), false)));
     } else if (locationInspection) {
       wrapper.append(locationInspection.locationsKey ? mepLocationsByPointEditor(block, locationInspection, isAttached) :
         mepLocationEditor(block, locationInspection, isAttached));
@@ -2661,6 +2709,7 @@ function validateBackup(data) {
       if (block.type === "heading") {
         valid(typeof block.body === "string");
         clean.body = block.body;
+        if (typeof block.checklistKey === "string") clean.checklistKey = block.checklistKey;
         if (typeof block.structureConclusionNote === "string") clean.structureConclusionNote = block.structureConclusionNote;
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
@@ -2768,11 +2817,13 @@ function validateBackup(data) {
       return block.type === "heading" || block.type === "photo" ? restorePhotos(clean, block) : clean;
     });
     const clean = { title: chapter.title, blocks, checklist: chapter.checklist === true };
+    if (typeof chapter.checklistKey === "string") clean.checklistKey = chapter.checklistKey;
     if (typeof chapter.introduction === "string") clean.introduction = chapter.introduction;
     return restorePhotos(importTextFormats(clean, chapter, ["title"]), chapter);
   });
   const project = {
     id: crypto.randomUUID(), name: (source.name || "Kajian impor").slice(0, 120), template: source.template,
+    workflowVersion: source.workflowVersion === 2 && source.template === "disiplin" ? 2 : 1,
     ...([disciplineNarrativeRevision, architectureHealthTableRevision, architectureInspectionRevision].includes(source.narrativeRevision) ?
       { narrativeRevision: source.narrativeRevision } : {}),
     cover: pickText(source.cover, coverFields.map(([key]) => key)),
@@ -2939,14 +2990,24 @@ function start() {
   const form = $("project-form");
   const templates = form.elements.template;
   templates.append(...Object.entries(reportTemplates).map(([key, value]) => new Option(value.label, key)));
-  const explain = () => { $("template-description").textContent = reportTemplates[templates.value].description; };
+  const version = form.elements.workflowVersion;
+  const explain = () => {
+    const fromChecklist = version.value === "2";
+    $("project-template").hidden = fromChecklist;
+    templates.disabled = fromChecklist;
+    $("template-description").textContent = fromChecklist ?
+      "Mulai dari daftar simak. Hasilnya otomatis masuk ke laporan kajian per disiplin." :
+      reportTemplates[templates.value].description;
+  };
   templates.addEventListener("change", explain);
+  version.addEventListener("change", explain);
   explain();
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = form.elements.name.value.trim();
     if (!name) { form.elements.name.focus(); return; }
-    const project = draft(name, templates.value);
+    const fromChecklist = version.value === "2";
+    const project = draft(name, fromChecklist ? preset : templates.value, fromChecklist ? 2 : 1);
     project.createdAt = new Date().toISOString();
     workspace.projects.push(project);
     $("project-dialog").close();

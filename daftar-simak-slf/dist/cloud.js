@@ -122,7 +122,7 @@ function slfCreateDraftStore(client, owner, photos) {
       const rows = [];
       const pageSize = 500;
       for (let start = 0; ; start += pageSize) {
-        const page = slfCheckCloudResult(await drafts().select("id,name,revision,updated_at,created_at:payload->project->>createdAt")
+        const page = slfCheckCloudResult(await drafts().select("id,name,revision,updated_at,created_at:payload->project->>createdAt,workflow_version:payload->project->>workflowVersion")
           .eq("owner_id", owner).order("updated_at", { ascending: false }).order("id").range(start, start + pageSize - 1));
         rows.push(...page);
         if (page.length < pageSize) {

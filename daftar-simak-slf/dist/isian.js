@@ -333,6 +333,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
   const sources = new Map();
   sources.recommendations = new Map();
   sources.healthRows = healthMeasurementReferences(project);
+  sources.structureChecks = [];
   const teamLeads = new Set();
   const designatedLeads = new Set();
   let hasDesignation = false;
@@ -401,6 +402,9 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     if (!check || check.na) continue;
     const structural = structuralChapters.has(checklistDestination(project, item)?.chapter);
     for (const row of check.rows) {
+      if (project.workflowVersion === 2 && structural) sources.structureChecks.push({
+        subject: [item.title, row.location || row.label].filter(Boolean).join(" · "), row,
+      });
       if (cleanValue(row.location) && tokenName(item.title) !== "jarak antar bangunan") locations.add(cleanValue(row.location));
       if (row.photo || row.ndtPhoto) hasPhotos = true;
       const conformity = cleanValue(row.conformity);
