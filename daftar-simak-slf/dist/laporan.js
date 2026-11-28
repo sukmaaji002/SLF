@@ -37,8 +37,17 @@ function readChecklist(id, owner = slfCloudOwner()) {
   }
 }
 
-const checklistItems = catalog.flatMap((category) => category.groups.flatMap((group, gi) =>
-  group.items.map((item, ii) => ({ ...item, group, category, id: category.code + "-" + gi + "-" + ii }))));
+function flattenChecklist(categories) {
+  return categories.flatMap((category) => category.groups.flatMap((group, gi) =>
+    group.items.map((item, ii) => ({ ...item, group, category, id: checklistItemId(category, gi, item, ii) }))));
+}
+const checklistItems = flattenChecklist(catalog);
+const allChecklistItems = [...checklistItems,
+  ...flattenChecklist(catalogForChecklist(2)).filter(item => !checklistItems.some(existing => existing.id === item.id))];
+
+function projectChecklistItems(project, checklist) {
+  return project.workflowVersion === 2 ? flattenChecklist(catalogForChecklist(2, checklist?.checks)) : checklistItems;
+}
 const trialChapterCount = 2;
 const trialChecklistItems = checklistItems.slice(0, Math.floor(checklistItems.length / 4));
 const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
@@ -48,7 +57,7 @@ const checklistLabels = {
   ndt: "Uji non-destruktif", test: "Pengetesan", view: "Hasil pengamatan", disruption: "Uraian gangguan",
   note: "Keterangan", component: "Komponen", routine: "Rutin", periodic: "Berkala", unscheduled: "Tidak terjadwal",
   ndtPhoto: "Foto uji non-destruktif", photo: "Foto pemeriksaan",
-  criterion: "Acuan yang digunakan", followUp: "Rekomendasi teknis",
+  criterion: "Acuan yang digunakan", followUp: "Rekomendasi teknis", lightSource: "Sumber cahaya saat pengukuran",
 };
 const checklistIdentityLabels = {
   ownerNameStatus: "Ketersediaan nama pemilik", ownerName: "Nama pemilik",
@@ -62,7 +71,7 @@ let photoDatabase;
 
 function checklistPhotos(checklist) {
   const photos = [];
-  for (const { id } of checklistItems) {
+  for (const { id } of allChecklistItems) {
     for (const row of checklist.checks[id]?.rows ?? []) {
       for (const property of ["photo", "ndtPhoto"]) {
         if (row[property]) photos.push(id + ":" + row.key + ":" + property);
@@ -554,9 +563,9 @@ function approvalSignoff(project) {
 
 async function buildReport(target, project, urls, { trial = false } = {}) {
   target.replaceChildren();
-  const items = trial ? trialChecklistItems : checklistItems;
   if (trial) project = { ...project, chapters: project.chapters.slice(0, trialChapterCount) };
   const checklist = readChecklist(project.id);
+  const items = trial ? trialChecklistItems : projectChecklistItems(project, checklist);
   const sources = reportSources(project, checklist);
   const resolveToken = (links, structural) => (original, name) => resolveReportLink(original, name, sources, links, structural);
   const coverFormat = (key, token) => key === "consultant" ? sources.get("cover:consultant")?.format :
@@ -726,7 +735,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
           section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links, isStructureConclusion(block))));
         }
         if (project.workflowVersion === 2 && chapter.checklistKey === "Rekomendasi" && block.checklistKey === "Rekomendasi dan prioritas") {
-          const rows = checklistFollowUpRows(checklist, item => reportJump("report-check-" + item.id, item.title));
+          const rows = checklistFollowUpRows(items, checklist, item => reportJump("report-check-" + item.id, item.title));
           if (rows.length) {
             const followUpId = id + "-checklist-follow-up";
             const caption = "Tabel " + (tableEntries.length + 1) + " · Rekomendasi dari daftar simak";

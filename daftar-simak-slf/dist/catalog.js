@@ -277,3 +277,42 @@ const catalog = [
     ],
   },
 ];
+
+const checklistIlluminance = {
+  id: "K.3-1-4", no: "3", title: "Iluminansi per lokasi", fields: "SMFK", page: 13, unit: "lux",
+  lightSource: true,
+};
+const checklistWaste = {
+  code: "K.3.9", title: "Pemeriksaan Pengelolaan Sampah",
+  items: [
+    { id: "K.3-8-0", no: "1", title: "Pewadahan dan pemilahan sampah", fields: "SADCFK" },
+    { id: "K.3-8-1", no: "2", title: "Penampungan sementara sampah", fields: "SADCFK" },
+    { id: "K.3-8-2", no: "3", title: "Pengolahan atau pengangkutan sampah", fields: "SADCFK" },
+  ],
+};
+const checklistHistoricalV2 = new Set([
+  "K.3-1-2", "K.3-1-3", "K.3-4-0", "K.3-4-1", "K.3-4-2", "K.5-2-5",
+]);
+
+function checklistItemId(category, groupIndex, item, itemIndex) {
+  return item.id ?? category.code + "-" + groupIndex + "-" + itemIndex;
+}
+
+function catalogForChecklist(version, checks = {}) {
+  if (version !== 2) return catalog;
+  return catalog.map(category => {
+    if (!["K.3", "K.5"].includes(category.code)) return category;
+    const groups = category.groups.map((group, groupIndex) => {
+      const items = group.items.flatMap((item, itemIndex) => {
+        const id = checklistItemId(category, groupIndex, item, itemIndex);
+        if (!checklistHistoricalV2.has(id)) return [{ ...item, id }];
+        if (!checks[id]) return [];
+        return [{ ...item, id, title: item.title + " · isian sebelumnya" }];
+      });
+      if (category.code === "K.3" && groupIndex === 1) items.splice(2, 0, checklistIlluminance);
+      return { ...group, items };
+    }).filter(group => group.items.length);
+    if (category.code === "K.3") groups.push(checklistWaste);
+    return { ...category, groups };
+  });
+}

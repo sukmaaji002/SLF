@@ -387,6 +387,8 @@ function definitionsFor(item) {
     if (!item.fields.includes(code)) continue;
     if (code === "M" && item.category.code === "K.5") {
       definitions.push(["measurement", "Dimensi"], ["direction", "Arah bukaan"]);
+    } else if (code === "M" && item.lightSource) {
+      definitions.push(["measurement", "Iluminansi (lux)"]);
     } else if (code === "M" && item.unit) {
       definitions.push(["measurement", "Hasil pengukuran (" + item.unit + ")"]);
     } else if (code === "U" && item.group.code === "K.2.1" && item.fields.includes("N")) {
@@ -445,7 +447,12 @@ function renderItem(item) {
     setAvailability();
     change();
   });
-  item.body.append(reference, availability, reason, rows);
+  item.body.append(reference);
+  if (item.lightSource) item.body.append(el("p", "inspection-reference",
+    "Catat satu hasil ukur dalam lux untuk setiap lokasi dan kondisi pencahayaan. Pilih Gabungan jika kedua sumber menerangi lokasi saat diukur."));
+  if (checklistFirst && item.id === "K.3-8-0") item.body.append(el("p", "inspection-reference",
+    "Catat keberadaan tempat sampah dan hasil pemeriksaan pemilahannya di sini. Catatan ini juga masuk ke aspek Kemudahan."));
+  item.body.append(availability, reason, rows);
   if (add) item.body.append(add);
   setAvailability();
 
@@ -466,6 +473,7 @@ function renderItem(item) {
       group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context, item).label);
     }
     const definitions = definitionsFor(item);
+    if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
     if (checklistFirst) {
       if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
       definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
@@ -496,7 +504,7 @@ function renderItem(item) {
 }
 
 function renderCatalog() {
-  for (const source of catalog) {
+  for (const source of catalogForChecklist(checklistFirst ? 2 : 1, state.checks)) {
     const section = { ...source, groups: [], node: el("section", "catalog-section") };
     section.node.id = "bagian-" + source.code.replace(".", "");
     const title = source.code + " " + source.title;
@@ -515,8 +523,24 @@ function renderCatalog() {
       const group = { ...sourceGroup, items: [], node: el("details", "group") };
       group.node.open = true;
       group.node.append(el("summary", "", sourceGroup.code + " " + sourceGroup.title));
+      if (checklistFirst && sourceGroup.code === "K.5.3") {
+        const wasteLink = el("a", "", "Pewadahan dan pemilahan sampah");
+        wasteLink.href = "#butir-K.3-8-0";
+        wasteLink.addEventListener("click", () => {
+          byId("category").value = "";
+          byId("status-filter").value = "";
+          byId("search").value = "";
+          refresh();
+          const entry = items.find(item => item.id === "K.3-8-0");
+          entry.group.node.open = true;
+          entry.node.open = true;
+        });
+        const note = el("p", "inspection-reference", "Untuk tempat sampah, isi ");
+        note.append(wasteLink, " di aspek Kesehatan.");
+        group.node.append(note);
+      }
       for (const [itemIndex, sourceItem] of sourceGroup.items.entries()) {
-        const item = { ...sourceItem, category: section, group, id: source.code + "-" + groupIndex + "-" + itemIndex };
+        const item = { ...sourceItem, category: section, group, id: checklistItemId(source, groupIndex, sourceItem, itemIndex) };
         item.locked = trialMode && !trialChecklistIds.has(item.id);
         if (!item.locked) item.initialCount = startRows(item).length;
         item.search = [sourceItem.title, sourceGroup.code, sourceGroup.title, title, ...(sourceItem.components || [])].join(" ").toLocaleLowerCase("id");
@@ -576,7 +600,7 @@ function exportCsv() {
     nonconformity, disruption, ["direction", "Arah bukaan"], ...periodFields,
     ["ndtPhoto", "Nama foto pengujian non-destruktif"], ["photo", "Nama foto"],
   ];
-  if (checklistFirst) rowFields.push(["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
+  if (checklistFirst) rowFields.push(["lightSource", "Sumber cahaya saat pengukuran"], ["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
   const uniqueFields = [...new Map(rowFields.map((definition) => [definition[0], definition])).values()];
   const lines = [
     [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],
@@ -648,7 +672,7 @@ async function prepareSimakPaper() {
   const snapshot = { ...structuredClone(state), identity: effectiveChecklistIdentity(projectCover(), state.identity) };
   await renderSimakForm(draft, snapshot, {
     tegal: tegalReference, photoUrls: urls, loadPhoto: trialMode ? undefined : (key) => photoStore("get", key),
-    items: trialMode ? trialChecklistItems : checklistItems,
+    items: trialMode ? trialChecklistItems : flattenChecklist(catalogForChecklist(checklistFirst ? 2 : 1, snapshot.checks)),
   });
   if (urls !== simakPhotoUrls) {
     urls.forEach((url) => URL.revokeObjectURL(url));

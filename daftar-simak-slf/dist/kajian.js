@@ -64,7 +64,7 @@ function draft(name, template, workflowVersion = 1) {
       }
       chapter.blocks = chapter.blocks.filter(block => !architectureInspectionKind(block));
     }
-    const linkedHeadings = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
+    const linkedHeadings = new Set(projectChecklistItems(project).flatMap(item => checklistDestinations(project, item))
       .map(({ chapter, block }) => project.chapters[chapter].blocks[block]));
     for (const block of linkedHeadings) {
       if (block && !mepParameterGroup(block)) block.body = "";
@@ -1413,7 +1413,7 @@ function renderChecklistMap(project) {
     const checklist = readChecklist(project.id);
     const term = tokenName(search.value);
     const rows = [];
-    for (const item of checklistItems) {
+    for (const item of projectChecklistItems(project, checklist)) {
       const reference = checklistReference(item.id, project.intensity?.region === "tegal");
       const label = item.group.code + " · " + item.title;
       if (!tokenName(label + " " + reference).includes(term)) continue;
@@ -1466,13 +1466,13 @@ function refreshChecklistViews() {
 }
 
 function checklistFollowUpEditor(project, checklist) {
-  const rows = checklistFollowUpRows(checklist, item => checklistEditorLink(project, item.id, item.title));
+  const rows = checklistFollowUpRows(projectChecklistItems(project, checklist), checklist, item => checklistEditorLink(project, item.id, item.title));
   return rows.length ? editorTable(checklistFollowUpColumns, rows) : dom("p", { className: "hint" }, "Belum ada rekomendasi teknis yang dicatat di daftar simak.");
 }
 
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
-  for (const item of checklistItems) {
+  for (const item of projectChecklistItems(project, checklist)) {
     if (!checklistDestinations(project, item).some(to => to.chapter === active && to.block === blockIndex)) continue;
     const summary = isTrial() && !trialChecklistIds.has(item.id) ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]);
     if (project.workflowVersion === 2 && !summary) continue;
@@ -1692,7 +1692,7 @@ function renderChapter(project) {
     editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
   }
   const checklist = readChecklist(project.id);
-  const mapped = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
+  const mapped = new Set(projectChecklistItems(project, checklist).flatMap(item => checklistDestinations(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;
@@ -2847,7 +2847,7 @@ function validateBackup(data) {
     project.cover.image = source.cover.image;
   }
   const checks = {};
-  for (const { id } of checklistItems) {
+  for (const { id } of allChecklistItems) {
     const check = data.checklist?.checks?.[id];
     if (!check) continue;
     valid(Array.isArray(check.rows) && Number.isSafeInteger(check.nextRow) && check.nextRow > 0);

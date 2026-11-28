@@ -22,6 +22,7 @@ const checklistPlacements = {
   "K.3-4": [6, "Air bersih, air limbah, dan air hujan", "SNI 8153:2025, jaringan air limbah; pertimbangkan skema sambungan dan pengolahan kawasan."],
   "K.3-5": [6, "Air bersih, air limbah, dan air hujan", "SNI 8153:2025 dan desain jaringan air hujan."],
   "K.3-6": [6, "Kesehatan", "PP 16/2021, penggunaan bahan bangunan dan kesehatan; telaah spesifikasi material."],
+  "K.3-8": [6, "Persampahan dan utilitas khusus", "PP 16/2021 tentang sarana pengelolaan sampah. Periksa ketentuan pengelolaan sampah setempat dan sistem yang melayani bangunan."],
   "K.3-7": [6, "Persampahan dan utilitas khusus", "Gunakan ketentuan fasilitas pelayanan kesehatan dan acuan sistem gas medik bila relevan dengan fungsi bangunan."],
   "K.4-0": [4, "Kenyamanan", "PP 16/2021, ruang gerak dan hubungan antarruang; cek denah, okupansi desain, dan tata letak."],
   "K.4-1": [6, "Kenyamanan", "PP 16/2021, kenyamanan kondisi udara dalam ruang; pengukuran sesuai fungsi dan kondisi representatif."],
@@ -140,11 +141,17 @@ function checklistDestinations(project, item) {
     const shared = checklistReportDestination(project, 4, sharedHeading);
     if (shared?.block >= 0) destinations.push(shared);
   }
+  if (item.id === "K.3-8-0") {
+    for (const index of [4, 6]) {
+      const ease = checklistReportDestination(project, index, "Kemudahan");
+      if (ease?.block >= 0) destinations.push(ease);
+    }
+  }
   return destinations;
 }
 
-function checklistFollowUpRows(checklist, link) {
-  return checklistItems.flatMap(item => {
+function checklistFollowUpRows(items, checklist, link) {
+  return items.flatMap(item => {
     const check = checklist.checks[item.id];
     if (!check || check.na) return [];
     return check.rows.filter(row => row.followUp?.trim()).map(row => [
@@ -180,7 +187,7 @@ function checklistReportResult(item, check) {
   return result;
 }
 
-const checklistSummaryOrder = ["nonconformity", "measurement", "note", "observation", "test", "ndt", "damage", "presence",
+const checklistSummaryOrder = ["nonconformity", "measurement", "lightSource", "note", "observation", "test", "ndt", "damage", "presence",
   "conformity", "view", "disruption", "direction", "criterion", "followUp", "routine", "periodic", "unscheduled", "component", "location", "photo", "ndtPhoto"];
 
 function formatChecklistMeasurement(value, unit) {

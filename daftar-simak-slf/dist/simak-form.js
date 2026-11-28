@@ -67,12 +67,15 @@ function simakFormColumns(item) {
     columns.push({ title: item.components || item.id === "K.1-1-9" ? "Komponen" : "Sampel", keys: ["location"],
       sample: true, weight: item.components ? 1.8 : 1.05 });
   }
+  if (item.lightSource) columns.push({ title: "Sumber cahaya saat pengukuran", keys: ["lightSource"], weight: 1.3 });
   const order = item.category.code === "K.5" ? "MVDATCENUGK" : "VDATMCENUGK";
   for (const code of order) {
     if (!item.fields.includes(code)) continue;
     const column = simakColumns[code];
     if (code === "M" && item.category.code === "K.5") {
       columns.push({ ...column, title: "Pengukuran dimensi dan arah bukaan", keys: ["measurement","direction"] });
+    } else if (code === "M" && item.lightSource) {
+      columns.push({ ...column, title: "Iluminansi (lux)" });
     } else if (code === "U" && item.fields.includes("N")) {
       columns.push({ ...column, title: "Pengujian kekuatan dan material (apabila diperlukan)" });
     } else columns.push(column);
