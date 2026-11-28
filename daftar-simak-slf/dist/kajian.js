@@ -596,7 +596,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     Array.isArray(data.environmentAreas));
   const areaKey = environmentGuide ? "environmentAreas" : roomLayoutGuide ? "roomLayoutAreas" : undefined;
   if (areaKey && !data[key]?.trim()) textEditor.open = false;
-  const fireProtectionGuide = key === "body" && isFireProtection(data);
+  const fireProtectionGuide = key === "body" && mepLocationInspection(data) === fireLocationInspection;
   if (fireProtectionGuide) {
     details.open = true;
     const reportPreview = preview.parentElement;
@@ -2258,32 +2258,33 @@ function structureTestingEditor(block, isAttached) {
     dom("label", {}, "Apakah ada hasil pengujian atau analisis struktur?", status), details, note, preview);
 }
 
-function fireProtectionEditor(block, isAttached) {
-  const presets = choicesForInput(fireProtectionSystemToken);
-  const facilities = block.fireInspections ?? [];
+function mepLocationEditor(block, inspection, isAttached) {
+  const { key: storageKey, item, customExample, fields } = inspection;
+  const presets = inspection.presets ?? choicesForInput(fireProtectionSystemToken);
+  const facilities = block[storageKey] ?? [];
   const cards = dom("div", { className: "appearance-sections" });
   const sets = new Map(facilities.map(facility => [tokenName(facility.name), facility]));
   const byName = (name) => sets.get(tokenName(name));
   const selected = () => facilities.filter(facility => facility.selected).map(facility => facility.name);
-  const fieldOptions = {
-    location: ["Koridor timur lantai 1", "text"],
-    observation: ["APAR tersedia, tetapi aksesnya terhalang kardus.", "area"],
-    followUp: ["Pindahkan penghalang, lalu cek kembali akses ke APAR.", "area"],
-    reference: ["Berita acara uji alarm BA-01 atau nomor butir daftar simak", "text"],
-  };
+  const editorId = "mep-locations-" + block.sourceId;
+  const itemLabel = item[0].toUpperCase() + item.slice(1);
+  const extraFields = fields.slice(3);
 
   function locationCard(facility, entry, removeLocation) {
-    const controls = new Map(fireLocationFields.map(([key, label]) => {
-      const [example, type] = fieldOptions[key];
+    const controls = new Map(fields.map(([key, label, example, type = "text"]) => {
       const control = boundField(entry, key, label + (key === "followUp" ? " (jika diperlukan)" : ""), type,
         () => save(), false);
       control.querySelector("input, textarea").placeholder = "Contoh · " + example;
       return [key, control];
     }));
-    const documents = dom("details", { className: "narrative-editor", open: Boolean(entry.reference?.trim()) },
-      dom("summary", {}, "Tambahkan rujukan dokumen (opsional)"),
-      dom("p", { className: "hint" }, "Isi jika ada dokumen atau butir daftar simak yang mendukung temuan atau hasil uji."), controls.get("reference"));
-    controls.get("location").querySelector("input").dataset.fireLocation = "";
+    const hasTestFields = extraFields.length > 1;
+    const documents = dom("details", { className: "narrative-editor", open: extraFields.some(([key]) => entry[key]?.trim()) },
+      dom("summary", {}, hasTestFields ? "Tambahkan hasil uji atau dokumen (opsional)" : "Tambahkan rujukan dokumen (opsional)"),
+      dom("p", { className: "hint" }, hasTestFields ?
+        "Jika ada hasil ukur, cantumkan nilai dan satuannya. Jika belum diuji, catat pada kondisi dan temuan." :
+        "Isi jika ada dokumen atau butir daftar simak yang mendukung temuan atau hasil uji."),
+      ...extraFields.map(([key]) => controls.get(key)));
+    controls.get("location").querySelector("input").dataset.mepLocation = "";
     return dom("fieldset", { className: "link-entry" }, dom("legend"), controls.get("location"), controls.get("observation"),
       sectionPhotoEditor(entry, "Unggah foto lokasi", () => isAttached() && facility.locations.includes(entry)),
       controls.get("followUp"), documents, button("Hapus lokasi", removeLocation, "quiet"));
@@ -2304,7 +2305,7 @@ function fireProtectionEditor(block, isAttached) {
     });
     function append(entry) {
       const card = locationCard(facility, entry, () => {
-        if (hasFireLocationContent(entry) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
+        if (hasMepLocationContent(entry, inspection) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
         facility.locations.splice(facility.locations.indexOf(entry), 1);
         photoEditors.delete(entry);
         card.remove();
@@ -2323,7 +2324,7 @@ function fireProtectionEditor(block, isAttached) {
   const sections = new Map();
   const names = [...new Map([...presets, ...facilities.map(facility => facility.name)]
     .map(name => [tokenName(name), name])).values()];
-  const { fieldset, sync } = narrativeChoiceCheckboxes("Sarana yang diperiksa", names, (name, checked) => {
+  const { fieldset, sync } = narrativeChoiceCheckboxes(itemLabel + " yang diperiksa", names, (name, checked) => {
     let facility = byName(name);
     if (!facility) {
       facility = { name, selected: false, locations: [{}] };
@@ -2332,7 +2333,7 @@ function fireProtectionEditor(block, isAttached) {
     }
     facility.selected = checked;
     show(facility);
-    block.fireInspections = facilities;
+    block[storageKey] = facilities;
     save();
   });
   function show(facility) {
@@ -2344,20 +2345,20 @@ function fireProtectionEditor(block, isAttached) {
     if (sections.has(facility)) sections.get(facility).hidden = !facility.selected;
   }
 
-  const custom = dom("input", { type: "text", maxLength: 120, placeholder: "Misalnya detektor asap" });
+  const custom = dom("input", { type: "text", maxLength: 120, placeholder: "Misalnya " + customExample });
   const feedback = dom("p", { className: "hint", role: "status" });
   function addFacility() {
     const name = custom.value.trim().replace(/\s+/g, " ");
     if (!name || names.some(choice => tokenName(choice) === tokenName(name))) {
-      feedback.textContent = name ? "Sarana ini sudah ada di daftar pilihan." : "Isi nama sarana terlebih dahulu.";
+      feedback.textContent = name ? itemLabel + " ini sudah ada di daftar pilihan." : "Isi nama " + item + " terlebih dahulu.";
       custom.focus();
       return;
     }
     facilities.push({ name, selected: true, locations: [{}] });
-    block.fireInspections = facilities;
+    block[storageKey] = facilities;
     save();
     render();
-    const locations = $("fire-inspections-" + block.sourceId).querySelectorAll("[data-fire-location]");
+    const locations = $(editorId).querySelectorAll("[data-mep-location]");
     locations[locations.length - 1]?.focus();
   }
   custom.addEventListener("keydown", event => {
@@ -2365,10 +2366,10 @@ function fireProtectionEditor(block, isAttached) {
   });
   sync(selected());
   facilities.forEach(show);
-  return dom("div", { id: "fire-inspections-" + block.sourceId, className: "appearance-sections" },
-    dom("p", { className: "hint" }, "Pilih sarana, lalu tambah satu pemeriksaan untuk setiap lokasi. Melepas centang menyembunyikan catatan sarana dan menyimpan isiannya."),
-    fieldset, dom("details", { className: "narrative-editor" }, dom("summary", {}, "Tambah sarana lain"),
-      dom("label", {}, "Nama sarana", custom), button("Tambah sarana", addFacility), feedback), cards);
+  return dom("div", { id: editorId, className: "appearance-sections" },
+    dom("p", { className: "hint" }, "Pilih " + item + ", lalu tambah satu pemeriksaan untuk setiap lokasi. Jika centang dilepas, catatan disimpan dan bisa dibuka kembali."),
+    fieldset, dom("details", { className: "narrative-editor" }, dom("summary", {}, "Tambah " + item + " lain"),
+      dom("label", {}, "Nama " + item, custom), button("Tambah " + item, addFacility), feedback), cards);
 }
 
 function mepSafetyEditor(chapter, parent, sources) {
@@ -2471,11 +2472,12 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     }
     const project = current();
     const isAttached = () => workspace.projects.includes(project) && project.chapters.includes(chapter) && chapter.blocks.includes(block);
+    const locationInspection = mepLocationInspection(block);
     if (block.mepSafety) {
       wrapper.append(mepSafetyEditor(chapter, block, sources));
-    } else if (isFireProtection(block)) {
-      wrapper.append(fireProtectionEditor(block, isAttached));
-      if (hasLegacyFireProtection(block)) {
+    } else if (locationInspection) {
+      wrapper.append(mepLocationEditor(block, locationInspection, isAttached));
+      if (hasLegacyMepLocationInspection(block, locationInspection)) {
         const previous = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Lihat atau ubah catatan sebelumnya"));
         previous.addEventListener("toggle", () => {
           if (previous.open && previous.childElementCount === 1) previous.append(linked("body", "Isi subbab"));
@@ -2618,9 +2620,11 @@ function validateBackup(data) {
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
         }
-        if (Array.isArray(block.fireInspections)) {
+        for (const inspection of [fireLocationInspection, lightningLocationInspection]) {
+          if (!Array.isArray(block[inspection.key])) continue;
+          const fields = inspection.fields.map(([key]) => key);
           const seen = new Set();
-          clean.fireInspections = block.fireInspections.flatMap(facility => {
+          clean[inspection.key] = block[inspection.key].flatMap(facility => {
             if (typeof facility?.name !== "string" || !facility.name.trim() || !Array.isArray(facility.locations)) return [];
             const name = facility.name.trim();
             const key = tokenName(name);
@@ -2628,7 +2632,7 @@ function validateBackup(data) {
             seen.add(key);
             return [{ name, selected: facility.selected === true,
               locations: facility.locations.filter(entry => entry && typeof entry === "object" && !Array.isArray(entry))
-                .map(entry => restorePhotos(pickText(entry, fireLocationFields.map(([field]) => field)), entry)) }];
+                .map(entry => restorePhotos(pickText(entry, fields), entry)) }];
           });
         }
         if (Array.isArray(block.appearanceSections)) {
