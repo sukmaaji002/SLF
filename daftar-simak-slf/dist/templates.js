@@ -1,5 +1,6 @@
 "use strict";
 
+const electricalInspectionNarrative = {"body":"Instalasi listrik yang ditinjau mencakup [sumber, panel, jaringan distribusi, dan perangkat proteksi]. Pada [lokasi panel atau sistem] tercatat [kondisi aktual], berdasarkan [observasi, dokumen, atau hasil pengujian]. Bagian yang memerlukan tindak lanjut adalah [temuan].","previous":"[Catat sumber, panel, distribusi, perlindungan, dan kondisi instalasi.]"};
 const lightningProtectionNarrative = {"body":"Sistem proteksi petir yang tersedia diidentifikasi sebagai [jenis atau konfigurasi]. Pemeriksaan mencakup [komponen yang dapat diverifikasi] dan didukung [hasil pengukuran atau dokumen yang tersedia]. Hasil dan keterbatasan pemeriksaan adalah [hasil serta batasan].","previous":"[Catat instalasi, pembumian, dan hasil pengujian yang tersedia.]"};
 const mepSafetyToken = "sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait";
 const mepSafetyNarrative = "Penilaian utilitas keselamatan mencakup [sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait]. Rincian sistem yang diperiksa, lokasi, hasil, dan bukti pembanding dijabarkan pada subbagian berikut.";
@@ -247,7 +248,7 @@ const reportTemplates = {
           {"body":mepSafetyNarrative,"previous":"[Ringkas kondisi utilitas terkait keselamatan.]"},
           ["Proteksi kebakaran", { body: contextualNarrative("Proteksi kebakaran"), previous: "[Catat sistem pasif, aktif, dan sarana evakuasi yang diperiksa.]" }],
           ["Penangkal petir", lightningProtectionNarrative],
-          ["Instalasi listrik", {"body":"Instalasi listrik yang ditinjau mencakup [sumber, panel, jaringan distribusi, dan perangkat proteksi]. Pada [lokasi panel atau sistem] tercatat [kondisi aktual], berdasarkan [observasi, dokumen, atau hasil pengujian]. Bagian yang memerlukan tindak lanjut adalah [temuan].","previous":"[Catat sumber, panel, distribusi, perlindungan, dan kondisi instalasi.]"}],
+          ["Instalasi listrik", electricalInspectionNarrative],
         ],
         [
           "Kesehatan",

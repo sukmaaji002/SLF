@@ -139,6 +139,7 @@ const fireLocationInspection = {
 };
 
 const lightningLocationInspection = {
+  locationsKey: "lightningLocations", photoKey: "lightning",
   fields: [
     ["location", "Lokasi", "Bak kontrol sisi timur"],
     ["observation", "Kondisi dan temuan", "Sambungan terlihat berkarat. Bagian tertanam belum bisa diperiksa.", "area"],
@@ -151,11 +152,25 @@ const lightningLocationInspection = {
   legacyDefaults: () => [lightningProtectionNarrative.body, lightningProtectionNarrative.previous],
 };
 
+const electricalLocationInspection = {
+  locationsKey: "electricalLocations", photoKey: "electrical",
+  fields: [
+    ["location", "Lokasi", "Ruang panel lantai dasar"],
+    ["observation", "Kondisi dan temuan", "Label beberapa sirkuit di panel belum terbaca.", "area"],
+    ["followUp", "Rekomendasi tindak lanjut", "Cocokkan identitas sirkuit dengan diagram panel, lalu perbarui label.", "area"],
+    ["component", "Komponen yang diperiksa", "Panel distribusi lantai dasar"],
+    ["measurement", "Hasil uji atau pengukuran", "Hasil ukur tegangan 230 V pada titik yang diperiksa"],
+    ["reference", "Rujukan dokumen", "Diagram satu garis atau berita acara pengujian panel"],
+  ],
+  legacyDefaults: () => [electricalInspectionNarrative.body, electricalInspectionNarrative.previous],
+};
+
 function mepLocationInspection(block) {
   if (block.type !== "heading") return;
   const name = mepSafetyKey(block.mepSafetyPreset ?? block.text);
   if (name === "proteksi kebakaran" || Array.isArray(block.fireInspections)) return fireLocationInspection;
   if (name === "penangkal petir" || Array.isArray(block.lightningInspections) || Array.isArray(block.lightningLocations)) return lightningLocationInspection;
+  if (name === "instalasi listrik" || Array.isArray(block.electricalLocations)) return electricalLocationInspection;
 }
 
 function upgradeLightningLocations(block) {
@@ -659,9 +674,9 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         const structureTesting = isStructureTesting(block);
         const locationInspection = mepLocationInspection(block);
         if (locationInspection) {
-          const lightning = locationInspection === lightningLocationInspection;
-          const entries = lightning ?
-            (block.lightningLocations ?? []).map((entry, index) => ({ entry, photoId: "lightning-" + index })) :
+          const { locationsKey, photoKey } = locationInspection;
+          const entries = locationsKey ?
+            (block[locationsKey] ?? []).map((entry, index) => ({ entry, photoId: photoKey + "-" + index })) :
             (block.fireInspections ?? []).flatMap((facility, facilityIndex) => facility.selected ?
               facility.locations.map((entry, index) => ({ entry, facility: facility.name, photoId: "fire-" + facilityIndex + "-" + index })) : []);
           const visible = entries.filter(({ entry }) => !entry.excluded && hasMepLocationContent(entry, locationInspection));
@@ -669,13 +684,13 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
             const location = entry.location?.trim() || "Lokasi " + (index + 1);
             section.append(dom("h5", {}, facility ? facility + " · " + location : location));
             for (const [key, label] of locationInspection.fields.slice(1)) {
-              if (lightning && key === "followUp") continue;
+              if (locationsKey && key === "followUp") continue;
               const value = entry[key]?.trim();
               if (value) section.append(...reportParagraphs(label + " — " + value));
             }
             appendPhotos(section, (entry.photos ?? []).map((photo, photoIndex) =>
               [photo, id + "-" + photoId + "-photo-" + photoIndex]));
-            if (lightning && entry.followUp?.trim()) {
+            if (locationsKey && entry.followUp?.trim()) {
               section.append(...reportParagraphs("Rekomendasi tindak lanjut — " + entry.followUp.trim()));
             }
           }

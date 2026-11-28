@@ -2280,8 +2280,8 @@ function mepLocationCard(entry, inspection, isAttached, removeLocation, restoreL
     restoreLocation ? button("Tampilkan di laporan", restoreLocation) : "", button("Hapus lokasi", removeLocation, "quiet"));
 }
 
-function lightningLocationsEditor(block, isAttached) {
-  const locations = block.lightningLocations ??= [];
+function mepLocationsByPointEditor(block, inspection, isAttached) {
+  const locations = block[inspection.locationsKey] ??= [];
   if (!locations.length) locations.push({});
   const activeLocations = dom("div", { className: "appearance-sections" });
   const excluded = dom("details", { className: "narrative-editor" },
@@ -2303,8 +2303,8 @@ function lightningLocationsEditor(block, isAttached) {
   }
 
   function append(entry) {
-    const card = mepLocationCard(entry, lightningLocationInspection, () => isAttached() && locations.includes(entry), () => {
-      if (hasMepLocationContent(entry, lightningLocationInspection) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
+    const card = mepLocationCard(entry, inspection, () => isAttached() && locations.includes(entry), () => {
+      if (hasMepLocationContent(entry, inspection) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
       locations.splice(locations.indexOf(entry), 1);
       photoEditors.delete(entry);
       card.remove();
@@ -2534,7 +2534,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     if (block.mepSafety) {
       wrapper.append(mepSafetyEditor(chapter, block, sources));
     } else if (locationInspection) {
-      wrapper.append(locationInspection === lightningLocationInspection ? lightningLocationsEditor(block, isAttached) :
+      wrapper.append(locationInspection.locationsKey ? mepLocationsByPointEditor(block, locationInspection, isAttached) :
         mepLocationEditor(block, locationInspection, isAttached));
       if (hasLegacyMepLocationInspection(block, locationInspection)) {
         const previous = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Lihat atau ubah catatan sebelumnya"));
@@ -2679,9 +2679,11 @@ function validateBackup(data) {
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
         }
-        if (Array.isArray(block.lightningLocations)) {
-          const fields = lightningLocationInspection.fields.map(([key]) => key);
-          clean.lightningLocations = block.lightningLocations.filter(entry => entry && typeof entry === "object" && !Array.isArray(entry))
+        for (const inspection of [lightningLocationInspection, electricalLocationInspection]) {
+          const { locationsKey } = inspection;
+          if (!Array.isArray(block[locationsKey])) continue;
+          const fields = inspection.fields.map(([key]) => key);
+          clean[locationsKey] = block[locationsKey].filter(entry => entry && typeof entry === "object" && !Array.isArray(entry))
             .map(entry => restorePhotos({ ...pickText(entry, fields), ...(entry.excluded === true ? { excluded: true } : {}) }, entry));
         }
         for (const [key, inspection] of [["fireInspections", fireLocationInspection], ["lightningInspections", lightningLocationInspection]]) {

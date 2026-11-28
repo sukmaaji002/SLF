@@ -40,7 +40,7 @@ function* slfReportPhotos(project) {
       for (const facility of [...(block.fireInspections ?? []), ...(block.lightningInspections ?? [])]) {
         for (const entry of facility.locations) yield* entry.photos ?? [];
       }
-      for (const entry of block.lightningLocations ?? []) yield* entry.photos ?? [];
+      for (const entry of [...(block.lightningLocations ?? []), ...(block.electricalLocations ?? [])]) yield* entry.photos ?? [];
       for (const entry of block.structureComponents ?? []) yield* entry.photos ?? [];
       for (const entry of block.structureTest?.items ?? []) yield* entry.photos ?? [];
     }
