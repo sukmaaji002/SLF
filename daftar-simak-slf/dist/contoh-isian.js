@@ -34,6 +34,17 @@ const appearanceFields = new Map([
   ["hasil observasi", ["Bagaimana kondisinya?", "Kondisi yang terlihat", "cat dinding mengelupas di dekat pintu masuk, sedangkan kanopi terlihat utuh"]],
 ]);
 
+const fireProtectionSystemToken = "sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia";
+const fireProtectionResultToken = "kondisi, fungsi terverifikasi, atau temuan";
+const fireProtectionLocationField = ["Di mana diperiksa?", "Lokasi", "Koridor timur lantai 1"];
+const fireProtectionFields = new Map([
+  [fireProtectionSystemToken, ["Apa yang diperiksa?", "Sarana yang diperiksa", ""]],
+  ["lokasi komponen proteksi kebakaran", fireProtectionLocationField],
+  ["lokasi", fireProtectionLocationField],
+  [fireProtectionResultToken, ["Apa hasil pemeriksaannya?", "Kondisi dan temuan", "APAR tersedia dan mudah dijangkau. Alarm terlihat terpasang, tetapi fungsi alarm belum diuji."]],
+  ["daftar simak, hasil uji, atau foto", ["Apa buktinya?", "Rujukan bukti", "Butir APAR pada daftar simak atau berita acara uji alarm. Foto bisa diunggah di bawah."]],
+]);
+
 const inputExamples = {
   "aspek": "tata bangunan atau keselamatan, sesuai butir yang dibahas",
   "sampel / sumber bukti": "titik P-01 di koridor dan Foto 2.1",
@@ -362,7 +373,7 @@ const inputChoices = {
   "metode atau status pengujian": ["observasi visual", "telaah laporan hasil uji", "pengujian lapangan sesuai lembar pengujian", "pengujian belum dilakukan"],
   "parameter pembanding": ["dimensi pada gambar rencana", "nilai pada dokumen spesifikasi", "kriteria yang dicatat pada acuan pemeriksaan"],
   "sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait": ["proteksi kebakaran", "proteksi petir", "instalasi listrik"],
-  "sistem pasif, sistem aktif, dan jalur evakuasi yang tersedia": ["pintu tahan api", "APAR", "alarm kebakaran", "jalur evakuasi"],
+  [fireProtectionSystemToken]: ["APAR", "alarm kebakaran", "hidran", "sprinkler", "pintu tahan api", "jalur evakuasi"],
   "sumber, panel, jaringan distribusi, dan perangkat proteksi": ["sumber listrik utama", "panel utama", "panel distribusi", "perangkat proteksi"],
   "penghawaan, pencahayaan, air bersih, sanitasi, atau sistem terkait": ["penghawaan", "pencahayaan", "suplai air bersih", "sanitasi"],
   "sistem atau bukaan": ["bukaan alami", "ventilasi mekanis", "gabungan bukaan alami dan ventilasi mekanis"],

@@ -596,7 +596,16 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     Array.isArray(data.environmentAreas));
   const areaKey = environmentGuide ? "environmentAreas" : roomLayoutGuide ? "roomLayoutAreas" : undefined;
   if (areaKey && !data[key]?.trim()) textEditor.open = false;
-  const guideFields = followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
+  const fireProtectionGuide = key === "body" && (data.mepSafetyPreset === "Proteksi kebakaran" ||
+    tokenName(data.text ?? "") === "proteksi kebakaran");
+  if (fireProtectionGuide) {
+    details.open = true;
+    const reportPreview = preview.parentElement;
+    reportPreview.firstElementChild.remove();
+    details.after(dom("details", { className: "narrative-editor" },
+      dom("summary", {}, "Lihat tampilan di laporan"), reportPreview));
+  }
+  const guideFields = fireProtectionGuide ? fireProtectionFields : followUp ? documentFollowUpFields : useGuide ? buildingUseFields :
     intensityGuide ? intensityGuideFields : appearanceGuide ? appearanceFields : structureGuide ? structuralSystemFields : undefined;
 
   function openField(token) {
@@ -766,7 +775,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         refreshLinkedFields(details);
         save();
       };
-      const choiceLegend = multipleChoiceLegends.get(token);
+      const fireSystem = fireProtectionGuide && token === fireProtectionSystemToken;
+      const fireResult = fireProtectionGuide && token === fireProtectionResultToken;
+      const choiceLegend = fireSystem ? "Centang sarana yang diperiksa" : multipleChoiceLegends.get(token);
       const manualLabel = token === "nomor rekomendasi" ? "Rujukan manual" : choiceLegend && token !== "metode pemeriksaan yang digunakan" ?
         "Isian sendiri atau sesuaikan pilihan" : "Isi " + name;
       const presetGroups = comfortParameters ? comfortParameterGroups :
@@ -796,15 +807,15 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
       }
       const suggestedNumbers = permitDocuments ? recordedPermitNumbers(project, data, sources) : undefined;
       const manual = repeated ? repeatedNarrativeField(repeated, manualData, saveManual, groupsForChoices, suggestedNumbers) :
-        field(guideField?.[1] ?? manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
-        token === "tanggal pemeriksaan" ? "date" : "text", manualData, "value", saveManual);
-      const manualInput = manual.querySelector("input");
+        field((fireSystem ? "Sarana terpilih atau tambahan lain" : guideField?.[1]) ?? manualLabel, manualData.value, (input) => { manualData.value = input; saveManual(); },
+        token === "tanggal pemeriksaan" ? "date" : fireResult ? "area" : "text", manualData, "value", saveManual);
+      const manualInput = manual.querySelector("input, textarea");
       const focusManual = () => {
-        const input = manual.querySelector("input");
+        const input = manual.querySelector("input, textarea");
         if (input) focusTextField(input);
         else manual.querySelector("button")?.focus();
       };
-      const showChoices = !guideField || showDocumentChoices;
+      const showChoices = !guideField || showDocumentChoices || fireSystem;
       const choices = repeated || token === "nomor rekomendasi" || token === "tanggal pemeriksaan" || !showChoices ? [] : presets;
       const applyChoiceValue = (text) => {
         select.value = "manual";
@@ -959,7 +970,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         else source.querySelector("summary").focus();
       });
       const isIntensityDetail = intensityGuide && guideField && token !== intensityFinding;
-      if (appearanceGuide && token === "hasil observasi") entry.classList.add("wide");
+      if ((appearanceGuide && token === "hasil observasi") || fireResult) entry.classList.add("wide");
       (isIntensityDetail ? intensityDetails : useSteps[guideField?.[3]]?.fields ?? grid).append(entry);
     }
     if (followUp) {
@@ -968,6 +979,9 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
         dom("p", { className: "hint" }, "Jika tidak ada temuan, buka Ubah teks dan format lalu ganti narasi dengan kalimat “Tidak ditemukan kekurangan atau perbedaan pada dokumen yang ditelaah.”"),
         documentReviewLinks(project));
       content.replaceChildren(instructions, grid, ...(fields.has("tujuan kajian") ? [editPurpose] : []));
+    } else if (fireProtectionGuide) {
+      content.replaceChildren(dom("p", { className: "hint" },
+        "Pilih sarana yang diperiksa, tulis lokasinya, lalu catat hasil dan buktinya. Untuk fungsi yang belum diuji, tulis “belum diuji” pada hasil pemeriksaan."), grid);
     } else if (structureGuide) {
       content.replaceChildren(dom("p", { className: "hint" },
         "Centang pilihan yang sesuai atau gunakan Tambah isian sendiri untuk menulis jawaban, nomor dokumen, atau lokasi. Catat bagian yang belum bisa dipastikan pada isian terakhir."),
