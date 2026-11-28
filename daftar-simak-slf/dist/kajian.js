@@ -2258,9 +2258,88 @@ function structureTestingEditor(block, isAttached) {
     dom("label", {}, "Apakah ada hasil pengujian atau analisis struktur?", status), details, note, preview);
 }
 
+function mepLocationCard(entry, inspection, isAttached, removeLocation, restoreLocation) {
+  const { fields } = inspection;
+  const extraFields = fields.slice(3);
+  const controls = new Map(fields.map(([key, label, example, type = "text"]) => {
+    const control = boundField(entry, key, label + (key === "followUp" ? " (jika diperlukan)" : ""), type,
+      () => save(), false);
+    control.querySelector("input, textarea").placeholder = "Contoh · " + example;
+    return [key, control];
+  }));
+  const hasTestFields = extraFields.length > 1;
+  const documents = dom("details", { className: "narrative-editor", open: extraFields.some(([key]) => key !== "component" && entry[key]?.trim()) },
+    dom("summary", {}, hasTestFields ? "Detail komponen, hasil uji, dan dokumen (opsional)" : "Tambahkan rujukan dokumen (opsional)"),
+    dom("p", { className: "hint" }, hasTestFields ?
+      "Jika ada hasil ukur, cantumkan nilai dan satuannya. Jika belum diuji, catat pada kondisi dan temuan." :
+      "Isi jika ada dokumen atau butir daftar simak yang mendukung temuan atau hasil uji."),
+    ...extraFields.map(([key]) => controls.get(key)));
+  controls.get("location").querySelector("input").dataset.mepLocation = "";
+  return dom("fieldset", { className: "link-entry" }, dom("legend"), controls.get("location"), controls.get("observation"),
+    sectionPhotoEditor(entry, "Unggah foto lokasi", isAttached), controls.get("followUp"), documents,
+    restoreLocation ? button("Tampilkan di laporan", restoreLocation) : "", button("Hapus lokasi", removeLocation, "quiet"));
+}
+
+function lightningLocationsEditor(block, isAttached) {
+  const locations = block.lightningLocations ??= [];
+  if (!locations.length) locations.push({});
+  const activeLocations = dom("div", { className: "appearance-sections" });
+  const excluded = dom("details", { className: "narrative-editor" },
+    dom("summary", {}, "Lokasi yang sebelumnya disembunyikan"));
+  const add = button("＋ Tambah lokasi", () => {
+    const entry = {};
+    locations.push(entry);
+    const card = append(entry);
+    save();
+    card.querySelector("[data-mep-location]").focus();
+  });
+
+  function refreshLabels() {
+    [...activeLocations.children].forEach((card, index) => {
+      card.querySelector("legend").textContent = "Pemeriksaan " + (index + 1);
+    });
+    excluded.hidden = excluded.childElementCount === 1;
+    add.textContent = activeLocations.childElementCount ? "＋ Tambah lokasi lain" : "＋ Tambah lokasi";
+  }
+
+  function append(entry) {
+    const card = mepLocationCard(entry, lightningLocationInspection, () => isAttached() && locations.includes(entry), () => {
+      if (hasMepLocationContent(entry, lightningLocationInspection) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
+      locations.splice(locations.indexOf(entry), 1);
+      photoEditors.delete(entry);
+      card.remove();
+      refreshLabels();
+      save();
+      add.focus();
+    }, entry.excluded ? () => {
+      delete entry.excluded;
+      locations.splice(locations.indexOf(entry), 1);
+      locations.push(entry);
+      card.remove();
+      const restored = append(entry);
+      save();
+      restored.querySelector("[data-mep-location]").focus();
+    } : undefined);
+    if (entry.excluded) {
+      card.querySelector("legend").textContent = entry.location?.trim() || "Pemeriksaan sebelumnya";
+      excluded.append(card);
+    } else {
+      activeLocations.append(card);
+    }
+    refreshLabels();
+    return card;
+  }
+
+  locations.forEach(append);
+  refreshLabels();
+  return dom("div", { className: "appearance-sections" },
+    dom("p", { className: "hint" }, "Buat satu catatan untuk setiap titik yang diperiksa. Tulis temuan, tambahkan foto, lalu isi rekomendasi jika perlu."),
+    activeLocations, dom("div", { className: "button-row" }, add), excluded);
+}
+
 function mepLocationEditor(block, inspection, isAttached) {
-  const { key: storageKey, item, customExample, fields } = inspection;
-  const presets = inspection.presets ?? choicesForInput(fireProtectionSystemToken);
+  const { key: storageKey, item, customExample } = inspection;
+  const presets = choicesForInput(fireProtectionSystemToken);
   const facilities = block[storageKey] ?? [];
   const cards = dom("div", { className: "appearance-sections" });
   const sets = new Map(facilities.map(facility => [tokenName(facility.name), facility]));
@@ -2268,27 +2347,6 @@ function mepLocationEditor(block, inspection, isAttached) {
   const selected = () => facilities.filter(facility => facility.selected).map(facility => facility.name);
   const editorId = "mep-locations-" + block.sourceId;
   const itemLabel = item[0].toUpperCase() + item.slice(1);
-  const extraFields = fields.slice(3);
-
-  function locationCard(facility, entry, removeLocation) {
-    const controls = new Map(fields.map(([key, label, example, type = "text"]) => {
-      const control = boundField(entry, key, label + (key === "followUp" ? " (jika diperlukan)" : ""), type,
-        () => save(), false);
-      control.querySelector("input, textarea").placeholder = "Contoh · " + example;
-      return [key, control];
-    }));
-    const hasTestFields = extraFields.length > 1;
-    const documents = dom("details", { className: "narrative-editor", open: extraFields.some(([key]) => entry[key]?.trim()) },
-      dom("summary", {}, hasTestFields ? "Tambahkan hasil uji atau dokumen (opsional)" : "Tambahkan rujukan dokumen (opsional)"),
-      dom("p", { className: "hint" }, hasTestFields ?
-        "Jika ada hasil ukur, cantumkan nilai dan satuannya. Jika belum diuji, catat pada kondisi dan temuan." :
-        "Isi jika ada dokumen atau butir daftar simak yang mendukung temuan atau hasil uji."),
-      ...extraFields.map(([key]) => controls.get(key)));
-    controls.get("location").querySelector("input").dataset.mepLocation = "";
-    return dom("fieldset", { className: "link-entry" }, dom("legend"), controls.get("location"), controls.get("observation"),
-      sectionPhotoEditor(entry, "Unggah foto lokasi", () => isAttached() && facility.locations.includes(entry)),
-      controls.get("followUp"), documents, button("Hapus lokasi", removeLocation, "quiet"));
-  }
 
   function facilityCard(facility) {
     const entries = dom("div", { className: "appearance-sections" });
@@ -2304,7 +2362,7 @@ function mepLocationEditor(block, inspection, isAttached) {
       entries.lastElementChild.querySelector("input").focus();
     });
     function append(entry) {
-      const card = locationCard(facility, entry, () => {
+      const card = mepLocationCard(entry, inspection, () => isAttached() && facility.locations.includes(entry), () => {
         if (hasMepLocationContent(entry, inspection) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
         facility.locations.splice(facility.locations.indexOf(entry), 1);
         photoEditors.delete(entry);
@@ -2476,7 +2534,8 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     if (block.mepSafety) {
       wrapper.append(mepSafetyEditor(chapter, block, sources));
     } else if (locationInspection) {
-      wrapper.append(mepLocationEditor(block, locationInspection, isAttached));
+      wrapper.append(locationInspection === lightningLocationInspection ? lightningLocationsEditor(block, isAttached) :
+        mepLocationEditor(block, locationInspection, isAttached));
       if (hasLegacyMepLocationInspection(block, locationInspection)) {
         const previous = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Lihat atau ubah catatan sebelumnya"));
         previous.addEventListener("toggle", () => {
@@ -2620,11 +2679,16 @@ function validateBackup(data) {
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
         }
-        for (const inspection of [fireLocationInspection, lightningLocationInspection]) {
-          if (!Array.isArray(block[inspection.key])) continue;
+        if (Array.isArray(block.lightningLocations)) {
+          const fields = lightningLocationInspection.fields.map(([key]) => key);
+          clean.lightningLocations = block.lightningLocations.filter(entry => entry && typeof entry === "object" && !Array.isArray(entry))
+            .map(entry => restorePhotos({ ...pickText(entry, fields), ...(entry.excluded === true ? { excluded: true } : {}) }, entry));
+        }
+        for (const [key, inspection] of [["fireInspections", fireLocationInspection], ["lightningInspections", lightningLocationInspection]]) {
+          if (!Array.isArray(block[key])) continue;
           const fields = inspection.fields.map(([key]) => key);
           const seen = new Set();
-          clean[inspection.key] = block[inspection.key].flatMap(facility => {
+          clean[key] = block[key].flatMap(facility => {
             if (typeof facility?.name !== "string" || !facility.name.trim() || !Array.isArray(facility.locations)) return [];
             const name = facility.name.trim();
             const key = tokenName(name);
@@ -2635,6 +2699,7 @@ function validateBackup(data) {
                 .map(entry => restorePhotos(pickText(entry, fields), entry)) }];
           });
         }
+        upgradeLightningLocations(clean);
         if (Array.isArray(block.appearanceSections)) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];
           clean.appearanceSections = block.appearanceSections.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))

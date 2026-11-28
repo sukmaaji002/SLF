@@ -127,7 +127,7 @@ function reportParagraphs(text, format, resolveToken) {
 }
 
 const fireLocationInspection = {
-  key: "fireInspections", photoKey: "fire", item: "sarana", customExample: "detektor asap",
+  key: "fireInspections", item: "sarana", customExample: "detektor asap",
   fields: [
     ["location", "Lokasi", "Koridor timur lantai 1"],
     ["observation", "Catatan temuan", "APAR tersedia, tetapi aksesnya terhalang kardus.", "area"],
@@ -139,12 +139,11 @@ const fireLocationInspection = {
 };
 
 const lightningLocationInspection = {
-  key: "lightningInspections", photoKey: "lightning", item: "komponen", customExample: "kotak sambungan",
-  presets: ["Penangkap petir di atap", "Kabel penyalur ke tanah", "Titik sambungan uji", "Elektroda pembumian"],
   fields: [
     ["location", "Lokasi", "Bak kontrol sisi timur"],
     ["observation", "Kondisi dan temuan", "Sambungan terlihat berkarat. Bagian tertanam belum bisa diperiksa.", "area"],
     ["followUp", "Rekomendasi tindak lanjut", "Periksa kondisi sambungan dan lakukan pengujian ulang setelah perbaikan.", "area"],
+    ["component", "Komponen yang diperiksa", "Elektroda pembumian"],
     ["configuration", "Jenis atau susunan sistem", "Penangkap di atap terhubung ke dua kabel penyalur"],
     ["measurement", "Hasil uji atau pengukuran", "Tahanan pembumian 2,4 Ω, ukur 12 Mei 2026"],
     ["reference", "Rujukan dokumen", "Laporan pengukuran pembumian BA-02"],
@@ -156,7 +155,19 @@ function mepLocationInspection(block) {
   if (block.type !== "heading") return;
   const name = mepSafetyKey(block.mepSafetyPreset ?? block.text);
   if (name === "proteksi kebakaran" || Array.isArray(block.fireInspections)) return fireLocationInspection;
-  if (name === "penangkal petir" || Array.isArray(block.lightningInspections)) return lightningLocationInspection;
+  if (name === "penangkal petir" || Array.isArray(block.lightningInspections) || Array.isArray(block.lightningLocations)) return lightningLocationInspection;
+}
+
+function upgradeLightningLocations(block) {
+  if (!Array.isArray(block.lightningInspections)) return;
+  const locations = block.lightningLocations ??= [];
+  for (const facility of block.lightningInspections) {
+    for (const entry of facility.locations) {
+      if (!hasMepLocationContent(entry, lightningLocationInspection)) continue;
+      locations.push({ ...entry, component: entry.component || facility.name, excluded: !facility.selected });
+    }
+  }
+  delete block.lightningInspections;
 }
 
 function hasLegacyMepLocationInspection(block, inspection) {
@@ -648,26 +659,28 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         const structureTesting = isStructureTesting(block);
         const locationInspection = mepLocationInspection(block);
         if (locationInspection) {
-          let hasLocations = false;
-          for (const [facilityIndex, facility] of (block[locationInspection.key] ?? []).entries()) {
-            if (!facility.selected) continue;
-            for (const [locationIndex, entry] of facility.locations.entries()) {
-              if (!hasMepLocationContent(entry, locationInspection)) continue;
-              hasLocations = true;
-              const location = entry.location?.trim() || "Lokasi " + (locationIndex + 1);
-              section.append(dom("h5", {}, facility.name + " · " + location));
-              for (const [key, label] of locationInspection.fields.slice(1)) {
-                const value = entry[key]?.trim();
-                if (value) section.append(...reportParagraphs(label + " — " + value));
-              }
-              appendPhotos(section, (entry.photos ?? []).map((photo, photoIndex) =>
-                [photo, id + "-" + locationInspection.photoKey + "-" + facilityIndex + "-" + locationIndex + "-photo-" + photoIndex]));
+          const lightning = locationInspection === lightningLocationInspection;
+          const entries = lightning ?
+            (block.lightningLocations ?? []).map((entry, index) => ({ entry, photoId: "lightning-" + index })) :
+            (block.fireInspections ?? []).flatMap((facility, facilityIndex) => facility.selected ?
+              facility.locations.map((entry, index) => ({ entry, facility: facility.name, photoId: "fire-" + facilityIndex + "-" + index })) : []);
+          const visible = entries.filter(({ entry }) => !entry.excluded && hasMepLocationContent(entry, locationInspection));
+          for (const [index, { entry, facility, photoId }] of visible.entries()) {
+            const location = entry.location?.trim() || "Lokasi " + (index + 1);
+            section.append(dom("h5", {}, facility ? facility + " · " + location : location));
+            for (const [key, label] of locationInspection.fields.slice(1)) {
+              if (lightning && key === "followUp") continue;
+              const value = entry[key]?.trim();
+              if (value) section.append(...reportParagraphs(label + " — " + value));
+            }
+            appendPhotos(section, (entry.photos ?? []).map((photo, photoIndex) =>
+              [photo, id + "-" + photoId + "-photo-" + photoIndex]));
+            if (lightning && entry.followUp?.trim()) {
+              section.append(...reportParagraphs("Rekomendasi tindak lanjut — " + entry.followUp.trim()));
             }
           }
           if (hasLegacyMepLocationInspection(block, locationInspection)) {
-            if (hasLocations) {
-              section.append(dom("h5", {}, "Catatan pemeriksaan sebelumnya"));
-            }
+            if (visible.length) section.append(dom("h5", {}, "Catatan pemeriksaan sebelumnya"));
             section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
           }
         } else if (block.mepSafety) {

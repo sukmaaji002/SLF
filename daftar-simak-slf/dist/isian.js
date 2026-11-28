@@ -151,6 +151,7 @@ function ensureReportReferences(project) {
   initializeMepSafety(project);
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
+      upgradeLightningLocations(block);
       if (block.type === "heading" || block.type === "text" || block.type === "table") block.sourceId ??= crypto.randomUUID();
       for (const area of block.environmentAreas ?? []) area.id ??= crypto.randomUUID();
       if (block.structureTest && !Array.isArray(block.structureTest.items)) {
