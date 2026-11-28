@@ -130,7 +130,7 @@ function checklistReportDestination(project, templateIndex, title, parentFlag) {
 function checklistDestinations(project, item) {
   const primary = checklistDestination(project, item);
   const destinations = primary ? [primary] : [];
-  if (project.workflowVersion !== 2) return destinations;
+  if (project.template !== "disiplin") return destinations;
   const group = item.id.slice(0, item.id.lastIndexOf("-"));
   const sharedHeading = {
     "K.3-0": "Kesehatan", "K.3-1": "Kesehatan", "K.3-2": "Kesehatan", "K.3-3": "Kesehatan",

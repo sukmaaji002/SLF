@@ -41,13 +41,11 @@ function flattenChecklist(categories) {
   return categories.flatMap((category) => category.groups.flatMap((group, gi) =>
     group.items.map((item, ii) => ({ ...item, group, category, id: checklistItemId(category, gi, item, ii) }))));
 }
-const checklistItems = flattenChecklist(catalog);
-const allChecklistItems = [...checklistItems,
-  ...flattenChecklist(catalogForChecklist(2)).filter(item => !checklistItems.some(existing => existing.id === item.id))];
-
-function projectChecklistItems(project, checklist) {
-  return project.workflowVersion === 2 ? flattenChecklist(catalogForChecklist(2, checklist?.checks)) : checklistItems;
+function checklistItemsFor(checklist) {
+  return flattenChecklist(catalogForChecklist(checklist?.checks));
 }
+const checklistItems = checklistItemsFor();
+const allChecklistItems = [...checklistItems, ...flattenChecklist(catalog).filter(item => checklistHistoricalItems.has(item.id))];
 const trialChapterCount = 2;
 const trialChecklistItems = checklistItems.slice(0, Math.floor(checklistItems.length / 4));
 const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
@@ -565,7 +563,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   target.replaceChildren();
   if (trial) project = { ...project, chapters: project.chapters.slice(0, trialChapterCount) };
   const checklist = readChecklist(project.id);
-  const items = trial ? trialChecklistItems : projectChecklistItems(project, checklist);
+  const items = trial ? trialChecklistItems : checklistItemsFor(checklist);
   const sources = reportSources(project, checklist);
   const resolveToken = (links, structural) => (original, name) => resolveReportLink(original, name, sources, links, structural);
   const coverFormat = (key, token) => key === "consultant" ? sources.get("cover:consultant")?.format :
@@ -654,8 +652,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
     tableEntries.push([id, caption]);
     const table = reportTable(["Butir daftar simak", "Ringkasan hasil", "Dasar aturan atau acuan teknis"],
       rows.map(({ item }) => [reportJump("report-check-" + item.id, item.group.code + " · " + item.title),
-        project.workflowVersion === 2 ? checklistReportResult(item, checklist.checks[item.id]) :
-          checklistSummary(item, checklist.checks[item.id], true),
+        checklistReportResult(item, checklist.checks[item.id]),
         checklistReference(item.id, intensity.data.region === "tegal")]));
     for (const [i, row] of [...table.tBodies[0].rows].entries()) row.id = rows[i].id;
     section.append(dom("div", { id, className: "report-block" }, dom("p", { className: "caption" }, caption), table));

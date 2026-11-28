@@ -290,7 +290,7 @@ const checklistWaste = {
     { id: "K.3-8-2", no: "3", title: "Pengolahan atau pengangkutan sampah", fields: "SADCFK" },
   ],
 };
-const checklistHistoricalV2 = new Set([
+const checklistHistoricalItems = new Set([
   "K.3-1-2", "K.3-1-3", "K.3-4-0", "K.3-4-1", "K.3-4-2", "K.5-2-5",
 ]);
 
@@ -298,14 +298,13 @@ function checklistItemId(category, groupIndex, item, itemIndex) {
   return item.id ?? category.code + "-" + groupIndex + "-" + itemIndex;
 }
 
-function catalogForChecklist(version, checks = {}) {
-  if (version !== 2) return catalog;
+function catalogForChecklist(checks = {}) {
   return catalog.map(category => {
     if (!["K.3", "K.5"].includes(category.code)) return category;
     const groups = category.groups.map((group, groupIndex) => {
       const items = group.items.flatMap((item, itemIndex) => {
         const id = checklistItemId(category, groupIndex, item, itemIndex);
-        if (!checklistHistoricalV2.has(id)) return [{ ...item, id }];
+        if (!checklistHistoricalItems.has(id)) return [{ ...item, id }];
         if (!checks[id]) return [];
         return [{ ...item, id, title: item.title + " · isian sebelumnya" }];
       });

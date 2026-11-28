@@ -397,7 +397,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     const value = identity[key];
     add("identity:" + key, "Identitas daftar simak", label, key === "date" ? inspectionDate(value) : value, getTextFormat(identity, key));
   }
-  for (const item of projectChecklistItems(project, checklist)) {
+  for (const item of checklistItemsFor(checklist)) {
     const check = checklist.checks[item.id];
     if (!check || check.na) continue;
     const structural = structuralChapters.has(checklistDestination(project, item)?.chapter);

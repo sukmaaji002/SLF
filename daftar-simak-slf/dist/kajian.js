@@ -64,7 +64,7 @@ function draft(name, template, workflowVersion = 1) {
       }
       chapter.blocks = chapter.blocks.filter(block => !architectureInspectionKind(block));
     }
-    const linkedHeadings = new Set(projectChecklistItems(project).flatMap(item => checklistDestinations(project, item))
+    const linkedHeadings = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
       .map(({ chapter, block }) => project.chapters[chapter].blocks[block]));
     for (const block of linkedHeadings) {
       if (block && !mepParameterGroup(block)) block.body = "";
@@ -1382,7 +1382,6 @@ function projectChecklistUrl(project, item, embed = false) {
   const params = new URLSearchParams({ proyek: project.id });
   if (project.intensity?.region === "tegal") params.set("acuan", "tegal");
   if (embed) params.set("embed", "1");
-  if (project.workflowVersion === 2) params.set("versi", "2");
   if (isTrial()) params.set("trial", "1");
   if (slfCloudOwner()) params.set("cloud", "1");
   const anchor = item === "tanggal-pemeriksaan" ? "#tanggal-pemeriksaan" : item ? "#butir-" + item : "";
@@ -1413,7 +1412,7 @@ function renderChecklistMap(project) {
     const checklist = readChecklist(project.id);
     const term = tokenName(search.value);
     const rows = [];
-    for (const item of projectChecklistItems(project, checklist)) {
+    for (const item of checklistItemsFor(checklist)) {
       const reference = checklistReference(item.id, project.intensity?.region === "tegal");
       const label = item.group.code + " · " + item.title;
       if (!tokenName(label + " " + reference).includes(term)) continue;
@@ -1466,18 +1465,20 @@ function refreshChecklistViews() {
 }
 
 function checklistFollowUpEditor(project, checklist) {
-  const rows = checklistFollowUpRows(projectChecklistItems(project, checklist), checklist, item => checklistEditorLink(project, item.id, item.title));
+  const rows = checklistFollowUpRows(checklistItemsFor(checklist), checklist, item => checklistEditorLink(project, item.id, item.title));
   return rows.length ? editorTable(checklistFollowUpColumns, rows) : dom("p", { className: "hint" }, "Belum ada rekomendasi teknis yang dicatat di daftar simak.");
 }
 
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
-  for (const item of projectChecklistItems(project, checklist)) {
+  for (const item of checklistItemsFor(checklist)) {
     if (!checklistDestinations(project, item).some(to => to.chapter === active && to.block === blockIndex)) continue;
-    const summary = isTrial() && !trialChecklistIds.has(item.id) ? "Perlu login" : checklistSummary(item, checklist.checks[item.id]);
-    if (project.workflowVersion === 2 && !summary) continue;
+    const check = checklist.checks[item.id];
+    const locked = isTrial() && !trialChecklistIds.has(item.id);
+    const hasResult = !locked && checklistSummary(item, check);
+    if (project.workflowVersion === 2 && !hasResult) continue;
     rows.push([checklistEditorLink(project, item.id, item.title),
-      project.workflowVersion === 2 ? checklistReportResult(item, checklist.checks[item.id]) : summary || "Belum diisi",
+      locked ? "Perlu login" : hasResult ? checklistReportResult(item, check) : "Belum diisi",
       checklistReference(item.id, project.intensity?.region === "tegal")]);
   }
   return project.workflowVersion === 2 && !rows.length ?
@@ -1692,7 +1693,7 @@ function renderChapter(project) {
     editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
   }
   const checklist = readChecklist(project.id);
-  const mapped = new Set(projectChecklistItems(project, checklist).flatMap(item => checklistDestinations(project, item))
+  const mapped = new Set(checklistItemsFor(checklist).flatMap(item => checklistDestinations(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;

@@ -8,7 +8,6 @@ const trialMode = params.has("trial");
 const trialData = trialMode ? (window.parent !== window ? window.parent.slfTrialData?.(projectId) : undefined)
   ?? { checklist: { identity: {}, checks: {} } } : undefined;
 const projectMode = /^[a-zA-Z0-9-]{1,64}$/.test(projectId ?? "");
-const checklistFirst = projectMode && params.get("versi") === "2";
 const cloudChecklist = !trialMode && projectMode && params.has("cloud");
 const cloudOwner = cloudChecklist && window.parent !== window ? window.parent.slfCloudOwner?.() || "" : "";
 if (cloudChecklist && !cloudOwner) {
@@ -403,7 +402,7 @@ function definitionsFor(item) {
 }
 
 function photosFor(item) {
-  if (!checklistFirst && !item.fields.includes("F")) return [];
+  if (!projectMode && !item.fields.includes("F")) return [];
   if (item.fields.includes("N")) {
     return [["ndtPhoto", "Foto hasil pengujian non-destruktif"], ["photo", "Foto hasil pengujian kekuatan dan material"]];
   }
@@ -428,7 +427,7 @@ function renderItem(item) {
     change();
   }, item.title, item).label;
   const rows = el("div", "sample-list");
-  const repeatable = checklistFirst || item.fields.includes("S") || item.fields.includes("P");
+  const repeatable = projectMode || item.fields.includes("S") || item.fields.includes("P");
   const add = repeatable ? button(item.fields.includes("P") ? "Tambah komponen" : "Tambah sampel", () => {
     if (photoWrites) return;
     const key = String(check.nextRow++);
@@ -450,7 +449,7 @@ function renderItem(item) {
   item.body.append(reference);
   if (item.lightSource) item.body.append(el("p", "inspection-reference",
     "Catat satu hasil ukur dalam lux untuk setiap lokasi dan kondisi pencahayaan. Pilih Gabungan jika kedua sumber menerangi lokasi saat diukur."));
-  if (checklistFirst && item.id === "K.3-8-0") item.body.append(el("p", "inspection-reference",
+  if (item.id === "K.3-8-0") item.body.append(el("p", "inspection-reference",
     "Catat keberadaan tempat sampah dan hasil pemeriksaan pemilahannya di sini. Catatan ini juga masuk ke aspek Kemudahan."));
   item.body.append(availability, reason, rows);
   if (add) item.body.append(add);
@@ -474,7 +473,7 @@ function renderItem(item) {
     }
     const definitions = definitionsFor(item);
     if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
-    if (checklistFirst) {
+    if (projectMode) {
       if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
       definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
         ["followUp", "Rekomendasi teknis (opsional)", "long"]);
@@ -504,7 +503,7 @@ function renderItem(item) {
 }
 
 function renderCatalog() {
-  for (const source of catalogForChecklist(checklistFirst ? 2 : 1, state.checks)) {
+  for (const source of catalogForChecklist(state.checks)) {
     const section = { ...source, groups: [], node: el("section", "catalog-section") };
     section.node.id = "bagian-" + source.code.replace(".", "");
     const title = source.code + " " + source.title;
@@ -523,7 +522,7 @@ function renderCatalog() {
       const group = { ...sourceGroup, items: [], node: el("details", "group") };
       group.node.open = true;
       group.node.append(el("summary", "", sourceGroup.code + " " + sourceGroup.title));
-      if (checklistFirst && sourceGroup.code === "K.5.3") {
+      if (sourceGroup.code === "K.5.3") {
         const wasteLink = el("a", "", "Pewadahan dan pemilahan sampah");
         wasteLink.href = "#butir-K.3-8-0";
         wasteLink.addEventListener("click", () => {
@@ -600,7 +599,7 @@ function exportCsv() {
     nonconformity, disruption, ["direction", "Arah bukaan"], ...periodFields,
     ["ndtPhoto", "Nama foto pengujian non-destruktif"], ["photo", "Nama foto"],
   ];
-  if (checklistFirst) rowFields.push(["lightSource", "Sumber cahaya saat pengukuran"], ["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
+  if (projectMode) rowFields.push(["lightSource", "Sumber cahaya saat pengukuran"], ["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
   const uniqueFields = [...new Map(rowFields.map((definition) => [definition[0], definition])).values()];
   const lines = [
     [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],
@@ -672,7 +671,7 @@ async function prepareSimakPaper() {
   const snapshot = { ...structuredClone(state), identity: effectiveChecklistIdentity(projectCover(), state.identity) };
   await renderSimakForm(draft, snapshot, {
     tegal: tegalReference, photoUrls: urls, loadPhoto: trialMode ? undefined : (key) => photoStore("get", key),
-    items: trialMode ? trialChecklistItems : flattenChecklist(catalogForChecklist(checklistFirst ? 2 : 1, snapshot.checks)),
+    items: trialMode ? trialChecklistItems : checklistItemsFor(snapshot),
   });
   if (urls !== simakPhotoUrls) {
     urls.forEach((url) => URL.revokeObjectURL(url));
