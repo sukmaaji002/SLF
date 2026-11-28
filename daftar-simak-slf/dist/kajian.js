@@ -1596,8 +1596,28 @@ function renderChecklistEditor(project) {
     active = "links";
     render();
   }), button("Pratinjau laporan", () => presentReport(false)));
-  if (!trying) head.append(dom("a", { href: projectChecklistUrl(project), target: "_blank", rel: "noopener" }, "Buka layar penuh"));
-  editor.append(head, dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" }));
+  const frame = dom("iframe", { src: projectChecklistUrl(project, item, true), title: "Daftar simak proyek", className: "checklist-frame" });
+  if (trying) {
+    editor.append(head, frame);
+    return;
+  }
+  const label = "Daftar simak · " + project.name;
+  const panel = dom("dialog", { className: "checklist-panel", open: true, ariaLabel: label });
+  const back = button("Kembali ke editor", () => panel.close(), "quiet");
+  back.autofocus = true;
+  const bar = dom("div", { className: "checklist-fullscreen-bar" }, dom("strong", {}, label), back);
+  panel.append(bar, frame);
+  const expand = button("Buka layar penuh", () => {
+    panel.open = false;
+    panel.showModal();
+  }, "quiet");
+  panel.addEventListener("close", () => {
+    if (!panel.isConnected || panel.open) return;
+    panel.show();
+    expand.focus({ preventScroll: true });
+  });
+  head.append(expand);
+  editor.append(head, panel);
 }
 
 function openIntensityEditor() {
