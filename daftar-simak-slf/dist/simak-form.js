@@ -17,6 +17,8 @@ const simakFormStyle = `
   .simak-form tr { break-inside: avoid; }
   .simak-form .simak-item.fit { break-inside: avoid; }
   .simak-form .simak-center { text-align: center; }
+  .simak-form .simak-conditions td:nth-child(n+3) { text-align: center; vertical-align: middle; }
+  .simak-form .simak-condition-check { font: 10pt/1 Arial, "DejaVu Sans", sans-serif; }
   .simak-form .simak-ref { margin: 2pt 0 0; color: #343434; font-size: 7.5pt; break-before: avoid; }
   .simak-form .simak-choice { white-space: normal; }
   .simak-form .simak-options { display: flex; flex-wrap: wrap; gap: 2pt 6pt; }
@@ -120,7 +122,8 @@ function simakIdentity(identity) {
     return [label, yes ? [simakMark(true), value] : "", no ? [simakMark(true), value] : ""];
   });
   const damage = identity.damage;
-  const options = (no, title, value) => [no, title, value === "Ya" ? simakMark(true) : "", value === "Tidak" ? simakMark(true) : ""];
+  const check = () => dom("span", { className: "simak-condition-check", role: "img", ariaLabel: "Ditandai" }, "✓");
+  const options = (no, title, value) => [no, title, value === "Ya" ? check() : "", value === "Tidak" ? check() : ""];
   const rows = [
     options("1", "Miring / deformasi", identity.deformation),
     options("2", "Terdapat kerusakan", damage),
@@ -129,12 +132,14 @@ function simakIdentity(identity) {
     options("3", "Bangunan dimanfaatkan", identity.inUse),
     options("4", "Bangunan terawat dengan baik", identity.maintained),
   ];
+  const conditions = simakTable(["No","Kondisi bangunan gedung","Ya","Tidak"], rows, [.7,3,2,2]);
+  conditions.classList.add("simak-conditions");
   const fragment = document.createDocumentFragment();
   fragment.append(dom("h4", { className: "simak-band" }, "K. IDENTITAS PEMILIK"),
     dom("div", { className: "simak-item" }, dom("h6", { className: "simak-item-title" }, "1. Identitas pemilik bangunan gedung"),
       simakTable(["Identitas pemilik","Ada","Tidak"], owner, [2,3,2])),
     dom("div", { className: "simak-item" }, dom("h6", { className: "simak-item-title" }, "2. Kondisi bangunan gedung"),
-      simakTable(["No","Kondisi bangunan gedung","Ya","Tidak"], rows, [.7,3,2,2])));
+      conditions));
   const details = ["building","location","use","date"].filter((key) => identity[key]?.trim())
     .map((key) => [checklistIdentityLabels[key], simakValue(identity,key)]);
   if (details.length) fragment.append(dom("div", { className: "simak-item" }, simakTable(["Data bangunan","Isian"], details,[2,5])));
