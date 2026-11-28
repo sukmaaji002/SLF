@@ -50,7 +50,7 @@ const trialChapterCount = 2;
 const trialChecklistItems = checklistItems.slice(0, Math.floor(checklistItems.length / 4));
 const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
 const checklistLabels = {
-  location: "Lokasi sampel", observation: "Pengamatan visual", damage: "Kerusakan", presence: "Ketersediaan",
+  location: "Lokasi sampel", floor: "Lantai", observation: "Pengamatan visual", damage: "Kerusakan", presence: "Ketersediaan",
   measurement: "Pengukuran", direction: "Arah bukaan", conformity: "Kesesuaian", nonconformity: "Uraian ketidaksesuaian",
   conformityNote: "Catatan kesesuaian sebelumnya",
   ndt: "Uji non-destruktif", test: "Pengetesan", view: "Hasil pengamatan", disruption: "Uraian gangguan",

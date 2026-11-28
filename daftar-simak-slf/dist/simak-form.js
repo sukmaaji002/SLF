@@ -65,9 +65,11 @@ const upkeep = [
 function simakFormColumns(item) {
   if (item.fields.includes("P")) return upkeep;
   const columns = [];
+  if (item.sampleFloor) columns.push({ title: "Lantai", keys: ["floor"], weight: .6 });
   if (item.fields.includes("S") || item.components || item.samples) {
-    columns.push({ title: item.indoorUse ? "Sampel ruang dalam" : item.components || item.id === "K.1-1-9" ? "Komponen" : "Sampel", keys: ["location"],
-      sample: true, weight: item.components ? 1.8 : 1.05 });
+    const title = item.indoorUse ? "Sampel ruang dalam" : item.outdoorUse ? "Sampel ruang luar" :
+      item.sampleFloor ? "Lokasi" : ((item.components && item.id !== "K.1-4-6") || item.id === "K.1-1-9") ? "Komponen" : "Sampel";
+    columns.push({ title, keys: ["location"], sample: true, weight: item.components ? 1.8 : 1.05 });
   }
   if (item.lightSource) columns.push({ title: "Sumber cahaya saat pengukuran", keys: ["lightSource"], weight: 1.3 });
   const order = item.category.code === "K.5" ? "MVDATCENUGK" : "VDATMCENUGK";
@@ -194,7 +196,7 @@ async function renderSimakForm(target, checklist, settings = {}) {
     const visited = new Set();
     const cells = columns.map((column) => {
       const parts = [];
-      if (column.sample && !(item.indoorUse && row.location?.trim())) parts.push(row.label || row.key || "");
+      if (column.sample && !(item.category.code === "K.1" && row.location?.trim())) parts.push(row.label || row.key || "");
       for (const [index, key] of column.keys.entries()) {
         visited.add(key);
         const value = row[key]?.trim();
