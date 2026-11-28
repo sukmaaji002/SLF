@@ -2874,7 +2874,9 @@ function validateBackup(data) {
     valid(Array.isArray(check.rows) && Number.isSafeInteger(check.nextRow) && check.nextRow > 0);
     const rows = check.rows.map((row) => {
       valid(typeof row?.key === "string" && /^\d+$/.test(row.key) && Number(row.key) < check.nextRow);
-      return pickText(row, ["key", "label", ...Object.keys(checklistLabels)]);
+      const restored = pickText(row, ["key", "label", ...Object.keys(checklistLabels)]);
+      if (row.excluded === true) restored.excluded = true;
+      return restored;
     });
     valid(new Set(rows.map((row) => row.key)).size === rows.length);
     checks[id] = { rows, nextRow: check.nextRow, na: check.na === true, ...pickText(check, ["reason"]) };

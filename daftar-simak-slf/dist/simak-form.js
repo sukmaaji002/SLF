@@ -252,14 +252,14 @@ async function renderSimakForm(target, checklist, settings = {}) {
     const rows = [
       ...defaults.map((row) => saved.find(({ key }) => key === row.key) ?? row),
       ...saved.filter(({ key }) => !defaults.some((row) => row.key === key)),
-    ];
+    ].filter(row => !row.excluded);
     const table = simakTable(columns.map(({title}) => title),
       check?.na ? [] : rows.map((row) => rowCells(item, columns, row)),
       columns.map(({weight}) => weight), item.fields.includes("P"));
     if (check?.na) {
       const cell = dom("td", { colSpan: columns.length }, dom("div", { className: "simak-state" }, "Tidak berlaku"));
       const reason = checklistReason(check);
-      if (reason) cell.append(formattedValue(reason, getTextFormat(check,"reason") || getTextFormat(check.rows[0],"note")));
+      if (reason) cell.append(formattedValue(reason, getTextFormat(check,"reason") || getTextFormat(activeChecklistRows(check)[0],"note")));
       table.tBodies[0].append(dom("tr", {}, cell));
     }
     if (columns[0].sample && !check?.na) {

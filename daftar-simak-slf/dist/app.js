@@ -259,8 +259,9 @@ function hasData(row) {
 }
 
 function flags(check) {
-  const filled = check.rows.some(hasData);
-  const issue = !check.na && check.rows.some((row) =>
+  const rows = activeChecklistRows(check);
+  const filled = rows.some(hasData);
+  const issue = !check.na && rows.some((row) =>
     row.conformity === "Tidak sesuai" || damage.slice(1).includes(row.damage) || row.view === "Mengganggu");
   return { filled, issue, na: Boolean(check.na) };
 }
@@ -433,7 +434,7 @@ function photosFor(item) {
   return [["photo", "Unggah foto dokumentasi", checklistPhotoColumn(item)]];
 }
 
-function renderItem(item) {
+function renderItem(item, showRemoved = false) {
   for (const element of item.body.querySelectorAll(".photo-field")) element.dispose();
   item.body.replaceChildren();
   const check = getCheck(item);
@@ -451,6 +452,22 @@ function renderItem(item) {
     change();
   }, item.title, item).label;
   const rows = el("div", "sample-list");
+  const activeRows = activeChecklistRows(check);
+  const removedRows = check.rows.filter(row => row.excluded);
+  const removed = removedRows.length ? dom("details", { className: "removed-parameters", open: showRemoved },
+    dom("summary", {}, "Parameter yang dihapus (" + removedRows.length + ")")) : undefined;
+  if (removed) {
+    for (const row of removedRows) {
+      const name = row.location?.trim() || row.component?.trim() || row.label || "Parameter " + row.key;
+      const restore = button("Pulihkan " + name, () => {
+        if (photoWrites) return;
+        delete row.excluded;
+        change();
+        renderItem(item, true);
+      });
+      removed.append(dom("p", {}, restore));
+    }
+  }
   const tataBangunan = item.category.code === "K.1";
   const repeatable = item.fields.includes("S") || item.fields.includes("P") || Boolean(item.components);
   const addLabel = item.indoorUse ? "Tambah ruang dalam" : item.outdoorUse ? "Tambah ruang luar" :
@@ -467,6 +484,7 @@ function renderItem(item) {
     rows.hidden = na.checked;
     reason.hidden = !na.checked;
     if (add) add.hidden = na.checked;
+    if (removed) removed.hidden = na.checked;
   };
   na.addEventListener("input", () => {
     check.na = na.checked;
@@ -480,9 +498,11 @@ function renderItem(item) {
     "Catat keberadaan tempat sampah dan hasil pemeriksaan pemilahannya di sini. Catatan ini juga masuk ke aspek Kemudahan."));
   item.body.append(availability, reason, rows);
   if (add) item.body.append(add);
+  if (removed) item.body.append(removed);
   setAvailability();
 
-  for (const row of check.rows) {
+  if (!activeRows.length && removed) rows.append(el("p", "result", "Semua parameter pada butir ini telah dihapus."));
+  for (const row of activeRows) {
     const sample = el("section", "sample");
     const group = el("div", "form-grid");
     sample.classList.toggle("has-data", hasData(row));
@@ -547,21 +567,17 @@ function renderItem(item) {
     if (!evidence.length) extras.append(attachPhoto(item, row, onRowChange, photos[0][1]));
     group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
     sample.append(group);
-    if (Number(row.key) > item.initialCount) {
-      const remove = button("Hapus " + (item.fields.includes("P") ? "komponen" : "sampel"), async () => {
-        if (photoWrites || (hasData(row) && !window.confirm("Hapus baris beserta semua isian dan fotonya?"))) return;
-        try {
-          for (const [property] of photosFor(item)) {
-            if (row[property]) await photoStore("delete", item.id + ":" + row.key + ":" + property);
-          }
-          check.rows = check.rows.filter((entry) => entry !== row);
-          change();
-          renderItem(item);
-        } catch {
-          byId("save-status").textContent = "Foto sampel gagal dihapus";
-        }
+    if (repeatable || Number(row.key) > item.initialCount) {
+      const name = row.location?.trim() || row.component?.trim() || row.label || "parameter " + row.key;
+      const remove = button("Hapus parameter", () => {
+        if (photoWrites) return;
+        row.excluded = true;
+        change();
+        renderItem(item);
+        item.body.querySelector(".removed-parameters summary")?.focus({ preventScroll: true });
       });
       remove.className = "remove-sample";
+      remove.setAttribute("aria-label", "Hapus parameter " + name);
       sample.append(remove);
     }
     rows.append(sample);
@@ -671,7 +687,9 @@ function exportCsv() {
     [...identity.map(([, label]) => label), "Kategori", "Bagian", "Nomor", "Butir atau komponen", "Halaman PDF", "Sampel", "Tidak berlaku", ...uniqueFields.map(([, label]) => label), "Alasan tidak berlaku", "Acuan pemeriksaan"],
     ...items.filter((item) => !item.locked).flatMap((item) => {
       const check = getCheck(item);
-      return check.rows.map((row) => [
+      const rows = activeChecklistRows(check);
+      const exportRows = check.na && !rows.length ? [{}] : rows;
+      return exportRows.map((row) => [
         ...identity.map(([key]) => values[key]),
         item.category.title, item.group.code + " " + item.group.title, item.no, item.title, item.page, row.label,
         check.na ? "Ya" : "",

@@ -241,9 +241,11 @@ function initialIntensityMeasurement(data, checklist, metric) {
     return { raw: data.measurements[metric.key], notApplicable: false };
   }
   const check = checklist.checks[metric.id];
+  const rows = activeChecklistRows(check);
+  const excluded = metric.rowKey && check?.rows.some(row => row.key === metric.rowKey && row.excluded);
   return {
-    raw: !check?.na ? check?.rows.find((row) => metric.rowKey ? row.key === metric.rowKey : row.measurement?.trim())?.measurement || "" : "",
-    notApplicable: check?.na === true,
+    raw: !check?.na ? rows.find(row => metric.rowKey ? row.key === metric.rowKey : row.measurement?.trim())?.measurement || "" : "",
+    notApplicable: check?.na === true || Boolean(excluded),
   };
 }
 

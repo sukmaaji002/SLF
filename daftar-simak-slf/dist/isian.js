@@ -401,7 +401,7 @@ function reportSources(project, checklist = readChecklist(project.id)) {
     const check = checklist.checks[item.id];
     if (!check || check.na) continue;
     const structural = structuralChapters.has(checklistDestination(project, item)?.chapter);
-    for (const row of check.rows) {
+    for (const row of activeChecklistRows(check)) {
       if (project.workflowVersion === 2 && structural) sources.structureChecks.push({
         subject: [item.title, row.location || row.label].filter(Boolean).join(" · "), row,
       });

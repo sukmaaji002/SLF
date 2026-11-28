@@ -85,8 +85,12 @@ function checklistReference(id, tegal = false) {
   return local || base;
 }
 
+function activeChecklistRows(check) {
+  return (check?.rows ?? []).filter(row => !row.excluded);
+}
+
 function checklistReason(check) {
-  return check.reason?.trim() || check.rows[0]?.note?.trim() || "";
+  return check.reason?.trim() || activeChecklistRows(check)[0]?.note?.trim() || "";
 }
 
 function checklistDestination(project, item) {
@@ -154,7 +158,7 @@ function checklistFollowUpRows(items, checklist, link) {
   return items.flatMap(item => {
     const check = checklist.checks[item.id];
     if (!check || check.na) return [];
-    return check.rows.filter(row => row.followUp?.trim()).map(row => [
+    return activeChecklistRows(check).filter(row => row.followUp?.trim()).map(row => [
       link(item), [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · "),
       formattedValue(row.followUp, getTextFormat(row, "followUp")),
     ]);
@@ -167,7 +171,7 @@ function checklistReportResult(item, check) {
   if (check.na) return checklistSummary(item, check, true);
   const result = document.createDocumentFragment();
   const fields = checklistSummaryOrder.filter(key => !["location", "component", "photo", "ndtPhoto"].includes(key));
-  for (const row of check.rows) {
+  for (const row of activeChecklistRows(check)) {
     if (!checklistSummaryOrder.some(key => row[key]?.trim())) continue;
     const location = [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · ");
     const details = dom("div", {});
@@ -198,13 +202,13 @@ function checklistSummary(item, check, rich = false) {
   if (!check) return "";
   if (check.na) {
     const reason = checklistReason(check);
-    const format = getTextFormat(check, "reason") || getTextFormat(check.rows[0], "note");
+    const format = getTextFormat(check, "reason") || getTextFormat(activeChecklistRows(check)[0], "note");
     return rich && reason && format ? [document.createTextNode("Tidak berlaku. "), formattedValue(reason, format)].reduce((fragment, node) => {
       fragment.append(node);
       return fragment;
     }, document.createDocumentFragment()) : ["Tidak berlaku", reason].filter(Boolean).join(". ");
   }
-  const available = check.rows.filter((row) => checklistSummaryOrder.some((key) => row[key]?.trim()));
+  const available = activeChecklistRows(check).filter((row) => checklistSummaryOrder.some((key) => row[key]?.trim()));
   const first = available[0];
   if (!first) return "";
   const keys = checklistSummaryOrder.filter((key) => first[key]?.trim()).slice(0, 3);
