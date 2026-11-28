@@ -52,6 +52,7 @@ const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
 const checklistLabels = {
   location: "Lokasi sampel", observation: "Pengamatan visual", damage: "Kerusakan", presence: "Ketersediaan",
   measurement: "Pengukuran", direction: "Arah bukaan", conformity: "Kesesuaian", nonconformity: "Uraian ketidaksesuaian",
+  conformityNote: "Catatan kesesuaian sebelumnya",
   ndt: "Uji non-destruktif", test: "Pengetesan", view: "Hasil pengamatan", disruption: "Uraian gangguan",
   note: "Keterangan", component: "Komponen", routine: "Rutin", periodic: "Berkala", unscheduled: "Tidak terjadwal",
   ndtPhoto: "Foto uji non-destruktif", photo: "Foto pemeriksaan",

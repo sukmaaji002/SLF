@@ -6,7 +6,7 @@ const catalog = [
     code: "K.1", title: "Tata bangunan gedung", groups: [
       {
         code: "K.1.1", title: "Pemeriksaan Persyaratan Peruntukan Bangunan Gedung", items: [
-          {"no":"1","title":"Fungsi Bangunan Gedung","fields":"VEFK","page":1},
+          {"no":"1","title":"Fungsi Bangunan Gedung","fields":"VCF","page":1,"buildingUse":true},
           {"no":"2","title":"Pemanfaatan Setiap Ruang Dalam Bangunan Gedung","fields":"SVCFK","page":1,"samples":["Ruang dalam 1","Ruang dalam 2"],"sampleTitle":"Sampel ruang dalam"},
           {"no":"3","title":"Pemanfaatan Ruang Luar Pada Persil Bangunan Gedung","fields":"SVCFK","page":1,"samples":["Ruang luar 1"],"sampleTitle":"Sampel ruang luar"},
         ],

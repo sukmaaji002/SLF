@@ -188,7 +188,7 @@ function checklistReportResult(item, check) {
 }
 
 const checklistSummaryOrder = ["nonconformity", "measurement", "lightSource", "note", "observation", "test", "ndt", "damage", "presence",
-  "conformity", "view", "disruption", "direction", "criterion", "followUp", "routine", "periodic", "unscheduled", "component", "location", "photo", "ndtPhoto"];
+  "conformity", "conformityNote", "view", "disruption", "direction", "criterion", "followUp", "routine", "periodic", "unscheduled", "component", "location", "photo", "ndtPhoto"];
 
 function formatChecklistMeasurement(value, unit) {
   return unit && /^[-+−]?\d[\d.,\s]*$/.test(value.trim()) ? value.trim() + " " + unit : value;

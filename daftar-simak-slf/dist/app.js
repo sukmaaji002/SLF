@@ -164,7 +164,8 @@ function field([key, title, type], data, onChange, context, item) {
   }
   control.setAttribute("aria-label", context ? title + " — " + context : title);
   if (!Array.isArray(type) && type !== "date" && Object.hasOwn(checklistExamples, key)) {
-    const example = key === "measurement" && item?.unit ? "masukkan angka hasil ukur dalam " + item.unit :
+    const example = key === "observation" && item?.buildingUse ? "bangunan digunakan sebagai gudang penyimpanan" :
+      key === "measurement" && item?.unit ? "masukkan angka hasil ukur dalam " + item.unit :
       key === "location" && !item ? "Jl. Melati No. 10, Kota Contoh" :
       title === "Nama bangunan pembanding" ? "gedung servis di sisi timur" : checklistExamples[key];
     control.placeholder = "Contoh: " + example;
@@ -442,7 +443,7 @@ function renderItem(item) {
     change();
   }, item.title, item).label;
   const rows = el("div", "sample-list");
-  const repeatable = projectMode || item.fields.includes("S") || item.fields.includes("P");
+  const repeatable = !item.buildingUse && (projectMode || item.fields.includes("S") || item.fields.includes("P"));
   const add = repeatable ? button(item.fields.includes("P") ? "Tambah komponen" : "Tambah sampel", () => {
     if (photoWrites) return;
     const key = String(check.nextRow++);
@@ -486,15 +487,43 @@ function renderItem(item) {
     if (item.title === "Jarak Antar Bangunan" && Number(row.key) > 3) {
       group.append(field(["location", "Nama bangunan pembanding"], row, onRowChange, context, item).label);
     }
-    const definitions = definitionsFor(item);
-    if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
-    if (projectMode) {
-      if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
-      definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
-        ["followUp", "Rekomendasi teknis (opsional)", "long"]);
+    if (item.buildingUse) {
+      const previous = row.conformity?.trim();
+      const choice = conformity.find(value => value.toLowerCase() === previous?.toLowerCase());
+      if (previous && !choice) {
+        if (!row.conformityNote) setTextFormat(row, "conformityNote", getTextFormat(row, "conformity"));
+        row.conformityNote = [row.conformityNote, row.conformity].filter(Boolean).join("\n");
+        setTextFormat(row, "conformity", undefined);
+      }
+      if (previous) row.conformity = choice || "";
+      const explanation = field(nonconformity, row, onRowChange, context, item);
+      const status = field(fields.C, row, () => {
+        explanation.label.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
+        onRowChange();
+      }, context, item);
+      explanation.label.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
+      group.append(field(fields.V, row, onRowChange, context, item).label, status.label, explanation.label);
+      const extras = dom("div", { className: "form-grid" });
+      const optional = [
+        ...(row.location?.trim() ? [["location", "Lokasi atau identitas sampel", "text"]] : []),
+        ...(row.measurement?.trim() ? [["measurement", "Hasil ukur dan satuan", "long"]] : []),
+        ...(row.conformityNote?.trim() ? [["conformityNote", "Catatan kesesuaian sebelumnya", "long"]] : []),
+        fields.K, ["criterion", "Acuan yang digunakan", "long"], ["followUp", "Rekomendasi teknis", "long"],
+      ];
+      for (const definition of optional) extras.append(field(definition, row, onRowChange, context, item).label);
+      for (const [property, label] of photosFor(item)) extras.append(attachPhoto(item, row, onRowChange, label, property));
+      group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
+    } else {
+      const definitions = definitionsFor(item);
+      if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
+      if (projectMode) {
+        if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
+        definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
+          ["followUp", "Rekomendasi teknis (opsional)", "long"]);
+      }
+      for (const definition of definitions) group.append(field(definition, row, onRowChange, context, item).label);
+      for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
     }
-    for (const definition of definitions) group.append(field(definition, row, onRowChange, context, item).label);
-    for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
     sample.append(group);
     if (Number(row.key) > item.initialCount) {
       const remove = button("Hapus " + (item.fields.includes("P") ? "komponen" : "sampel"), async () => {
@@ -611,7 +640,7 @@ function exportCsv() {
   const rowFields = [
     ["location", "Lokasi atau identitas sampel"],
     ...Object.values(fields),
-    nonconformity, disruption, ["direction", "Arah bukaan"], ...periodFields,
+    nonconformity, ["conformityNote", "Catatan kesesuaian sebelumnya"], disruption, ["direction", "Arah bukaan"], ...periodFields,
     ["ndtPhoto", "Nama foto pengujian non-destruktif"], ["photo", "Nama foto"],
   ];
   if (projectMode) rowFields.push(["lightSource", "Sumber cahaya saat pengukuran"], ["criterion", "Acuan yang digunakan"], ["followUp", "Rekomendasi teknis"]);
