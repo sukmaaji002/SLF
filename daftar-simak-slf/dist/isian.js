@@ -148,7 +148,7 @@ function reportTokens(text) {
 }
 
 function ensureReportReferences(project) {
-  initializeMepSafety(project);
+  initializeMepParameters(project);
   for (const chapter of project.chapters) {
     for (const block of chapter.blocks) {
       upgradeLightningLocations(block);

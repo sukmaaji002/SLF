@@ -110,11 +110,12 @@ function checklistDestination(project, item) {
   if (chapter < 0) return null;
   const blocks = project.chapters[chapter].blocks;
   let block = blocks.findIndex((entry) => entry.type === "heading" && entry.text === title);
-  if (project.template === "disiplin" && defaultIndex === 6 && item.category.code === "K.2") {
+  const parentFlag = { "K.2": "mepSafety", "K.3": "mepHealth" }[item.category.code];
+  if (project.template === "disiplin" && defaultIndex === 6 && parentFlag) {
     const preset = blocks.findIndex(entry => entry.mepSafetyPreset === title);
     if (preset >= 0) block = preset;
-    const parent = blocks.findIndex(entry => entry.mepSafety);
-    if (parent >= 0 && (block < 0 || blocks[block].mepSafetySelected === false)) block = parent;
+    const parent = blocks.findIndex(entry => entry[parentFlag]);
+    if (parent >= 0 && (block < 0 || title.toLowerCase() === "kesehatan" || title.toLowerCase() === "keselamatan" || blocks[block].mepSafetySelected === false)) block = parent;
   }
   return { chapter, block, title: blocks[block]?.text ?? originalTitle };
 }

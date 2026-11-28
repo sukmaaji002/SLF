@@ -55,7 +55,7 @@ function draft(name, template) {
     })),
   };
   initializeHealthMeasurements(project);
-  initializeMepSafety(project, true);
+  initializeMepParameters(project, true);
   return project;
 }
 
@@ -1156,7 +1156,7 @@ function renderOutline() {
 
 function render() {
   const project = current();
-  initializeMepSafety(project);
+  initializeMepParameters(project);
   const trying = isTrial();
   $("page-title").textContent = trying ? "Coba buat kajian" : "Editor kajian";
   for (const id of ["trial-controls", "trial-notice", "trial-locked-tools"]) $(id).hidden = !trying;
@@ -2430,9 +2430,11 @@ function mepLocationEditor(block, inspection, isAttached) {
       dom("label", {}, "Nama " + item, custom), button("Tambah " + item, addFacility), feedback), cards);
 }
 
-function mepSafetyEditor(chapter, parent, sources) {
-  const { parameters, end } = mepSafetyParameters(chapter, parent);
-  const choices = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Parameter keselamatan yang dikaji"));
+function mepParameterEditor(chapter, parent, group, sources) {
+  const { parameters, end } = mepParameters(chapter, parent);
+  const optionsId = "mep-options-" + parent.sourceId;
+  const choices = dom("fieldset", { className: "scope-options", id: optionsId },
+    dom("legend", {}, "Parameter " + group.name + " yang dikaji"));
   choices.append(dom("p", { className: "hint" }, "Centang parameter untuk menampilkan subbabnya. Jika centang dilepas, isian tetap tersimpan dan dapat dibuka kembali."));
   for (const block of parameters) {
     const check = dom("input", { type: "checkbox", checked: block.mepSafetySelected !== false });
@@ -2440,13 +2442,12 @@ function mepSafetyEditor(chapter, parent, sources) {
       block.mepSafetySelected = check.checked;
       save();
       render();
-      $("mep-safety-options").querySelectorAll('input[type="checkbox"]')[parameters.indexOf(block)]?.focus({ preventScroll: true });
+      $(optionsId).querySelectorAll('input[type="checkbox"]')[parameters.indexOf(block)]?.focus({ preventScroll: true });
     });
     choices.append(dom("label", { className: "scope-choice" }, check,
-      dom("span", { id: "mep-safety-option-" + block.sourceId }, block.text.trim() || "Tanpa judul")));
+      dom("span", { id: "mep-option-" + block.sourceId }, block.text.trim() || "Tanpa judul")));
   }
-  choices.id = "mep-safety-options";
-  const input = dom("input", { type: "text", maxLength: 120, placeholder: "Misalnya sistem listrik darurat" });
+  const input = dom("input", { type: "text", maxLength: 120, placeholder: "Misalnya " + group.example });
   const feedback = dom("p", { className: "hint", role: "status" });
   function add() {
     const name = input.value.trim().replace(/\s+/g, " ");
@@ -2472,9 +2473,9 @@ function mepSafetyEditor(chapter, parent, sources) {
   const preview = dom("div", { className: "narrative-preview" });
   function refresh() {
     preview.replaceChildren(dom("h4", {}, "Tampilan di laporan"),
-      ...mepSafetySummary(chapter, parent, (original, label) => resolveReportLink(original, label, sources, parent.links)));
+      ...mepParameterSummary(chapter, parent, group, (original, label) => resolveReportLink(original, label, sources, parent.links)));
   }
-  choices.refreshSafetyPreview = refresh;
+  choices.refreshParameterPreview = refresh;
   refresh();
   const edit = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Ubah narasi pengantar pemeriksaan"),
     boundField(parent, "body", "Narasi pemeriksaan", "area", () => { refresh(); save(); }));
@@ -2488,6 +2489,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
   const name = dom("h3", {}, named ? block.text.trim() || "Tanpa judul" : marker);
   const bar = dom("div", { className: "block-head" }, dom("div", {},
     named ? dom("span", { className: "block-marker" }, marker) : "", name));
+  const parameterGroup = mepParameterGroup(block);
   const controls = dom("div", { className: "button-row" });
   for (const [delta, name] of [[-1, "Naikkan blok"], [1, "Turunkan blok"]]) {
     const control = button(name, () => {
@@ -2497,7 +2499,7 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
       render();
     }, "quiet");
     const adjacent = chapter.blocks[index + delta];
-    control.disabled = !adjacent || adjacent.mepSafety || adjacent.mepSafetySelected !== undefined;
+    control.disabled = !adjacent || mepParameterGroup(adjacent) || adjacent.mepSafetySelected !== undefined;
     controls.append(control);
   }
   controls.append(button("Hapus", () => {
@@ -2512,13 +2514,15 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     const option = $("subchapter-picker")?.querySelector('option[value="' + index + '"]');
     if (option && headingInfo) option.textContent = headingInfo.number + " · " + name.textContent;
     if (block.mepSafetySelected !== undefined) {
-      const label = $("mep-safety-option-" + block.sourceId);
-      if (label) label.textContent = name.textContent;
-      $("mep-safety-options")?.refreshSafetyPreview();
+      const label = $("mep-option-" + block.sourceId);
+      if (label) {
+        label.textContent = name.textContent;
+        label.closest("fieldset")?.refreshParameterPreview();
+      }
     }
     save();
   }));
-  if (!block.mepSafety && block.mepSafetySelected === undefined) settings.append(controls);
+  if (!parameterGroup && block.mepSafetySelected === undefined) settings.append(controls);
   bar.append(settings);
   const wrapper = dom("section", { className: headingInfo?.nested ? "block nested-block" : "block", id: "edit-block-" + index, tabIndex: -1 }, bar);
   name.id = "block-title-" + index;
@@ -2531,8 +2535,8 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     const project = current();
     const isAttached = () => workspace.projects.includes(project) && project.chapters.includes(chapter) && chapter.blocks.includes(block);
     const locationInspection = mepLocationInspection(block);
-    if (block.mepSafety) {
-      wrapper.append(mepSafetyEditor(chapter, block, sources));
+    if (parameterGroup) {
+      wrapper.append(mepParameterEditor(chapter, block, parameterGroup, sources));
     } else if (locationInspection) {
       wrapper.append(locationInspection.locationsKey ? mepLocationsByPointEditor(block, locationInspection, isAttached) :
         mepLocationEditor(block, locationInspection, isAttached));
@@ -2660,7 +2664,7 @@ function validateBackup(data) {
         if (typeof block.structureConclusionNote === "string") clean.structureConclusionNote = block.structureConclusionNote;
         if (typeof block.introduction === "string") clean.introduction = block.introduction;
         clean.depth = block.depth === 2 ? 2 : 1;
-        if (block.mepSafety === true) clean.mepSafety = true;
+        for (const group of mepParameterGroups) if (block[group.flag] === true) clean[group.flag] = true;
         if (typeof block.mepSafetySelected === "boolean") clean.mepSafetySelected = block.mepSafetySelected;
         if (typeof block.mepSafetyPreset === "string") clean.mepSafetyPreset = block.mepSafetyPreset;
         if (block.structureTest && typeof block.structureTest === "object" && !Array.isArray(block.structureTest)) {

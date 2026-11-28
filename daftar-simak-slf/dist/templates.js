@@ -4,6 +4,16 @@ const electricalInspectionNarrative = {"body":"Instalasi listrik yang ditinjau m
 const lightningProtectionNarrative = {"body":"Sistem proteksi petir yang tersedia diidentifikasi sebagai [jenis atau konfigurasi]. Pemeriksaan mencakup [komponen yang dapat diverifikasi] dan didukung [hasil pengukuran atau dokumen yang tersedia]. Hasil dan keterbatasan pemeriksaan adalah [hasil serta batasan].","previous":"[Catat instalasi, pembumian, dan hasil pengujian yang tersedia.]"};
 const mepSafetyToken = "sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait";
 const mepSafetyNarrative = "Penilaian utilitas keselamatan mencakup [sistem proteksi kebakaran, penangkal petir, instalasi listrik, atau sistem terkait]. Rincian sistem yang diperiksa, lokasi, hasil, dan bukti pembanding dijabarkan pada subbagian berikut.";
+const mepHealthToken = "penghawaan, pencahayaan, air bersih, sanitasi, atau sistem terkait";
+const mepHealthNarrative = "Pemeriksaan utilitas kesehatan mencakup [" + mepHealthToken + "]. Hasil observasi dan pengukuran dirinci menurut sistem yang diperiksa dan sumber bukti yang tersedia.";
+const mepParameterGroups = [
+  { flag: "mepSafety", name: "keselamatan", token: mepSafetyToken, narrative: mepSafetyNarrative, example: "sistem listrik darurat" },
+  { flag: "mepHealth", name: "kesehatan", token: mepHealthToken, narrative: mepHealthNarrative, example: "pengolahan air limbah khusus" },
+];
+function mepParameterGroup(block) {
+  return mepParameterGroups.find(group => block[group.flag] === true);
+}
+
 const structuralConclusionNarrative = "Penilaian bidang struktur dalam lingkup ini menghasilkan [kesimpulan pengkaji] berdasarkan [dokumen, observasi, atau hasil uji]. Elemen yang masih memerlukan konfirmasi atau pemeriksaan lanjutan adalah [elemen atau lokasi], dengan tindak lanjut pada [nomor rekomendasi].";
 const structuralTestingNarrative = "Pengujian atau analisis struktur yang tersedia berupa [metode atau status pengujian]. Hasil yang dapat ditelusuri adalah [hasil dan satuan], dibandingkan dengan [parameter pembanding]. Interpretasi pengkaji serta batasan penggunaannya adalah [interpretasi dan batasan].";
 const structuralInspectionNarrative = "Pemeriksaan visual dilakukan pada [elemen dan lokasi sampel] untuk mencatat kondisi yang dapat diamati. Temuan pada elemen tersebut adalah [kondisi, lokasi, dan ukuran kerusakan bila ada]. Lokasi dan bukti temuan ditunjukkan pada [tabel, denah, atau foto].";
@@ -252,7 +262,7 @@ const reportTemplates = {
         ],
         [
           "Kesehatan",
-          {"body":"Pemeriksaan utilitas kesehatan mencakup [penghawaan, pencahayaan, air bersih, sanitasi, atau sistem terkait]. Hasil observasi dan pengukuran dirinci menurut sistem yang diperiksa dan sumber bukti yang tersedia.","previous":"[Ringkas hasil pemeriksaan utilitas kesehatan.]"},
+          {"body":mepHealthNarrative,"previous":"[Ringkas hasil pemeriksaan utilitas kesehatan.]"},
           ["Penghawaan dan pencahayaan", {"body":"Pada [lokasi sampel], penghawaan disediakan melalui [sistem atau bukaan], sedangkan pencahayaan berasal dari [sumber]. Hasil pengamatan atau pengukuran adalah [hasil dan satuan], dengan metode [metode] serta acuan [acuan].","previous":"[Masukkan lokasi sampel, metode, hasil ukur, dan satuan.]"}],
           ["Air bersih, air limbah, dan air hujan", {"body":"Air bersih berasal dari [sumber] dan disalurkan melalui [sistem distribusi]. Air limbah dialirkan atau diolah melalui [sistem], sedangkan air hujan ditangani oleh [sistem drainase atau penampungan]. Kondisi terverifikasi dan keterbatasannya adalah [hasil verifikasi].","previous":"[Catat sumber, jaringan distribusi, pengolahan, dan kondisi aktual.]"}],
           ["Persampahan dan utilitas khusus", {"body":contextualNarrative("Persampahan dan utilitas khusus"),"previous":"[Catat sistem yang ada dan yang relevan dengan fungsi bangunan.]"}],
@@ -625,7 +635,7 @@ function mepSafetyKey(title) {
   return key === "proteksi petir" ? "penangkal petir" : key;
 }
 
-function mepSafetyParameters(chapter, parent) {
+function mepParameters(chapter, parent) {
   const start = chapter.blocks.indexOf(parent) + 1;
   let end = chapter.blocks.findIndex((block, index) => index >= start && block.type === "heading" && block.depth !== 2);
   if (end < 0) end = chapter.blocks.length;
@@ -633,44 +643,47 @@ function mepSafetyParameters(chapter, parent) {
   return { parameters, end };
 }
 
-function initializeMepSafety(project, fresh = false) {
+function initializeMepParameters(project, fresh = false) {
   if (project.template !== "disiplin") return;
   const [title, ...sections] = reportTemplates.disiplin.chapters[6];
-  const definition = sections.find(section => Array.isArray(section) && section[1]?.body === mepSafetyNarrative);
-  for (const chapter of project.chapters) {
-    const parent = chapter.blocks.find(block => block.mepSafety || (block.type === "heading" && block.depth !== 2 &&
-      (block.body?.includes("[" + mepSafetyToken + "]") || (chapter.title === title && tokenName(block.text) === "keselamatan"))));
-    if (!parent || parent.mepSafety) continue;
-    const { parameters, end } = mepSafetyParameters(chapter, parent);
-    parent.mepSafety = true;
-    for (const child of parameters) child.mepSafetySelected = !fresh;
-    const defaults = templateBlocks(definition.slice(2), 2);
-    const existing = new Map(parameters.map(block => [mepSafetyKey(block.text), block]));
-    const missing = [];
-    for (const preset of defaults) {
-      const child = existing.get(mepSafetyKey(preset.text)) || preset;
-      child.mepSafetyPreset = preset.text;
-      if (child === preset) {
-        child.mepSafetySelected = false;
-        missing.push(child);
+  for (const group of mepParameterGroups) {
+    const definition = sections.find(section => Array.isArray(section) && section[1]?.body === group.narrative);
+    for (const chapter of project.chapters) {
+      const parent = chapter.blocks.find(block => block.type === "heading" && block.depth !== 2 && (
+        block[group.flag] || block.body?.includes("[" + group.token + "]") ||
+        (chapter.title === title && tokenName(block.text) === group.name)));
+      if (!parent || parent[group.flag]) continue;
+      const { parameters, end } = mepParameters(chapter, parent);
+      parent[group.flag] = true;
+      for (const child of parameters) child.mepSafetySelected = !fresh;
+      const defaults = templateBlocks(definition.slice(2), 2);
+      const existing = new Map(parameters.map(block => [mepSafetyKey(block.text), block]));
+      const missing = [];
+      for (const preset of defaults) {
+        const child = existing.get(mepSafetyKey(preset.text)) || preset;
+        child.mepSafetyPreset = preset.text;
+        if (child === preset) {
+          child.mepSafetySelected = false;
+          missing.push(child);
+        }
       }
+      chapter.blocks.splice(end, 0, ...missing);
     }
-    chapter.blocks.splice(end, 0, ...missing);
   }
 }
 
-function mepSafetySummary(chapter, parent, resolveToken) {
-  const selected = mepSafetyParameters(chapter, parent).parameters
+function mepParameterSummary(chapter, parent, group, resolveToken) {
+  const selected = mepParameters(chapter, parent).parameters
     .filter(block => block.mepSafetySelected !== false).map(block => block.text.trim()).filter(Boolean);
   const value = selected.length ? scopeList.format(selected) : "";
-  const body = parent.body?.trim() || mepSafetyNarrative;
-  if (!value && body === mepSafetyNarrative) return reportParagraphs("Parameter keselamatan belum dipilih.");
+  const body = parent.body?.trim() ? parent.body : group.narrative;
+  if (!value && body.trim() === group.narrative) return reportParagraphs("Parameter " + group.name + " belum dipilih.");
   const format = getTextFormat(parent, "body");
-  const resolve = (original, label) => tokenName(label) === mepSafetyToken ?
+  const resolve = (original, label) => tokenName(label) === group.token ?
     { value: value || "parameter yang belum dipilih" } : resolveToken(original, label);
   const result = reportParagraphs(body, format, resolve);
-  if (value && !reportTokens(body).has(mepSafetyToken)) {
-    result.push(...reportParagraphs("Parameter keselamatan yang dipilih meliputi " + value + "."));
+  if (value && !reportTokens(body).has(group.token)) {
+    result.push(...reportParagraphs("Parameter " + group.name + " yang dipilih meliputi " + value + "."));
   }
   return result;
 }

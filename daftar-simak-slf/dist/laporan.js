@@ -672,6 +672,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(...reportParagraphs(introductionText(chapter, block)));
         const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
         const structureTesting = isStructureTesting(block);
+        const parameterGroup = mepParameterGroup(block);
         const locationInspection = mepLocationInspection(block);
         if (locationInspection) {
           const { locationsKey, photoKey } = locationInspection;
@@ -698,8 +699,8 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
             if (visible.length) section.append(dom("h5", {}, "Catatan pemeriksaan sebelumnya"));
             section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
           }
-        } else if (block.mepSafety) {
-          section.append(...mepSafetySummary(chapter, block, resolveToken(block.links)));
+        } else if (parameterGroup) {
+          section.append(...mepParameterSummary(chapter, block, parameterGroup, resolveToken(block.links)));
         } else if (isStructureConclusion(block)) {
           section.append(...structureConclusionContent(chapter, block, sources));
         } else if ((!structureInspection || hasLegacyStructureInspection(block)) &&
