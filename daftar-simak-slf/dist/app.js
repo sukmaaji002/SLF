@@ -331,6 +331,8 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
   const input = el("input");
   input.type = "file";
   input.accept = "image/*";
+  const upload = item.buildingUse ? button(labelText, () => input.click()) : undefined;
+  input.hidden = Boolean(upload);
   const feedback = el("span", "photo-feedback", row[property] || "");
   feedback.setAttribute("role", "status");
   const preview = el("img", "photo-preview");
@@ -360,6 +362,7 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     version++;
     photoWrites++;
     input.disabled = remove.disabled = true;
+    if (upload) upload.disabled = true;
     try {
       await photoStore(file ? "put" : "delete", key, file);
       row[property] = file?.name || "";
@@ -373,6 +376,7 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     } finally {
       photoWrites--;
       input.disabled = remove.disabled = false;
+      if (upload) upload.disabled = false;
       input.value = "";
     }
   }
@@ -390,8 +394,12 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     }).catch(() => { feedback.textContent = "Foto gagal dibuka."; });
   }
   wrapper.dispose = () => show(null);
-  label.append(input);
-  wrapper.append(label, feedback, remove, preview);
+  if (upload) wrapper.append(upload, input);
+  else {
+    label.append(input);
+    wrapper.append(label);
+  }
+  wrapper.append(feedback, remove, preview);
   return wrapper;
 }
 
@@ -502,7 +510,8 @@ function renderItem(item) {
         onRowChange();
       }, context, item);
       explanation.label.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
-      group.append(field(fields.V, row, onRowChange, context, item).label, status.label, explanation.label);
+      group.append(field(fields.V, row, onRowChange, context, item).label,
+        attachPhoto(item, row, onRowChange, "Unggah foto dokumentasi"), status.label, explanation.label);
       const extras = dom("div", { className: "form-grid" });
       const optional = [
         ...(row.location?.trim() ? [["location", "Lokasi atau identitas sampel", "text"]] : []),
@@ -511,7 +520,6 @@ function renderItem(item) {
         fields.K, ["criterion", "Acuan yang digunakan", "long"], ["followUp", "Rekomendasi teknis", "long"],
       ];
       for (const definition of optional) extras.append(field(definition, row, onRowChange, context, item).label);
-      for (const [property, label] of photosFor(item)) extras.append(attachPhoto(item, row, onRowChange, label, property));
       group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
     } else {
       const definitions = definitionsFor(item);

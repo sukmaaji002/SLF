@@ -25,7 +25,7 @@
     const auth = params.has("trial") || embeddedAccount ? undefined : slfCloudClient()?.auth;
     const session = (await auth?.getSession().catch(() => null))?.data?.session;
     if (params.has("trial") || embeddedAccount || session) {
-      await import("./app.js?v=11");
+      await import("./app.js?v=12");
       document.body.hidden = false;
       auth?.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT") {
