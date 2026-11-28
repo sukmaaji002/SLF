@@ -62,14 +62,20 @@ const upkeep = [
   { title: "Tidak terjadwal", keys: ["unscheduled"], weight: 2 },
 ];
 
+function checklistPhotoColumn(item) {
+  if (item.fields.includes("U")) return "test";
+  if (item.fields.includes("V")) return "observation";
+  if (item.fields.includes("M")) return "measurement";
+  return "photo";
+}
+
 function simakFormColumns(item) {
   if (item.fields.includes("P")) return upkeep;
   const columns = [];
-  if (item.sampleFloor) columns.push({ title: "Lantai", keys: ["floor"], weight: .6 });
   if (item.fields.includes("S") || item.components || item.samples) {
     const title = item.indoorUse ? "Sampel ruang dalam" : item.outdoorUse ? "Sampel ruang luar" :
-      item.sampleFloor ? "Lokasi" : ((item.components && item.id !== "K.1-4-6") || item.id === "K.1-1-9") ? "Komponen" : "Sampel";
-    columns.push({ title, keys: ["location"], sample: true, weight: item.components ? 1.8 : 1.05 });
+      ((item.components && item.id !== "K.1-4-6") || item.id === "K.1-1-9") ? "Komponen" : "Sampel";
+    columns.push({ title, keys: item.sampleFloor ? ["floor", "location"] : ["location"], sample: true, weight: item.components ? 1.8 : 1.05 });
   }
   if (item.lightSource) columns.push({ title: "Sumber cahaya saat pengukuran", keys: ["lightSource"], weight: 1.3 });
   const order = item.category.code === "K.5" ? "MVDATCENUGK" : "VDATMCENUGK";
@@ -80,17 +86,20 @@ function simakFormColumns(item) {
       columns.push({ ...column, title: "Pengukuran dimensi dan arah bukaan", keys: ["measurement","direction"] });
     } else if (code === "M" && item.lightSource) {
       columns.push({ ...column, title: "Iluminansi (lux)" });
+    } else if (code === "M" && item.lightingMeasurement) {
+      columns.push({ ...column, title: "Pengukuran menggunakan peralatan" });
     } else if (code === "U" && item.fields.includes("N")) {
       columns.push({ ...column, title: "Pengujian kekuatan dan material (apabila diperlukan)" });
     } else columns.push(column);
   }
   if (item.fields.includes("F")) {
-    const type = item.fields.includes("U") ? "test" : item.fields.includes("V") ? "observation" :
-      item.fields.includes("M") ? "measurement" : "photo";
+    const type = checklistPhotoColumn(item);
     const evidence = columns.findIndex(({ keys }) => keys.includes(type));
     if (evidence >= 0) columns[evidence] = { ...columns[evidence], keys: [...columns[evidence].keys, "photo"] };
-    else columns.splice(Math.max(0, columns.findIndex(({keys}) => keys.includes("note"))), 0,
-      { title: "Pengamatan visual dan dokumentasi", keys: ["photo"], weight: 2.1 });
+    else {
+      const notes = columns.findIndex(({ keys }) => keys.includes("note"));
+      columns.splice(notes < 0 ? columns.length : notes, 0, { title: "Pengamatan visual", keys: ["photo"], weight: 2.1 });
+    }
   }
   return columns;
 }

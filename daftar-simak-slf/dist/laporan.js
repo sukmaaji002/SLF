@@ -41,11 +41,7 @@ function flattenChecklist(categories) {
   return categories.flatMap((category) => category.groups.flatMap((group, gi) =>
     group.items.map((item, ii) => ({ ...item, group, category, id: checklistItemId(category, gi, item, ii) }))));
 }
-function checklistItemsFor(checklist) {
-  return flattenChecklist(catalogForChecklist(checklist?.checks));
-}
-const checklistItems = checklistItemsFor();
-const allChecklistItems = [...checklistItems, ...flattenChecklist(catalog).filter(item => checklistHistoricalItems.has(item.id))];
+const checklistItems = flattenChecklist(catalog);
 const trialChapterCount = 2;
 const trialChecklistItems = checklistItems.slice(0, Math.floor(checklistItems.length / 4));
 const trialChecklistIds = new Set(trialChecklistItems.map(({ id }) => id));
@@ -70,7 +66,7 @@ let photoDatabase;
 
 function checklistPhotos(checklist) {
   const photos = [];
-  for (const { id } of allChecklistItems) {
+  for (const { id } of checklistItems) {
     for (const row of checklist.checks[id]?.rows ?? []) {
       for (const property of ["photo", "ndtPhoto"]) {
         if (row[property]) photos.push(id + ":" + row.key + ":" + property);
@@ -564,7 +560,7 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
   target.replaceChildren();
   if (trial) project = { ...project, chapters: project.chapters.slice(0, trialChapterCount) };
   const checklist = readChecklist(project.id);
-  const items = trial ? trialChecklistItems : checklistItemsFor(checklist);
+  const items = trial ? trialChecklistItems : checklistItems;
   const sources = reportSources(project, checklist);
   const resolveToken = (links, structural) => (original, name) => resolveReportLink(original, name, sources, links, structural);
   const coverFormat = (key, token) => key === "consultant" ? sources.get("cover:consultant")?.format :

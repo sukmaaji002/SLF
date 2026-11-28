@@ -6,62 +6,62 @@ const catalog = [
     code: "K.1", title: "Tata bangunan gedung", groups: [
       {
         code: "K.1.1", title: "Pemeriksaan Persyaratan Peruntukan Bangunan Gedung", items: [
-          {"no":"1","title":"Fungsi Bangunan Gedung","fields":"VCF","page":1,"buildingUse":true},
-          {"no":"2","title":"Pemanfaatan Setiap Ruang Dalam Bangunan Gedung","fields":"SVCF","page":1,"samples":["Ruang dalam 1","Ruang dalam 2"],"sampleTitle":"Ruang dalam","indoorUse":true},
-          {"no":"3","title":"Pemanfaatan Ruang Luar Pada Persil Bangunan Gedung","fields":"SVCF","page":1,"samples":["Ruang luar 1"],"sampleTitle":"Ruang luar","outdoorUse":true},
+          {"no":"1","title":"Fungsi Bangunan Gedung","fields":"VCFK","page":1,"buildingUse":true},
+          {"no":"2","title":"Pemanfaatan Setiap Ruang Dalam Bangunan Gedung","fields":"SVCFK","page":1,"samples":["Ruang dalam 1","Ruang dalam 2"],"sampleTitle":"Ruang dalam","indoorUse":true},
+          {"no":"3","title":"Pemanfaatan Ruang Luar Pada Persil Bangunan Gedung","fields":"SVCFK","page":1,"samples":["Ruang luar 1"],"sampleTitle":"Ruang luar","outdoorUse":true},
         ],
       },
       {
         code: "K.1.2", title: "Pemeriksaan Persyaratan Intensitas Bangunan Gedung", items: [
-          {"no":"1","title":"Luas Lantai Dasar Bangunan","fields":"CM","page":1,"unit":"m²"},
-          {"no":"2","title":"Luas Dasar Basemen","fields":"CM","page":1,"unit":"m²"},
-          {"no":"3","title":"Luas Total Lantai Bangunan","fields":"CM","page":1,"unit":"m²"},
-          {"no":"4","title":"Jumlah Lantai Bangunan","fields":"CM","page":1,"unit":"lantai"},
-          {"no":"5","title":"Jumlah Lantai Basemen","fields":"CM","page":2,"unit":"lantai"},
-          {"no":"6","title":"Ketinggian Bangunan","fields":"CM","page":2,"unit":"m"},
-          {"no":"7","title":"Luas Daerah Hijau Dalam Persil","fields":"CM","page":2,"unit":"m²"},
-          {"no":"8","title":"Jarak Sempadan Jalan/Sungai/Pantai/Danau/Rel Kereta Api/Jalur Tegangan Tinggi","fields":"CM","page":2,"unit":"m","components":["Jalan","Sungai","Pantai","Danau","Rel Kereta Api","Jalur Tegangan Tinggi","Saluran / irigasi"]},
-          {"no":"9","title":"Jarak Bangunan Gedung Dengan Batas Persil","fields":"CM","page":2,"unit":"m","components":["Batas kiri","Batas kanan","Batas belakang","Batas depan"]},
-          {"no":"10","title":"Jarak Antar Bangunan","fields":"SMC","page":2,"unit":"m","samples":["Bangunan 1","Bangunan 2","Bangunan 3"],"sampleTitle":"Bangunan"},
+          {"no":"1","title":"Luas Lantai Dasar Bangunan","fields":"CMFK","page":1,"unit":"m²"},
+          {"no":"2","title":"Luas Dasar Basemen","fields":"CMFK","page":1,"unit":"m²"},
+          {"no":"3","title":"Luas Total Lantai Bangunan","fields":"CMFK","page":1,"unit":"m²"},
+          {"no":"4","title":"Jumlah Lantai Bangunan","fields":"CMFK","page":1,"unit":"lantai"},
+          {"no":"5","title":"Jumlah Lantai Basemen","fields":"CMFK","page":2,"unit":"lantai"},
+          {"no":"6","title":"Ketinggian Bangunan","fields":"CMFK","page":2,"unit":"m"},
+          {"no":"7","title":"Luas Daerah Hijau Dalam Persil","fields":"CMFK","page":2,"unit":"m²"},
+          {"no":"8","title":"Jarak Sempadan Jalan/Sungai/Pantai/Danau/Rel Kereta Api/Jalur Tegangan Tinggi","fields":"CMK","page":2,"unit":"m","components":["Jalan","Sungai","Pantai","Danau","Rel Kereta Api","Jalur Tegangan Tinggi","Saluran / irigasi"]},
+          {"no":"9","title":"Jarak Bangunan Gedung Dengan Batas Persil","fields":"CMK","page":2,"unit":"m","components":["Batas kiri","Batas kanan","Batas belakang","Batas depan"]},
+          {"no":"10","title":"Jarak Antar Bangunan","fields":"SMCK","page":2,"unit":"m","samples":["Bangunan 1","Bangunan 2","Bangunan 3"],"sampleTitle":"Bangunan"},
         ],
       },
       {
         code: "K.1.3", title: "Pemeriksaan Penampilan Bangunan Gedung", items: [
-          {"no":"1","title":"Bentuk Bangunan Gedung","fields":"C","page":3},
-          {"no":"2","title":"Bentuk Denah Bangunan Gedung","fields":"C","page":3},
-          {"no":"3","title":"Tampak bangunan","fields":"C","page":3},
-          {"no":"4","title":"Bentuk dan Penutup Atap Bangunan Gedung","fields":"DC","page":3},
-          {"no":"5","title":"Profil, Detail, dan Material Bangunan","fields":"SDC","page":3},
-          {"no":"6","title":"Batas Fisik Atau Pagar Pekarangan","fields":"SDC","page":3},
-          {"no":"7","title":"Kulit Atau Selubung Bangunan","fields":"SDC","page":3},
+          {"no":"1","title":"Bentuk Bangunan Gedung","fields":"CK","page":3},
+          {"no":"2","title":"Bentuk Denah Bangunan Gedung","fields":"CK","page":3},
+          {"no":"3","title":"Tampak bangunan","fields":"CK","page":3},
+          {"no":"4","title":"Bentuk dan Penutup Atap Bangunan Gedung","fields":"DCK","page":3},
+          {"no":"5","title":"Profil, Detail, dan Material Bangunan","fields":"SDCK","page":3},
+          {"no":"6","title":"Batas Fisik Atau Pagar Pekarangan","fields":"SDCK","page":3},
+          {"no":"7","title":"Kulit Atau Selubung Bangunan","fields":"SDCK","page":3},
         ],
       },
       {
         code: "K.1.4", title: "Pemeriksaan Tata Ruang-Dalam Bangunan Gedung", items: [
-          {"no":"1","title":"Kebutuhan Ruang Utama","fields":"C","page":3},
-          {"no":"2","title":"Bidang-Bidang Dinding","fields":"SDC","page":3},
-          {"no":"3","title":"Dinding-Dinding Penyekat","fields":"SDC","page":3},
-          {"no":"4","title":"Pintu/Jendela","fields":"SDC","page":3,"sampleFloor":true},
-          {"no":"5","title":"Tinggi Ruang","fields":"SMC","page":3,"unit":"m"},
-          {"no":"6","title":"Tinggi Lantai Dasar","fields":"CM","page":4,"unit":"m"},
-          {"no":"7","title":"Ruang Rongga Atap","fields":"DC","page":4},
-          {"no":"8","title":"Penutup Lantai","fields":"SDC","page":4,"sampleFloor":true},
-          {"no":"9","title":"Penutup Langit-Langit","fields":"SDC","page":4},
+          {"no":"1","title":"Kebutuhan Ruang Utama","fields":"CK","page":3},
+          {"no":"2","title":"Bidang-Bidang Dinding","fields":"SDCK","page":3},
+          {"no":"3","title":"Dinding-Dinding Penyekat","fields":"SDCK","page":3},
+          {"no":"4","title":"Pintu/Jendela","fields":"SDCK","page":3,"sampleFloor":true},
+          {"no":"5","title":"Tinggi Ruang","fields":"SMCFK","page":3,"unit":"m"},
+          {"no":"6","title":"Tinggi Lantai Dasar","fields":"CMFK","page":4,"unit":"m"},
+          {"no":"7","title":"Ruang Rongga Atap","fields":"DCK","page":4},
+          {"no":"8","title":"Penutup Lantai","fields":"SDCK","page":4,"sampleFloor":true},
+          {"no":"9","title":"Penutup Langit-Langit","fields":"SDCK","page":4},
         ],
       },
       {
         code: "K.1.5", title: "Pemeriksaan Keseimbangan, Keserasian dan Keselarasan Dengan Lingkungan", items: [
-          {"no":"1","title":"Tinggi (Peil) Pekarangan","fields":"CM","page":4,"unit":"m"},
-          {"no":"2","title":"Ruang Terbuka Hijau Pekarangan","fields":"CM","page":4,"unit":"m²"},
-          {"no":"3","title":"Pemanfaatan Ruang Sempadan Bangunan","fields":"CM","page":4},
-          {"no":"4","title":"Daerah Hijau Bangunan","fields":"CM","page":4},
-          {"no":"5","title":"Tata Tanaman","fields":"DC","page":4},
-          {"no":"6","title":"Tata Perkerasan Pekarangan","fields":"DC","page":4},
-          {"no":"7","title":"Sirkulasi Manusia dan Kendaraan","fields":"DC","page":5,"components":["Sirkulasi manusia","Sirkulasi kendaraan"]},
-          {"no":"8","title":"Jalur Utama Pedestrian","fields":"DC","page":5},
-          {"no":"9","title":"Perabot Lanskap (Landscape Furniture)","fields":"SDC","page":5},
-          {"no":"10","title":"Pertandaan (Signage)","fields":"SDC","page":5},
-          {"no":"11","title":"Pencahayaan Ruang Luar Bangunan Gedung","fields":"SDC","page":5},
+          {"no":"1","title":"Tinggi (Peil) Pekarangan","fields":"CMFK","page":4,"unit":"m"},
+          {"no":"2","title":"Ruang Terbuka Hijau Pekarangan","fields":"CMFK","page":4,"unit":"m²"},
+          {"no":"3","title":"Pemanfaatan Ruang Sempadan Bangunan","fields":"CMFK","page":4},
+          {"no":"4","title":"Daerah Hijau Bangunan","fields":"CMFK","page":4},
+          {"no":"5","title":"Tata Tanaman","fields":"DCK","page":4},
+          {"no":"6","title":"Tata Perkerasan Pekarangan","fields":"DCK","page":4},
+          {"no":"7","title":"Sirkulasi Manusia dan Kendaraan","fields":"DCK","page":5,"components":["Sirkulasi manusia","Sirkulasi kendaraan"]},
+          {"no":"8","title":"Jalur Utama Pedestrian","fields":"SDCK","page":5},
+          {"no":"9","title":"Perabot Lanskap (Landscape Furniture)","fields":"SDCK","page":5},
+          {"no":"10","title":"Pertandaan (Signage)","fields":"SDCK","page":5},
+          {"no":"11","title":"Pencahayaan Ruang Luar Bangunan Gedung","fields":"SDCK","page":5},
         ],
       },
     ],
@@ -108,7 +108,7 @@ const catalog = [
         code: "c)", title: "Proteksi Bahaya Kebakaran — Sistem Evakuasi Darurat", items: [
           {"no":"17","title":"Tangga Kebakaran","fields":"SDCUFK","page":9},
           {"no":"18","title":"Pintu Kebakaran","fields":"SDCUFK","page":9},
-          {"no":"19","title":"Bukan Penyelamatan","fields":"SDCUFK","page":9},
+          {"no":"19","title":"Bukaan Penyelamatan","fields":"SDCUFK","page":9},
           {"no":"20","title":"Lift Kebakaran","fields":"SDCUFK","page":9},
           {"no":"21","title":"Penerangan Darurat","fields":"SDCUFK","page":9},
           {"no":"22","title":"Tanda Petunjuk Arah Keluar","fields":"SDCUFK","page":10},
@@ -124,7 +124,7 @@ const catalog = [
         ],
       },
       {
-        code: "B.3", title: "Pemeriksaan Sistem Penangkal Petir", items: [
+        code: "K.2.3", title: "Pemeriksaan Sistem Penangkal Petir", items: [
           {"no":"1","title":"Sistem Kepala Penangkal Petir","fields":"SDCUFK","page":10},
           {"no":"2","title":"Sistem Hantaran Penangkal petir","fields":"SDCUFK","page":11},
           {"no":"3","title":"Sistem Pembumian","fields":"SDCUFK","page":11},
@@ -139,7 +139,7 @@ const catalog = [
         ],
       },
       {
-        code: "K.2.4", title: "Pengamanan Bahan Peledak", items: [
+        code: "K.2.5", title: "Pengamanan Bahan Peledak", items: [
           {"no":"1","title":"Prosedur Pengamanan Bahan Peledak","fields":"SCUFKT","page":12},
           {"no":"2","title":"Peralatan Pengamanan Bahan Peledak","fields":"SCUFKT","page":12},
           {"no":"3","title":"Petugas Pengamanan bahan Peledak","fields":"SCUFKT","page":12},
@@ -162,8 +162,9 @@ const catalog = [
         code: "K.3.2", title: "Pemeriksaan Sistem Pencahayaan", items: [
           {"no":"1","title":"Sistem Pencahayaan Alami","fields":"SDCUFK","page":13},
           {"no":"2","title":"Sistem Pencahayaan Buatan","fields":"SDCUFK","page":13},
-          {"no":"3","title":"Luminansi Pencahayaan Alami","fields":"SMK","page":13},
-          {"no":"4","title":"Luminansi Pencahayaan Buatan","fields":"SMK","page":13},
+          {"no":"3","title":"Pengukuran Pencahayaan Alami","fields":"SMK","page":13,"lightingMeasurement":true},
+          {"no":"4","title":"Pengukuran Pencahayaan Buatan","fields":"SMK","page":13,"lightingMeasurement":true},
+          {"id":"K.3-1-4","no":"","title":"Iluminansi per lokasi","fields":"SMFK","page":13,"unit":"lux","lightSource":true},
         ],
       },
       {
@@ -183,21 +184,21 @@ const catalog = [
         ],
       },
       {
-        code: "K.3.5", title: "Pemeriksaan Sistem Pengelolaan Air Kotor dan/atau Air Limbah (Black Water)", items: [
+        code: "K.3.5", title: "Pemeriksaan Pengelolaan Air Kotor dan/atau Air Limbah dalam Persil", items: [
           {"no":"1","title":"Inlet Pembuangan","fields":"SDCUFK","page":14},
           {"no":"2","title":"Penampungan Sementara Dalam Persil","fields":"SDCUFK","page":14},
           {"no":"3","title":"Pengolahan Dalam Persil","fields":"SDCUFK","page":15},
         ],
       },
       {
-        code: "K.3.6", title: "Pemeriksaan Sistem Pengelolaan Air Hujan (Grey Water)", items: [
+        code: "K.3.6", title: "Pemeriksaan Sistem Pengelolaan Air Hujan", items: [
           {"no":"1","title":"Sistem Penangkap Air Hujan, Termasuk Talang","fields":"SDCUFK","page":15},
           {"no":"2","title":"Sistem Penyalur Air Hujan, Termasuk Pipa Tegak dan Drainase Dalam Persil","fields":"SDCUFK","page":15},
           {"no":"3","title":"Sistem Penampungan, Pengolahan, Peresapan Dan/Atau Pembuangan Air Hujan","fields":"SDCUFK","page":15},
         ],
       },
       {
-        code: "K.3.7", title: "Pemeriksaan Sistem Pengelolaan Air Hujan (Grey Water)", items: [
+        code: "K.3.7", title: "Pemeriksaan Penggunaan Bahan Bangunan", items: [
           {"no":"1","title":"Bahan Bangunan yang Mengandung Bahan berbahaya/Beracun","fields":"SACUFK","page":15},
           {"no":"2","title":"Bahan Bangunan yang Menyebabkan Efek Silau Dan Pantulan","fields":"SACUFK","page":15},
           {"no":"3","title":"Bahan Bangunan yang Menyebabkan Efek Peningkatan Suhu","fields":"SACUFK","page":15},
@@ -206,6 +207,14 @@ const catalog = [
       {
         code: "K.3.8", title: "Pemeriksaan Sistem Gas Medik", items: [
           {"no":"","title":"Sistem Gas Medik","fields":"SDCUFK","page":16},
+        ],
+      },
+      {
+        code: "K.3.9", title: "Pemeriksaan Pengelolaan Sampah",
+        items: [
+          { id: "K.3-8-0", no: "1", title: "Pewadahan dan pemilahan sampah", fields: "SADCFK" },
+          { id: "K.3-8-1", no: "2", title: "Penampungan sementara sampah", fields: "SADCFK" },
+          { id: "K.3-8-2", no: "3", title: "Pengolahan atau pengangkutan sampah", fields: "SADCFK" },
         ],
       },
     ],
@@ -278,40 +287,6 @@ const catalog = [
   },
 ];
 
-const checklistIlluminance = {
-  id: "K.3-1-4", no: "3", title: "Iluminansi per lokasi", fields: "SMFK", page: 13, unit: "lux",
-  lightSource: true,
-};
-const checklistWaste = {
-  code: "K.3.9", title: "Pemeriksaan Pengelolaan Sampah",
-  items: [
-    { id: "K.3-8-0", no: "1", title: "Pewadahan dan pemilahan sampah", fields: "SADCFK" },
-    { id: "K.3-8-1", no: "2", title: "Penampungan sementara sampah", fields: "SADCFK" },
-    { id: "K.3-8-2", no: "3", title: "Pengolahan atau pengangkutan sampah", fields: "SADCFK" },
-  ],
-};
-const checklistHistoricalItems = new Set([
-  "K.3-1-2", "K.3-1-3", "K.3-4-0", "K.3-4-1", "K.3-4-2", "K.5-2-5",
-]);
-
 function checklistItemId(category, groupIndex, item, itemIndex) {
   return item.id ?? category.code + "-" + groupIndex + "-" + itemIndex;
-}
-
-function catalogForChecklist(checks = {}) {
-  return catalog.map(category => {
-    if (!["K.3", "K.5"].includes(category.code)) return category;
-    const groups = category.groups.map((group, groupIndex) => {
-      const items = group.items.flatMap((item, itemIndex) => {
-        const id = checklistItemId(category, groupIndex, item, itemIndex);
-        if (!checklistHistoricalItems.has(id)) return [{ ...item, id }];
-        if (!checks[id]) return [];
-        return [{ ...item, id, title: item.title + " · isian sebelumnya" }];
-      });
-      if (category.code === "K.3" && groupIndex === 1) items.splice(2, 0, checklistIlluminance);
-      return { ...group, items };
-    }).filter(group => group.items.length);
-    if (category.code === "K.3") groups.push(checklistWaste);
-    return { ...category, groups };
-  });
 }

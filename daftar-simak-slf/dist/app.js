@@ -170,6 +170,7 @@ function field([key, title, type], data, onChange, context, item) {
       key === "location" && item?.indoorUse ? "Gudang utama, lantai 1" :
       key === "observation" && item?.indoorUse ? "ruang digunakan untuk menyimpan barang dalam rak" :
       key === "observation" && item?.buildingUse ? "bangunan digunakan sebagai gudang penyimpanan" :
+      key === "measurement" && item?.lightingMeasurement ? "150 lux (iluminansi)" :
       key === "measurement" && item?.unit ? "masukkan angka hasil ukur dalam " + item.unit :
       key === "location" && !item ? "Jl. Melati No. 10, Kota Contoh" :
       title === "Nama bangunan pembanding" ? "gedung servis di sisi timur" : checklistExamples[key];
@@ -332,12 +333,11 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
   if (trialMode) return el("p", "photo-lock wide", labelText + " · Perlu login");
   const wrapper = el("div", "photo-field wide");
   wrapper.classList.toggle("has-value", Boolean(row[property]));
-  const label = el("label", "", labelText);
   const input = el("input");
   input.type = "file";
   input.accept = "image/*";
-  const upload = item.category.code === "K.1" ? button(labelText, () => input.click()) : undefined;
-  input.hidden = Boolean(upload);
+  const upload = button(labelText, () => input.click());
+  input.hidden = true;
   const feedback = el("span", "photo-feedback", row[property] || "");
   feedback.setAttribute("role", "status");
   const preview = el("img", "photo-preview");
@@ -367,7 +367,7 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     version++;
     photoWrites++;
     input.disabled = remove.disabled = true;
-    if (upload) upload.disabled = true;
+    upload.disabled = true;
     try {
       await photoStore(file ? "put" : "delete", key, file);
       row[property] = file?.name || "";
@@ -381,7 +381,7 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     } finally {
       photoWrites--;
       input.disabled = remove.disabled = false;
-      if (upload) upload.disabled = false;
+      upload.disabled = false;
       input.value = "";
     }
   }
@@ -399,19 +399,14 @@ function attachPhoto(item, row, onChange, labelText, property = "photo") {
     }).catch(() => { feedback.textContent = "Foto gagal dibuka."; });
   }
   wrapper.dispose = () => show(null);
-  if (upload) wrapper.append(upload, input);
-  else {
-    label.append(input);
-    wrapper.append(label);
-  }
-  wrapper.append(feedback, remove, preview);
+  wrapper.append(upload, input, feedback, remove, preview);
   return wrapper;
 }
 
 function definitionsFor(item) {
   if (item.fields.includes("P")) return [...periodFields];
   const definitions = [];
-  for (const code of "VDATMCENUGK") {
+  for (const code of item.category.code === "K.5" ? "MVDATCENUGK" : "VDATMCENUGK") {
     if (!item.fields.includes(code)) continue;
     if (code === "M" && item.category.code === "K.5") {
       definitions.push(["measurement", "Dimensi"], ["direction", "Arah bukaan"]);
@@ -431,11 +426,11 @@ function definitionsFor(item) {
 }
 
 function photosFor(item) {
-  if (!projectMode && item.category.code !== "K.1" && !item.fields.includes("F")) return [];
   if (item.fields.includes("N")) {
-    return [["ndtPhoto", "Foto hasil pengujian non-destruktif"], ["photo", "Foto hasil pengujian kekuatan dan material"]];
+    return [["ndtPhoto", "Unggah foto uji non-destruktif", "ndt"],
+      ["photo", "Unggah foto uji kekuatan dan material", "test"]];
   }
-  return [["photo", item.fields.includes("U") ? "Foto hasil pengetesan / pengujian" : "Foto hasil pemeriksaan"]];
+  return [["photo", "Unggah foto dokumentasi", checklistPhotoColumn(item)]];
 }
 
 function renderItem(item) {
@@ -457,7 +452,7 @@ function renderItem(item) {
   }, item.title, item).label;
   const rows = el("div", "sample-list");
   const tataBangunan = item.category.code === "K.1";
-  const repeatable = item.fields.includes("S") || item.fields.includes("P") || (tataBangunan ? Boolean(item.components) : projectMode);
+  const repeatable = item.fields.includes("S") || item.fields.includes("P") || Boolean(item.components);
   const addLabel = item.indoorUse ? "Tambah ruang dalam" : item.outdoorUse ? "Tambah ruang luar" :
     item.fields.includes("P") || (tataBangunan && item.components) ? "Tambah komponen" : "Tambah sampel";
   const add = repeatable ? button(addLabel, () => {
@@ -515,38 +510,42 @@ function renderItem(item) {
         setTextFormat(row, "conformity", undefined);
       }
       if (previous) row.conformity = choice || "";
-      const explanation = field(nonconformity, row, onRowChange, context, item);
-      const status = field(fields.C, row, () => {
-        explanation.label.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
+    }
+    const definitions = definitionsFor(item);
+    if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
+    const photos = photosFor(item);
+    const evidence = item.fields.includes("F") ? photos : [];
+    let explanation;
+    const syncExplanation = () => {
+      if (explanation) explanation.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
+    };
+    for (const definition of definitions) {
+      const [key] = definition;
+      const { label } = field(definition, row, () => {
+        if (key === "conformity") syncExplanation();
         onRowChange();
       }, context, item);
-      explanation.label.hidden = row.conformity !== "Tidak sesuai" && !row.nonconformity?.trim();
-      for (const definition of definitionsFor(item)) {
-        if (!["conformity", "nonconformity"].includes(definition[0])) group.append(field(definition, row, onRowChange, context, item).label);
+      if (key === "nonconformity") {
+        explanation = label;
+        syncExplanation();
       }
-      if (item.fields.includes("F")) group.append(attachPhoto(item, row, onRowChange, "Unggah foto dokumentasi"));
-      group.append(status.label, explanation.label);
-      const extras = dom("div", { className: "form-grid" });
-      const optional = [
-        ...(!repeatable && row.location?.trim() ? [["location", "Lokasi atau identitas sampel", "text"]] : []),
-        ...(!item.fields.includes("M") && row.measurement?.trim() ? [["measurement", "Hasil ukur dan satuan", "long"]] : []),
-        ...(row.conformityNote?.trim() ? [["conformityNote", "Catatan kesesuaian sebelumnya", "long"]] : []),
-        fields.K, ["criterion", "Acuan yang digunakan", "long"], ["followUp", "Rekomendasi teknis", "long"],
-      ];
-      for (const definition of optional) extras.append(field(definition, row, onRowChange, context, item).label);
-      if (!item.fields.includes("F")) extras.append(attachPhoto(item, row, onRowChange, "Unggah foto dokumentasi"));
-      group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
-    } else {
-      const definitions = definitionsFor(item);
-      if (item.lightSource) definitions.unshift(["lightSource", "Sumber cahaya saat pengukuran", ["Alami", "Buatan", "Gabungan"]]);
-      if (projectMode) {
-        if (!item.fields.includes("M") && !item.fields.includes("P")) definitions.push(["measurement", "Hasil ukur dan satuan", "long"]);
-        definitions.push(["criterion", "Acuan yang digunakan (opsional)", "long"],
-          ["followUp", "Rekomendasi teknis (opsional)", "long"]);
+      group.append(label);
+      for (const [property, text, column] of evidence) {
+        if (column === key) group.append(attachPhoto(item, row, onRowChange, text, property));
       }
-      for (const definition of definitions) group.append(field(definition, row, onRowChange, context, item).label);
-      for (const [property, label] of photosFor(item)) group.append(attachPhoto(item, row, onRowChange, label, property));
     }
+    if (evidence[0]?.[2] === "photo") group.append(attachPhoto(item, row, onRowChange, evidence[0][1]));
+    const extras = dom("div", { className: "form-grid" });
+    const optional = [
+      ...(!repeatable && row.location?.trim() ? [["location", "Lokasi atau identitas sampel", "text"]] : []),
+      ...(!item.fields.includes("M") && row.measurement?.trim() ? [["measurement", "Hasil ukur dan satuan", "long"]] : []),
+      ...(!item.fields.includes("K") && row.note?.trim() ? [fields.K] : []),
+      ...(row.conformityNote?.trim() ? [["conformityNote", "Catatan kesesuaian sebelumnya", "long"]] : []),
+      ["criterion", "Acuan yang digunakan", "long"], ["followUp", "Rekomendasi teknis", "long"],
+    ];
+    for (const definition of optional) extras.append(field(definition, row, onRowChange, context, item).label);
+    if (!evidence.length) extras.append(attachPhoto(item, row, onRowChange, photos[0][1]));
+    group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
     sample.append(group);
     if (Number(row.key) > item.initialCount) {
       const remove = button("Hapus " + (item.fields.includes("P") ? "komponen" : "sampel"), async () => {
@@ -570,7 +569,7 @@ function renderItem(item) {
 }
 
 function renderCatalog() {
-  for (const source of catalogForChecklist(state.checks)) {
+  for (const source of catalog) {
     const section = { ...source, groups: [], node: el("section", "catalog-section") };
     section.node.id = "bagian-" + source.code.replace(".", "");
     const title = source.code + " " + source.title;
@@ -601,7 +600,7 @@ function renderCatalog() {
           entry.group.node.open = true;
           entry.node.open = true;
         });
-        const note = el("p", "inspection-reference", "Untuk tempat sampah, isi ");
+        const note = el("p", "inspection-reference", "Untuk pemilahan dan pengelolaan sampah, lihat ");
         note.append(wasteLink, " di aspek Kesehatan.");
         group.node.append(note);
       }
@@ -737,7 +736,7 @@ async function prepareSimakPaper() {
   const snapshot = { ...structuredClone(state), identity: effectiveChecklistIdentity(projectCover(), state.identity) };
   await renderSimakForm(draft, snapshot, {
     tegal: tegalReference, photoUrls: urls, loadPhoto: trialMode ? undefined : (key) => photoStore("get", key),
-    items: trialMode ? trialChecklistItems : checklistItemsFor(snapshot),
+    items: trialMode ? trialChecklistItems : checklistItems,
   });
   if (urls !== simakPhotoUrls) {
     urls.forEach((url) => URL.revokeObjectURL(url));

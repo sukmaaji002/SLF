@@ -267,7 +267,7 @@ async function slfChangeAccount(user) {
       }
       if (openRequested && (query.get("bagian") === "simak" || current().workflowVersion === 2)) {
         active = "checklist";
-        slfChecklistItem = allChecklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
+        slfChecklistItem = checklistItems.some(({ id }) => id === query.get("butir")) ? query.get("butir") : "";
       }
     } else {
       slfCloudStatus(user ? "Akun terbuka di tab lain. Sinkronisasi dilanjutkan otomatis setelah tab itu ditutup." : "");

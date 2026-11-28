@@ -1412,7 +1412,7 @@ function renderChecklistMap(project) {
     const checklist = readChecklist(project.id);
     const term = tokenName(search.value);
     const rows = [];
-    for (const item of checklistItemsFor(checklist)) {
+    for (const item of checklistItems) {
       const reference = checklistReference(item.id, project.intensity?.region === "tegal");
       const label = item.group.code + " · " + item.title;
       if (!tokenName(label + " " + reference).includes(term)) continue;
@@ -1465,13 +1465,13 @@ function refreshChecklistViews() {
 }
 
 function checklistFollowUpEditor(project, checklist) {
-  const rows = checklistFollowUpRows(checklistItemsFor(checklist), checklist, item => checklistEditorLink(project, item.id, item.title));
+  const rows = checklistFollowUpRows(checklistItems, checklist, item => checklistEditorLink(project, item.id, item.title));
   return rows.length ? editorTable(checklistFollowUpColumns, rows) : dom("p", { className: "hint" }, "Belum ada rekomendasi teknis yang dicatat di daftar simak.");
 }
 
 function editorChecklistTable(project, checklist, blockIndex) {
   const rows = [];
-  for (const item of checklistItemsFor(checklist)) {
+  for (const item of checklistItems) {
     if (!checklistDestinations(project, item).some(to => to.chapter === active && to.block === blockIndex)) continue;
     const check = checklist.checks[item.id];
     const locked = isTrial() && !trialChecklistIds.has(item.id);
@@ -1713,7 +1713,7 @@ function renderChapter(project) {
     editor.append(dom("p", { className: "lead" }, "Mulai dari Tampilan di laporan. Pilih bagian bertanda Isi untuk melengkapi data, atau buka Ubah teks dan format untuk menyunting kalimat."));
   }
   const checklist = readChecklist(project.id);
-  const mapped = new Set(checklistItemsFor(checklist).flatMap(item => checklistDestinations(project, item))
+  const mapped = new Set(checklistItems.flatMap(item => checklistDestinations(project, item))
     .filter((destination) => destination?.chapter === index).map(({ block }) => block));
   function appendChecklist(blockIndex) {
     if (!mapped.has(blockIndex)) return;
@@ -2868,7 +2868,7 @@ function validateBackup(data) {
     project.cover.image = source.cover.image;
   }
   const checks = {};
-  for (const { id } of allChecklistItems) {
+  for (const { id } of checklistItems) {
     const check = data.checklist?.checks?.[id];
     if (!check) continue;
     valid(Array.isArray(check.rows) && Number.isSafeInteger(check.nextRow) && check.nextRow > 0);
