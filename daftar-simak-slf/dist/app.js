@@ -458,7 +458,7 @@ function renderItem(item, showRemoved = false) {
     dom("summary", {}, "Parameter yang dihapus (" + removedRows.length + ")")) : undefined;
   if (removed) {
     for (const row of removedRows) {
-      const name = row.location?.trim() || row.component?.trim() || row.label || "Parameter " + row.key;
+      const name = ((item.components || row.renamed) && row.label) || row.location?.trim() || row.component?.trim() || row.label || "Parameter " + row.key;
       const restore = button("Pulihkan " + name, () => {
         if (photoWrites) return;
         delete row.excluded;
@@ -511,7 +511,47 @@ function renderItem(item, showRemoved = false) {
       change();
     };
     const context = [item.title, row.label].filter(Boolean).join(", ");
-    if (row.label) sample.append(el("h4", "", row.label));
+    const editableName = repeatable || Number(row.key) > item.initialCount;
+    if (editableName) {
+      sample.dataset.rowKey = row.key;
+      const name = row.label || "Parameter " + row.key;
+      const input = dom("input", { type: "text", value: row.label || "", required: true, ariaLabel: "Nama parameter" });
+      const saveName = dom("button", { type: "submit" }, "Simpan nama");
+      const rename = button("Ubah nama", () => {
+        input.value = row.label || "";
+        editor.hidden = false;
+        input.focus();
+        input.select();
+      });
+      rename.className = "rename-parameter";
+      rename.setAttribute("aria-label", "Ubah nama " + name);
+      const closeEditor = () => {
+        editor.hidden = true;
+        rename.focus();
+      };
+      const editor = dom("form", { className: "parameter-name-editor", hidden: true },
+        dom("label", {}, "Nama parameter", input),
+        dom("div", { className: "parameter-name-actions" }, saveName, button("Batal", closeEditor)));
+      editor.addEventListener("submit", event => {
+        event.preventDefault();
+        const updated = input.value.trim();
+        if (!updated || photoWrites) return;
+        if (updated !== row.label) {
+          row.label = updated;
+          row.renamed = true;
+          change();
+        }
+        renderItem(item);
+        item.body.querySelector('[data-row-key="' + row.key + '"] .rename-parameter')?.focus();
+      });
+      editor.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeEditor();
+      });
+      sample.append(dom("div", { className: "parameter-heading" }, el("h4", "", name), rename), editor);
+    } else if (row.label) sample.append(el("h4", "", row.label));
     if (item.sampleFloor) group.append(field(["floor", "Lantai"], row, onRowChange, context, item).label);
     if (repeatable && !item.fields.includes("P") && item.title !== "Jarak Antar Bangunan") {
       const locationLabel = item.indoorUse ? "Nama ruang dalam" : item.outdoorUse ? "Nama ruang luar" :
@@ -567,8 +607,8 @@ function renderItem(item, showRemoved = false) {
     if (!evidence.length) extras.append(attachPhoto(item, row, onRowChange, photos[0][1]));
     group.append(dom("details", { className: "wide" }, dom("summary", {}, "Catatan dan bukti tambahan"), extras));
     sample.append(group);
-    if (repeatable || Number(row.key) > item.initialCount) {
-      const name = row.location?.trim() || row.component?.trim() || row.label || "parameter " + row.key;
+    if (editableName) {
+      const name = ((item.components || row.renamed) && row.label) || row.location?.trim() || row.component?.trim() || row.label || "parameter " + row.key;
       const remove = button("Hapus parameter", () => {
         if (photoWrites) return;
         row.excluded = true;

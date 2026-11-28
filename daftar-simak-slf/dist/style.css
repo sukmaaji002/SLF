@@ -113,6 +113,11 @@ summary { cursor: pointer; font-weight: 700; }
 .applicable input { appearance: auto; min-height: 0; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--dark); }
 .sample { padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; }
 .sample h4 { margin: 0 0 9px; }
+.parameter-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.parameter-heading h4 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.parameter-heading button { flex-shrink: 0; }
+.parameter-name-editor { margin-bottom: 12px; }
+.parameter-name-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .photo-field { display: grid; align-items: start; justify-items: start; gap: 6px; }
 .photo-field label { width: 100%; }
 .photo-feedback { font-size: .875rem; color: var(--muted); overflow-wrap: anywhere; }

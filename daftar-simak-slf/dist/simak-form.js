@@ -205,7 +205,12 @@ async function renderSimakForm(target, checklist, settings = {}) {
     const visited = new Set();
     const cells = columns.map((column) => {
       const parts = [];
-      if (column.sample && !(item.category.code === "K.1" && row.location?.trim())) parts.push(row.label || row.key || "");
+      const location = row.location?.trim();
+      const includeName = !location || ((item.components || row.renamed) ?
+        row.label?.trim() !== location : item.category.code !== "K.1");
+      if (column.sample && includeName) {
+        parts.push(row.label || row.key || "");
+      }
       for (const [index, key] of column.keys.entries()) {
         visited.add(key);
         const value = row[key]?.trim();

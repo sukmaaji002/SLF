@@ -2876,6 +2876,7 @@ function validateBackup(data) {
       valid(typeof row?.key === "string" && /^\d+$/.test(row.key) && Number(row.key) < check.nextRow);
       const restored = pickText(row, ["key", "label", ...Object.keys(checklistLabels)]);
       if (row.excluded === true) restored.excluded = true;
+      if (row.renamed === true) restored.renamed = true;
       return restored;
     });
     valid(new Set(rows.map((row) => row.key)).size === rows.length);

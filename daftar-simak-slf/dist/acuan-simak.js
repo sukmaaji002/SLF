@@ -154,12 +154,19 @@ function checklistDestinations(project, item) {
   return destinations;
 }
 
+function checklistRowLocation(item, row) {
+  const location = row.location?.trim();
+  const name = row.label?.trim();
+  const parts = item.components || row.renamed ? [name, location, row.component?.trim()] : [location || name, row.component?.trim()];
+  return [...new Set(parts.filter(Boolean))].join(" · ");
+}
+
 function checklistFollowUpRows(items, checklist, link) {
   return items.flatMap(item => {
     const check = checklist.checks[item.id];
     if (!check || check.na) return [];
     return activeChecklistRows(check).filter(row => row.followUp?.trim()).map(row => [
-      link(item), [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · "),
+      link(item), checklistRowLocation(item, row),
       formattedValue(row.followUp, getTextFormat(row, "followUp")),
     ]);
   });
@@ -173,7 +180,7 @@ function checklistReportResult(item, check) {
   const fields = checklistSummaryOrder.filter(key => !["location", "component", "photo", "ndtPhoto"].includes(key));
   for (const row of activeChecklistRows(check)) {
     if (!checklistSummaryOrder.some(key => row[key]?.trim())) continue;
-    const location = [row.location?.trim() || row.label?.trim(), row.component?.trim()].filter(Boolean).join(" · ");
+    const location = checklistRowLocation(item, row);
     const details = dom("div", {});
     if (location) details.append(dom("strong", {}, location));
     for (const key of fields) {
