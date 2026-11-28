@@ -195,17 +195,32 @@ function field([key, title, type], data, onChange, context, item) {
 
 function renderIdentity() {
   const defaults = effectiveChecklistIdentity(projectCover());
+  const ownerAddress = () => state.identity.ownerAddress?.trim() || "";
+  let copyAddress;
   for (const [id, definitions] of [
     ["owner-fields", ownerFields], ["condition-fields", conditionFields], ["building-fields", buildingFields],
   ]) {
     const wrapper = byId(id);
     wrapper.replaceChildren();
     for (const definition of definitions) {
-      const { label, control } = field(definition, state.identity, save);
       const key = definition[0];
+      const { label, control } = field(definition, state.identity, () => {
+        if (key === "ownerAddress") copyAddress.disabled = !ownerAddress();
+        save();
+      });
       if (defaults[key]) control.placeholder = "Dari Sampul: " + defaults[key];
       if (key === "date") control.id = "tanggal-pemeriksaan";
-      wrapper.append(label);
+      if (key === "location") {
+        copyAddress = button("Sama dengan alamat pemilik", () => {
+          const address = ownerAddress();
+          if (!address) return;
+          control.value = address;
+          control.dispatchEvent(new Event("input", { bubbles: true }));
+          focusTextField(control);
+        });
+        copyAddress.disabled = !ownerAddress();
+        wrapper.append(dom("div", { className: "building-location-field" }, copyAddress, label));
+      } else wrapper.append(label);
     }
   }
 }

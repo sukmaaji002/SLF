@@ -6,7 +6,7 @@
   <meta name="description" content="Form kajian pemeriksaan bangunan gedung untuk Sertifikat Laik Fungsi.">
   <meta name="theme-color" content="#f3f5f8">
   <title>Daftar Simak SLF</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
   <link rel="stylesheet" href="format-teks.css">
   <link rel="stylesheet" href="ruang-kerja.css">
   <link rel="stylesheet" href="ponsel.css">
@@ -25,7 +25,7 @@
     const auth = params.has("trial") || embeddedAccount ? undefined : slfCloudClient()?.auth;
     const session = (await auth?.getSession().catch(() => null))?.data?.session;
     if (params.has("trial") || embeddedAccount || session) {
-      await import("./app.js?v=8");
+      await import("./app.js?v=9");
       document.body.hidden = false;
       auth?.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT") {
