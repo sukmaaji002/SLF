@@ -596,8 +596,7 @@ function linkedText(project, data, key, label, getLinks, setLinks, initialSource
     Array.isArray(data.environmentAreas));
   const areaKey = environmentGuide ? "environmentAreas" : roomLayoutGuide ? "roomLayoutAreas" : undefined;
   if (areaKey && !data[key]?.trim()) textEditor.open = false;
-  const fireProtectionGuide = key === "body" && (data.mepSafetyPreset === "Proteksi kebakaran" ||
-    tokenName(data.text ?? "") === "proteksi kebakaran");
+  const fireProtectionGuide = key === "body" && isFireProtection(data);
   if (fireProtectionGuide) {
     details.open = true;
     const reportPreview = preview.parentElement;
@@ -2259,6 +2258,119 @@ function structureTestingEditor(block, isAttached) {
     dom("label", {}, "Apakah ada hasil pengujian atau analisis struktur?", status), details, note, preview);
 }
 
+function fireProtectionEditor(block, isAttached) {
+  const presets = choicesForInput(fireProtectionSystemToken);
+  const facilities = block.fireInspections ?? [];
+  const cards = dom("div", { className: "appearance-sections" });
+  const sets = new Map(facilities.map(facility => [tokenName(facility.name), facility]));
+  const byName = (name) => sets.get(tokenName(name));
+  const selected = () => facilities.filter(facility => facility.selected).map(facility => facility.name);
+  const fieldOptions = {
+    location: ["Koridor timur lantai 1", "text"],
+    observation: ["APAR tersedia, tetapi aksesnya terhalang kardus.", "area"],
+    followUp: ["Pindahkan penghalang, lalu cek kembali akses ke APAR.", "area"],
+    reference: ["Berita acara uji alarm BA-01 atau nomor butir daftar simak", "text"],
+  };
+
+  function locationCard(facility, entry, removeLocation) {
+    const controls = new Map(fireLocationFields.map(([key, label]) => {
+      const [example, type] = fieldOptions[key];
+      const control = boundField(entry, key, label + (key === "followUp" ? " (jika diperlukan)" : ""), type,
+        () => save(), false);
+      control.querySelector("input, textarea").placeholder = "Contoh · " + example;
+      return [key, control];
+    }));
+    const documents = dom("details", { className: "narrative-editor", open: Boolean(entry.reference?.trim()) },
+      dom("summary", {}, "Tambahkan rujukan dokumen (opsional)"),
+      dom("p", { className: "hint" }, "Isi jika ada dokumen atau butir daftar simak yang mendukung temuan atau hasil uji."), controls.get("reference"));
+    controls.get("location").querySelector("input").dataset.fireLocation = "";
+    return dom("fieldset", { className: "link-entry" }, dom("legend"), controls.get("location"), controls.get("observation"),
+      sectionPhotoEditor(entry, "Unggah foto lokasi", () => isAttached() && facility.locations.includes(entry)),
+      controls.get("followUp"), documents, button("Hapus lokasi", removeLocation, "quiet"));
+  }
+
+  function facilityCard(facility) {
+    const entries = dom("div", { className: "appearance-sections" });
+    const rowTitles = () => [...entries.children].forEach((card, index) => {
+      card.querySelector("legend").textContent = "Pemeriksaan " + (index + 1);
+    });
+    const add = button("＋ Tambah lokasi", () => {
+      const entry = {};
+      facility.locations.push(entry);
+      append(entry);
+      rowTitles();
+      save();
+      entries.lastElementChild.querySelector("input").focus();
+    });
+    function append(entry) {
+      const card = locationCard(facility, entry, () => {
+        if (hasFireLocationContent(entry) && !confirm("Hapus lokasi ini beserta catatan dan fotonya?")) return;
+        facility.locations.splice(facility.locations.indexOf(entry), 1);
+        photoEditors.delete(entry);
+        card.remove();
+        rowTitles();
+        save();
+        add.focus();
+      });
+      entries.append(card);
+    }
+    facility.locations.forEach(append);
+    rowTitles();
+    return dom("section", { className: "link-entry appearance-sections" },
+      dom("h4", {}, facility.name), entries, dom("div", { className: "button-row" }, add));
+  }
+
+  const sections = new Map();
+  const names = [...new Map([...presets, ...facilities.map(facility => facility.name)]
+    .map(name => [tokenName(name), name])).values()];
+  const { fieldset, sync } = narrativeChoiceCheckboxes("Sarana yang diperiksa", names, (name, checked) => {
+    let facility = byName(name);
+    if (!facility) {
+      facility = { name, selected: false, locations: [{}] };
+      facilities.push(facility);
+      sets.set(tokenName(name), facility);
+    }
+    facility.selected = checked;
+    show(facility);
+    block.fireInspections = facilities;
+    save();
+  });
+  function show(facility) {
+    if (!sections.has(facility) && facility.selected) {
+      const section = facilityCard(facility);
+      sections.set(facility, section);
+      cards.append(section);
+    }
+    if (sections.has(facility)) sections.get(facility).hidden = !facility.selected;
+  }
+
+  const custom = dom("input", { type: "text", maxLength: 120, placeholder: "Misalnya detektor asap" });
+  const feedback = dom("p", { className: "hint", role: "status" });
+  function addFacility() {
+    const name = custom.value.trim().replace(/\s+/g, " ");
+    if (!name || names.some(choice => tokenName(choice) === tokenName(name))) {
+      feedback.textContent = name ? "Sarana ini sudah ada di daftar pilihan." : "Isi nama sarana terlebih dahulu.";
+      custom.focus();
+      return;
+    }
+    facilities.push({ name, selected: true, locations: [{}] });
+    block.fireInspections = facilities;
+    save();
+    render();
+    const locations = $("fire-inspections-" + block.sourceId).querySelectorAll("[data-fire-location]");
+    locations[locations.length - 1]?.focus();
+  }
+  custom.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); addFacility(); }
+  });
+  sync(selected());
+  facilities.forEach(show);
+  return dom("div", { id: "fire-inspections-" + block.sourceId, className: "appearance-sections" },
+    dom("p", { className: "hint" }, "Pilih sarana, lalu tambah satu pemeriksaan untuk setiap lokasi. Melepas centang menyembunyikan catatan sarana dan menyimpan isiannya."),
+    fieldset, dom("details", { className: "narrative-editor" }, dom("summary", {}, "Tambah sarana lain"),
+      dom("label", {}, "Nama sarana", custom), button("Tambah sarana", addFacility), feedback), cards);
+}
+
 function mepSafetyEditor(chapter, parent, sources) {
   const { parameters, end } = mepSafetyParameters(chapter, parent);
   const choices = dom("fieldset", { className: "scope-options" }, dom("legend", {}, "Parameter keselamatan yang dikaji"));
@@ -2361,6 +2473,15 @@ function blockEditor(chapter, block, index, headingInfo, sources) {
     const isAttached = () => workspace.projects.includes(project) && project.chapters.includes(chapter) && chapter.blocks.includes(block);
     if (block.mepSafety) {
       wrapper.append(mepSafetyEditor(chapter, block, sources));
+    } else if (isFireProtection(block)) {
+      wrapper.append(fireProtectionEditor(block, isAttached));
+      if (hasLegacyFireProtection(block)) {
+        const previous = dom("details", { className: "narrative-editor" }, dom("summary", {}, "Lihat atau ubah catatan sebelumnya"));
+        previous.addEventListener("toggle", () => {
+          if (previous.open && previous.childElementCount === 1) previous.append(linked("body", "Isi subbab"));
+        });
+        wrapper.append(previous);
+      }
     } else if (tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents) {
       wrapper.append(structureComponentsEditor(block, isAttached));
       if (hasLegacyStructureInspection(block)) {
@@ -2496,6 +2617,19 @@ function validateBackup(data) {
           clean.structureComponents = block.structureComponents
             .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
             .map((entry) => restorePhotos(pickText(entry, ["id", ...keys]), entry));
+        }
+        if (Array.isArray(block.fireInspections)) {
+          const seen = new Set();
+          clean.fireInspections = block.fireInspections.flatMap(facility => {
+            if (typeof facility?.name !== "string" || !facility.name.trim() || !Array.isArray(facility.locations)) return [];
+            const name = facility.name.trim();
+            const key = tokenName(name);
+            if (seen.has(key)) return [];
+            seen.add(key);
+            return [{ name, selected: facility.selected === true,
+              locations: facility.locations.filter(entry => entry && typeof entry === "object" && !Array.isArray(entry))
+                .map(entry => restorePhotos(pickText(entry, fireLocationFields.map(([field]) => field)), entry)) }];
+          });
         }
         if (Array.isArray(block.appearanceSections)) {
           const keys = [...appearanceSectionFields.map(([key]) => key), "evidence"];

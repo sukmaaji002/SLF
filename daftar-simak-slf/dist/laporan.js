@@ -126,6 +126,29 @@ function reportParagraphs(text, format, resolveToken) {
   return paragraphs;
 }
 
+const fireLocationFields = [
+  ["location", "Lokasi"],
+  ["observation", "Catatan temuan"],
+  ["followUp", "Rekomendasi tindak lanjut"],
+  ["reference", "Rujukan dokumen"],
+];
+
+function isFireProtection(block) {
+  return block.type === "heading" && (block.mepSafetyPreset === "Proteksi kebakaran" ||
+    tokenName(block.text) === "proteksi kebakaran" || Array.isArray(block.fireInspections));
+}
+
+function hasLegacyFireProtection(block) {
+  const text = block.body?.trim();
+  return Boolean(text && (Object.values(block.links ?? {}).some(link => link?.value?.trim() || link?.source) ||
+    (text !== contextualNarrative("Proteksi kebakaran") && text !== contextualNarratives["Proteksi kebakaran"].previous &&
+      text !== "[Catat sistem pasif, aktif, dan sarana evakuasi yang diperiksa.]")));
+}
+
+function hasFireLocationContent(entry) {
+  return Boolean(entry.photos?.length || fireLocationFields.some(([key]) => entry[key]?.trim()));
+}
+
 const structureComponentFields = [
   ["component", "Komponen", "Kolom K-03"],
   ["location", "Lokasi", "Koridor lantai dasar"],
@@ -603,7 +626,28 @@ async function buildReport(target, project, urls, { trial = false } = {}) {
         section.append(...reportParagraphs(introductionText(chapter, block)));
         const structureInspection = tokenName(block.text) === "pemeriksaan elemen struktur" || block.structureComponents;
         const structureTesting = isStructureTesting(block);
-        if (block.mepSafety) {
+        if (isFireProtection(block)) {
+          for (const [facilityIndex, facility] of (block.fireInspections ?? []).entries()) {
+            if (!facility.selected) continue;
+            for (const [locationIndex, entry] of facility.locations.entries()) {
+              if (!hasFireLocationContent(entry)) continue;
+              const location = entry.location?.trim() || "Lokasi " + (locationIndex + 1);
+              section.append(dom("h5", {}, facility.name + " · " + location));
+              for (const [key, label] of fireLocationFields.slice(1)) {
+                const value = entry[key]?.trim();
+                if (value) section.append(...reportParagraphs(label + " — " + value));
+              }
+              appendPhotos(section, (entry.photos ?? []).map((photo, photoIndex) =>
+                [photo, id + "-fire-" + facilityIndex + "-" + locationIndex + "-photo-" + photoIndex]));
+            }
+          }
+          if (hasLegacyFireProtection(block)) {
+            if (block.fireInspections?.some(facility => facility.selected && facility.locations.some(hasFireLocationContent))) {
+              section.append(dom("h5", {}, "Catatan pemeriksaan sebelumnya"));
+            }
+            section.append(...reportParagraphs(block.body, getTextFormat(block, "body"), resolveToken(block.links)));
+          }
+        } else if (block.mepSafety) {
           section.append(...mepSafetySummary(chapter, block, resolveToken(block.links)));
         } else if (isStructureConclusion(block)) {
           section.append(...structureConclusionContent(chapter, block, sources));
